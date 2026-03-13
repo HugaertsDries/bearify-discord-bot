@@ -9,7 +9,7 @@ import java.lang.annotation.*;
  * Works like Spring MVC's {@code @ControllerAdvice}.
  *
  * <pre>{@code
- * @DiscordControllerAdvice
+ * @CommandAdvice
  * public class GlobalExceptionHandler {
  *
  *     @HandleException(RuntimeException.class)
@@ -23,6 +23,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Component
-public @interface DiscordControllerAdvice {
+public @interface CommandAdvice {
     String value() default "";
 }
