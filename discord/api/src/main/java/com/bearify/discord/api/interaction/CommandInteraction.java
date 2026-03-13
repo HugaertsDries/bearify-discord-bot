@@ -8,5 +8,7 @@ public interface CommandInteraction {
 
     String getName();
 
+    EditableMessage defer();
+
     ReplyBuilder reply(String message);
 }
