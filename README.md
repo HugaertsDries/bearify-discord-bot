@@ -25,9 +25,9 @@ flowchart TD
 
 | Module | Description |
 |---|---|
-| [`discord-api`](discord-api/README.md) | Pure Java interfaces — `DiscordClient`, `CommandInteraction`, `ReplyBuilder` |
-| [`discord-starter`](discord-starter/README.md) | Spring Boot auto-configuration — `@Command`, `@Interaction`, `@DiscordControllerAdvice` |
-| [`discord-jda`](discord-jda/README.md) | JDA 5 implementation of `discord-api` |
+| [`discord/api`](discord/api/README.md) | Pure Java interfaces — `DiscordClient`, `CommandInteraction`, `ReplyBuilder` |
+| [`discord/jda`](discord/jda/README.md) | JDA 5 implementation of `discord-api` |
+| [`discord/starter`](discord/starter/README.md) | Spring Boot auto-configuration — `@Command`, `@Interaction`, `@DiscordControllerAdvice` |
 | [`shared`](shared/README.md) | Shared DTOs — `Track`, `PlayerCommand`, `PlayerEvent` |
 | [`controller`](controller/README.md) | Main bot application |
 | [`player`](player/README.md) | Audio player agent |
@@ -49,7 +49,6 @@ flowchart TD
 
 **1. Start infrastructure:**
 ```bash
-cd infra
 docker-compose up -d
 ```
 

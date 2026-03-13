@@ -1,8 +1,8 @@
 rootProject.name = 'bearify-discord-bot'
 
-include 'discord-api'
-include 'discord-starter'
-include 'discord-jda'
+include 'discord:api'
+include 'discord:jda'
+include 'discord:starter'
 include 'shared'
 include 'controller'
 include 'player'

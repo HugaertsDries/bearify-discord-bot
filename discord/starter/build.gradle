@@ -1,7 +1,7 @@
 apply plugin: 'java-library'
 
 dependencies {
-    api project(':discord-api')
+    api project(':discord:api')
     implementation 'org.springframework.boot:spring-boot-autoconfigure'
     implementation 'org.slf4j:slf4j-api'
     implementation 'jakarta.validation:jakarta.validation-api'
