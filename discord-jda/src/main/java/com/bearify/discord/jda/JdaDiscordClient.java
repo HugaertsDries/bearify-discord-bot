@@ -1,0 +1,71 @@
+package com.bearify.discord.jda;
+
+import com.bearify.discord.api.gateway.DiscordClient;
+import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.model.CommandDefinition;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
+import net.dv8tion.jda.api.interactions.commands.build.Commands;
+
+import java.util.List;
+import java.util.function.Consumer;
+
+/**
+ * JDA-backed implementation of {@link DiscordClient}.
+ */
+class JdaDiscordClient implements DiscordClient {
+
+    private final List<CommandDefinition> commands;
+    private final Consumer<CommandInteraction> interactionHandler;
+    private JDA jda;
+
+    JdaDiscordClient(List<CommandDefinition> commands, Consumer<CommandInteraction> interactionHandler) {
+        this.commands = commands;
+        this.interactionHandler = interactionHandler;
+    }
+
+    @Override
+    public void start(String token) {
+        connect(token);
+        jda.updateCommands().addCommands(toCommandData()).queue();
+    }
+
+    @Override
+    public void start(String token, String guildId) {
+        connect(token);
+        var guild = jda.getGuildById(guildId);
+        if (guild == null) {
+            throw new IllegalStateException("Guild not found: " + guildId);
+        }
+        guild.updateCommands().addCommands(toCommandData()).queue();
+    }
+
+    @Override
+    public void shutdown() {
+        if (jda != null) {
+            jda.shutdown();
+        }
+    }
+
+    private void connect(String token) {
+        try {
+            jda = JDABuilder.createDefault(token)
+                    .addEventListeners(new JdaEventListener(interactionHandler))
+                    .build();
+            jda.awaitReady();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while waiting for JDA to be ready", e);
+        }
+    }
+
+    private List<CommandData> toCommandData() {
+        return commands.stream()
+                .map(def -> {
+                    String description = def.description().isBlank() ? "No description provided" : def.description();
+                    return (CommandData) Commands.slash(def.name(), description);
+                })
+                .toList();
+    }
+}

@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(':discord-starter')
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    implementation 'net.dv8tion:JDA:5.3.0'
+}

@@ -1,0 +1,11 @@
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+    implementation project(':discord-starter')
+    implementation project(':discord-jda')
+    implementation project(':shared')
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'io.github.cdimascio:dotenv-java:3.1.0'
+}

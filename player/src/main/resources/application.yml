@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: bearify-player
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+player:
+  id: ${PLAYER_ID:player-1}
+
+discord:
+  token: ${DISCORD_PLAYER_TOKEN}
+  guild-id: ${DISCORD_GUILD_ID}

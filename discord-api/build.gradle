@@ -1,0 +1,3 @@
+// Pure Java — no framework dependencies.
+// This module defines the abstraction over any Discord library.
+dependencies {}
