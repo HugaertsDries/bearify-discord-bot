@@ -3,10 +3,13 @@ package com.bearify.discord.jda;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
+import com.bearify.discord.api.model.OptionDefinition;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -15,6 +18,8 @@ import java.util.function.Consumer;
  * JDA-backed implementation of {@link DiscordClient}.
  */
 class JdaDiscordClient implements DiscordClient {
+
+    private static final String NO_DESCRIPTION = "No description provided";
 
     private final List<CommandDefinition> commands;
     private final Consumer<CommandInteraction> interactionHandler;
@@ -63,9 +68,16 @@ class JdaDiscordClient implements DiscordClient {
     private List<CommandData> toCommandData() {
         return commands.stream()
                 .map(def -> {
-                    String description = def.description().isBlank() ? "No description provided" : def.description();
-                    return (CommandData) Commands.slash(def.name(), description);
+                    String description = def.description().isBlank() ? NO_DESCRIPTION : def.description();
+                    List<OptionData> options = def.options().stream().map(this::toOptionData).toList();
+                    return (CommandData) Commands.slash(def.name(), description).addOptions(options);
                 })
                 .toList();
+    }
+
+    private OptionData toOptionData(OptionDefinition option) {
+        OptionType jdaType = OptionType.valueOf(option.type().name());
+        String description = option.description().isBlank() ? NO_DESCRIPTION : option.description();
+        return new OptionData(jdaType, option.name(), description, option.required());
     }
 }

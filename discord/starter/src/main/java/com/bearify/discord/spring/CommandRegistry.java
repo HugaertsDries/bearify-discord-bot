@@ -2,7 +2,10 @@ package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
+import com.bearify.discord.api.model.OptionDefinition;
+import com.bearify.discord.api.model.OptionDefinition.OptionType;
 import com.bearify.discord.spring.annotation.Interaction;
+import com.bearify.discord.spring.annotation.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +19,18 @@ import java.util.*;
 public class CommandRegistry {
 
     private static final Logger LOG = LoggerFactory.getLogger(CommandRegistry.class);
+
+    private static final Map<Class<?>, OptionType> OPTION_TYPES = new HashMap<>();
+
+    static {
+        OPTION_TYPES.put(String.class, OptionType.STRING);
+        OPTION_TYPES.put(int.class, OptionType.INTEGER);
+        OPTION_TYPES.put(Integer.class, OptionType.INTEGER);
+        OPTION_TYPES.put(long.class, OptionType.INTEGER);
+        OPTION_TYPES.put(Long.class, OptionType.INTEGER);
+        OPTION_TYPES.put(boolean.class, OptionType.BOOLEAN);
+        OPTION_TYPES.put(Boolean.class, OptionType.BOOLEAN);
+    }
 
     private final Map<String, CommandHandler> handlers = new HashMap<>();
     private final List<CommandDefinition> definitions = new ArrayList<>();
@@ -35,7 +50,7 @@ public class CommandRegistry {
         }
 
         handlers.put(name, new CommandHandler(bean, method));
-        definitions.add(new CommandDefinition(name, annotation.description()));
+        definitions.add(new CommandDefinition(name, annotation.description(), scanOptions(method)));
         LOG.info("Registered command '{}'", name);
     }
 
@@ -54,5 +69,29 @@ public class CommandRegistry {
         } catch (RuntimeException e) {
             exceptionHandlerRegistry.handle(interaction, e);
         }
+    }
+
+    private List<OptionDefinition> scanOptions(Method method) {
+        return Arrays.stream(method.getParameters())
+                .filter(param -> param.isAnnotationPresent(Option.class))
+                .map(param -> {
+                    Option option = param.getAnnotation(Option.class);
+                    return new OptionDefinition(
+                            option.name(),
+                            option.description(),
+                            inferType(param.getType(), method),
+                            option.required()
+                    );
+                })
+                .toList();
+    }
+
+    private OptionType inferType(Class<?> type, Method method) {
+        OptionType optionType = OPTION_TYPES.get(type);
+        if (optionType == null) {
+            throw new IllegalStateException(
+                    "Unsupported @Option parameter type '" + type.getName() + "' in " + method);
+        }
+        return optionType;
     }
 }
