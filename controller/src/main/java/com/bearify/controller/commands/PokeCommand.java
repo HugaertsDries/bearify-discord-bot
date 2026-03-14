@@ -7,6 +7,7 @@ import com.bearify.discord.spring.annotation.Command;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.Option;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LongSummaryStatistics;
@@ -16,6 +17,12 @@ public class PokeCommand {
 
     private static final long THRESHOLD_GREEN  = 300;
     private static final long THRESHOLD_YELLOW = 600;
+
+    private final Clock clock;
+
+    public PokeCommand(Clock clock) {
+        this.clock = clock;
+    }
 
     @SuppressWarnings("unused")
     @Interaction(value = "poke", description = "Poke the bear. Dare you.")
@@ -28,9 +35,9 @@ public class PokeCommand {
         handle.edit(cb.toString());
 
         for (int i = 0; i < pokes; i++) {
-            Instant start = Instant.now();
+            Instant start = clock.instant();
             handle.edit(cb.toString()); // round-trip edit to measure latency
-            long ms = Duration.between(start, Instant.now()).toMillis();
+            long ms = Duration.between(start, clock.instant()).toMillis();
             stats.accept(ms);
 
             cb.newline().append(String.format("🐾  #%2d  %6dms  %s", i + 1, ms, indicator(ms)));

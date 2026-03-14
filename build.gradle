@@ -44,6 +44,14 @@ subprojects {
         options.compilerArgs << '-parameters'
     }
 
+    dependencies {
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+
+    tasks.named('test') {
+        useJUnitPlatform()
+    }
+
     repositories {
         mavenCentral()
     }

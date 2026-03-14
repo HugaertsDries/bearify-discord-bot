@@ -5,13 +5,20 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.MapPropertySource;
 
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 
 @SpringBootApplication
 public class Application {
+
+    @Bean
+    Clock clock() {
+        return Clock.systemDefaultZone();
+    }
 
     public static void main(String[] args) {
         SpringApplication app = new SpringApplication(Application.class);
