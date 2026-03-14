@@ -3,6 +3,8 @@ package com.bearify.discord.spring;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
+import com.bearify.discord.api.model.SubcommandDefinition;
+import com.bearify.discord.spring.annotation.Command;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.Option;
 import com.bearify.discord.testing.MockCommandInteraction;
@@ -18,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommandRegistryTest {
 
+    @Command
     static class TestController {
         @Interaction(value = "greet", description = "Say hello")
         void greet(CommandInteraction interaction) {
@@ -32,6 +35,19 @@ class CommandRegistryTest {
         @Interaction(value = "crash", description = "Always throws")
         void crash(CommandInteraction interaction) {
             throw new RuntimeException("boom");
+        }
+    }
+
+    @Command(value = "music", description = "Music commands")
+    static class MusicController {
+        @Interaction(value = "play", description = "Play a song")
+        void play(CommandInteraction interaction) {
+            interaction.reply("Playing!").send();
+        }
+
+        @Interaction(value = "stop", description = "Stop playback")
+        void stop(CommandInteraction interaction) {
+            interaction.reply("Stopped.").send();
         }
     }
 
@@ -76,12 +92,12 @@ class CommandRegistryTest {
     }
 
     @Test
-    void dispatchesInteractionToRegisteredHandler() throws NoSuchMethodException {
+    void handlesCommandInteraction() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("greet", CommandInteraction.class);
         registry.register(method.getAnnotation(Interaction.class), new TestController(), method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("greet").build();
-        registry.dispatch(interaction);
+        registry.handle(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo("Hi!");
@@ -123,17 +139,64 @@ class CommandRegistryTest {
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("crash").build();
 
-        assertThatNoException().isThrownBy(() -> registry.dispatch(interaction));
+        assertThatNoException().isThrownBy(() -> registry.handle(interaction));
     }
 
     @Test
     void repliesEphemeralWhenCommandIsUnknown() {
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("unknown").build();
-        registry.dispatch(interaction);
+        registry.handle(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().getContent()).contains("not supported");
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
         assertThat(interaction.getReplies().getFirst().isSent()).isTrue();
+    }
+
+    // --- SUBCOMMAND GROUPS ---
+
+    @Test
+    void groupsInteractionsIntoSubcommandDefinition() throws NoSuchMethodException {
+        Method playMethod = MusicController.class.getDeclaredMethod("play", CommandInteraction.class);
+        Method stopMethod = MusicController.class.getDeclaredMethod("stop", CommandInteraction.class);
+        MusicController bean = new MusicController();
+
+        registry.register(playMethod.getAnnotation(Interaction.class), bean, playMethod);
+        registry.register(stopMethod.getAnnotation(Interaction.class), bean, stopMethod);
+
+        assertThat(registry.getDefinitions()).hasSize(1);
+        CommandDefinition def = registry.getDefinitions().getFirst();
+        assertThat(def.name()).isEqualTo("music");
+        assertThat(def.options()).isEmpty();
+        assertThat(def.subcommands()).hasSize(2);
+        assertThat(def.subcommands().stream().map(SubcommandDefinition::name))
+                .containsExactlyInAnyOrder("play", "stop");
+    }
+
+    @Test
+    void handlesSubcommandInteraction() throws NoSuchMethodException {
+        Method playMethod = MusicController.class.getDeclaredMethod("play", CommandInteraction.class);
+        registry.register(playMethod.getAnnotation(Interaction.class), new MusicController(), playMethod);
+
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("music")
+                .subcommand("play")
+                .build();
+        registry.handle(interaction);
+
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo("Playing!");
+    }
+
+    @Test
+    void rejectsDuplicateSubcommandName() throws NoSuchMethodException {
+        Method method = MusicController.class.getDeclaredMethod("play", CommandInteraction.class);
+        Interaction annotation = method.getAnnotation(Interaction.class);
+        MusicController bean = new MusicController();
+
+        registry.register(annotation, bean, method);
+
+        assertThatThrownBy(() -> registry.register(annotation, bean, method))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("music/play");
     }
 }

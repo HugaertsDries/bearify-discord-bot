@@ -14,19 +14,26 @@ public class MockCommandInteraction implements CommandInteraction {
 
     private final String name;
     private final Map<String, String> options;
+    private final String subcommandName;
+    private final String voiceChannelId;
+    private final String guildId;
     private MockEditableMessage deferredMessage;
     private boolean deferredEphemeral = false;
     private final List<MockReplyBuilder> replies = new ArrayList<>();
 
-    private MockCommandInteraction(String name, Map<String, String> options) {
+    private MockCommandInteraction(String name, Map<String, String> options, String subcommandName,
+                                   String voiceChannelId, String guildId) {
         this.name = name;
         this.options = Map.copyOf(options);
+        this.subcommandName = subcommandName;
+        this.voiceChannelId = voiceChannelId;
+        this.guildId = guildId;
     }
 
     @Override
     public EditableMessage defer() {
         this.deferredMessage = new MockEditableMessage();
-        this.deferredEphemeral = true;
+        this.deferredEphemeral = false;
         return deferredMessage;
     }
 
@@ -45,6 +52,21 @@ public class MockCommandInteraction implements CommandInteraction {
     @Override
     public Optional<String> getOption(String name) {
         return Optional.ofNullable(options.get(name));
+    }
+
+    @Override
+    public Optional<String> getSubcommandName() {
+        return Optional.ofNullable(subcommandName);
+    }
+
+    @Override
+    public Optional<String> getVoiceChannelId() {
+        return Optional.ofNullable(voiceChannelId);
+    }
+
+    @Override
+    public Optional<String> getGuildId() {
+        return Optional.ofNullable(guildId);
     }
 
     public Optional<MockEditableMessage> getDeferredMessage() {
@@ -66,6 +88,9 @@ public class MockCommandInteraction implements CommandInteraction {
     public static class Builder {
         private final String name;
         private final Map<String, String> options = new HashMap<>();
+        private String subcommandName;
+        private String voiceChannelId;
+        private String guildId;
 
         private Builder(String name) {
             this.name = name;
@@ -76,8 +101,23 @@ public class MockCommandInteraction implements CommandInteraction {
             return this;
         }
 
+        public Builder subcommand(String subcommandName) {
+            this.subcommandName = subcommandName;
+            return this;
+        }
+
+        public Builder voiceChannelId(String voiceChannelId) {
+            this.voiceChannelId = voiceChannelId;
+            return this;
+        }
+
+        public Builder guildId(String guildId) {
+            this.guildId = guildId;
+            return this;
+        }
+
         public MockCommandInteraction build() {
-            return new MockCommandInteraction(name, options);
+            return new MockCommandInteraction(name, options, subcommandName, voiceChannelId, guildId);
         }
     }
 }

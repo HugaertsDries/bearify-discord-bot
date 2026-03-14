@@ -10,6 +10,8 @@ import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
+import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -69,6 +71,16 @@ class JdaDiscordClient implements DiscordClient {
         return commands.stream()
                 .map(def -> {
                     String description = def.description().isBlank() ? NO_DESCRIPTION : def.description();
+                    if (!def.subcommands().isEmpty()) {
+                        SlashCommandData group = Commands.slash(def.name(), description);
+                        def.subcommands().forEach(sub -> {
+                            SubcommandData subData = new SubcommandData(sub.name(),
+                                    sub.description().isBlank() ? NO_DESCRIPTION : sub.description());
+                            sub.options().stream().map(this::toOptionData).forEach(subData::addOptions);
+                            group.addSubcommands(subData);
+                        });
+                        return group;
+                    }
                     List<OptionData> options = def.options().stream().map(this::toOptionData).toList();
                     return (CommandData) Commands.slash(def.name(), description).addOptions(options);
                 })

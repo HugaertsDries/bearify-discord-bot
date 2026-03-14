@@ -18,7 +18,7 @@ class CommandExceptionHandler {
         this.method.setAccessible(true);
     }
 
-    void invoke(CommandInteraction interaction, Throwable exception) {
+    void handle(CommandInteraction interaction, Throwable exception) {
         try {
             method.invoke(bean, interaction, exception);
         } catch (Exception e) {

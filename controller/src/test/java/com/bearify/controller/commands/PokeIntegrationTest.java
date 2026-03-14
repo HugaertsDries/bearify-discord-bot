@@ -19,7 +19,7 @@ class PokeIntegrationTest extends AbstractControllerIntegrationTest {
     void handlesPokeInteraction() {
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("poke").build();
 
-        registry.dispatch(interaction);
+        registry.handle(interaction);
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())

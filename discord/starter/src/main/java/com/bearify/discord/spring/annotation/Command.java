@@ -32,4 +32,5 @@ import java.lang.annotation.*;
 @Component
 public @interface Command {
     String value() default "";
+    String description() default "";
 }

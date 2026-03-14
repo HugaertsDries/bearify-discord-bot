@@ -24,7 +24,7 @@ public class CommandExceptionHandlerRegistry {
         while (type != null && type != Object.class) {
             CommandExceptionHandler handler = handlers.get(type);
             if (handler != null) {
-                handler.invoke(interaction, exception);
+                handler.handle(interaction, exception);
                 return;
             }
             type = type.getSuperclass();

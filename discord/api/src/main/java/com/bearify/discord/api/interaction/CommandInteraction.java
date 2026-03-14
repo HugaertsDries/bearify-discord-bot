@@ -12,7 +12,14 @@ public interface CommandInteraction {
 
     ReplyBuilder reply(String message);
 
+    Optional<String> getOption(String name);
+
     String getName();
 
-    Optional<String> getOption(String name);
+    Optional<String> getSubcommandName();
+
+    Optional<String> getGuildId();
+
+    Optional<String> getVoiceChannelId();
+
 }

@@ -42,7 +42,7 @@ public class DiscordAutoConfiguration {
 
     @Bean
     public DiscordClient discordClient(DiscordClientFactory factory, CommandRegistry registry) {
-        return factory.create(registry.getDefinitions(), registry::dispatch);
+        return factory.create(registry.getDefinitions(), registry::handle);
     }
 
     @Bean
