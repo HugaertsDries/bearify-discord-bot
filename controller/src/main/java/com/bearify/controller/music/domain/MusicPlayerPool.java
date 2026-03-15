@@ -22,23 +22,21 @@ public class MusicPlayerPool {
     }
 
     public Optional<MusicPlayer> acquire(String guildId, String voiceChannelId) {
-        Optional<String> existingPlayerId = allocator.findAssignedTo(guildId, voiceChannelId);
-        if (existingPlayerId.isPresent()) {
-            return existingPlayerId.map(playerId -> player(playerId, guildId, voiceChannelId));
-        }
+        return allocator
+                .findAssignedTo(guildId, voiceChannelId)
+                .map(playerId -> player(playerId, guildId, voiceChannelId))
+                .or(() -> claim(guildId,voiceChannelId));
+    }
 
-        Optional<String> playerId = allocator.claim();
-        if (playerId.isEmpty()) {
-            return Optional.empty();
-        }
-
-        if (allocator.assign(guildId, voiceChannelId, playerId.orElseThrow())) {
-            return playerId.map(value -> player(value, guildId, voiceChannelId));
-        }
-
-        allocator.release(playerId.orElseThrow());
-        return allocator.findAssignedTo(guildId, voiceChannelId)
-                .map(value -> player(value, guildId, voiceChannelId));
+    private Optional<MusicPlayer> claim(String guildId, String voiceChannelId) {
+        return allocator.claim().flatMap(playerId -> {
+            if(allocator.assign(guildId, voiceChannelId, playerId)) {
+                return Optional.of(player(playerId, guildId, voiceChannelId));
+            } else {
+                allocator.release(playerId);
+                return acquire(guildId, voiceChannelId);
+            }
+        });
     }
 
     private MusicPlayer player(String playerId, String guildId, String voiceChannelId) {
