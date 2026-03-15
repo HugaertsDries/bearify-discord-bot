@@ -1,0 +1,142 @@
+package com.bearify.controller.music.discord;
+
+import com.bearify.controller.AbstractControllerIntegrationTest;
+import com.bearify.discord.spring.CommandRegistry;
+import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.shared.events.PlayerInteraction;
+import com.bearify.shared.player.PlayerMessageCodec;
+import com.bearify.shared.player.PlayerRedisProtocol;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegrationTest {
+
+    private static final String VOICE_CHANNEL_ID = "vc-123";
+    private static final String GUILD_ID = "guild-456";
+    private static final String PLAYER_ID = "player-1";
+
+    @Autowired CommandRegistry commandRegistry;
+    @Autowired RedisConnectionFactory redisConnectionFactory;
+    @Autowired org.springframework.data.redis.core.StringRedisTemplate redis;
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    @BeforeEach
+    void seedPlayer() {
+        redis.delete(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY);
+        redis.delete(PlayerRedisProtocol.assignmentKey(GUILD_ID, VOICE_CHANNEL_ID));
+        redis.opsForSet().add(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY, PLAYER_ID);
+    }
+
+    // --- HAPPY PATH ---
+
+    @Test
+    void dispatchesSummonAndClaimsPlayer() {
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                .subcommand("join")
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .guildId(GUILD_ID)
+                .build();
+
+        commandRegistry.handle(interaction);
+
+        assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY, PLAYER_ID)).isFalse();
+        assertThat(interaction.getDeferredMessage()).isPresent();
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("Bearify is padding over to your voice channel");
+    }
+
+    @Test
+    void publishesConnectCommandToPlayerChannel() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(redisConnectionFactory);
+        container.addMessageListener(
+                (message, pattern) -> received.offer(new String(message.getBody())),
+                new ChannelTopic(PlayerRedisProtocol.commandChannel(PLAYER_ID)));
+        container.afterPropertiesSet();
+        container.start();
+
+        try {
+            MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                    .subcommand("join")
+                    .voiceChannelId(VOICE_CHANNEL_ID)
+                    .guildId(GUILD_ID)
+                    .build();
+
+            commandRegistry.handle(interaction);
+
+            String json = received.poll(2, TimeUnit.SECONDS);
+            assertThat(json).isNotNull();
+
+            PlayerInteraction command = PlayerMessageCodec.readCommand(objectMapper, json.getBytes());
+            assertThat(command).isInstanceOf(PlayerInteraction.Connect.class);
+            PlayerInteraction.Connect connect = (PlayerInteraction.Connect) command;
+            assertThat(connect.playerId()).isEqualTo(PLAYER_ID);
+            assertThat(connect.requestId()).isNotBlank();
+            assertThat(connect.voiceChannelId()).isEqualTo(VOICE_CHANNEL_ID);
+            assertThat(connect.guildId()).isEqualTo(GUILD_ID);
+        } finally {
+            container.stop();
+        }
+    }
+
+    // --- EDGE CASES ---
+
+    @Test
+    void showsDeferredMessageWhenNoPlayerAvailable() {
+        redis.delete(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY);
+
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                .subcommand("join")
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .guildId(GUILD_ID)
+                .build();
+
+        commandRegistry.handle(interaction);
+
+        assertThat(interaction.getDeferredMessage()).isPresent();
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("No music bears are free right now");
+    }
+
+    @Test
+    void reusesAssignedPlayerForSameVoiceChannel() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.assignmentKey(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(redisConnectionFactory);
+        container.addMessageListener(
+                (message, pattern) -> received.offer(new String(message.getBody())),
+                new ChannelTopic(PlayerRedisProtocol.commandChannel(PLAYER_ID)));
+        container.afterPropertiesSet();
+        container.start();
+
+        try {
+            MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                    .subcommand("join")
+                    .voiceChannelId(VOICE_CHANNEL_ID)
+                    .guildId(GUILD_ID)
+                    .build();
+
+            commandRegistry.handle(interaction);
+
+            String json = received.poll(2, TimeUnit.SECONDS);
+            assertThat(json).isNotNull();
+            assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY, PLAYER_ID)).isTrue();
+        } finally {
+            container.stop();
+        }
+    }
+}

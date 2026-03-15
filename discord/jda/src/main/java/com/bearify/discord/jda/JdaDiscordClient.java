@@ -1,11 +1,17 @@
 package com.bearify.discord.jda;
 
 import com.bearify.discord.api.gateway.DiscordClient;
+import com.bearify.discord.api.gateway.GuildClient;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
+import com.sedmelluq.discord.lavaplayer.jdaudp.NativeAudioSendFactory;
+import moe.kyokobot.libdave.NativeDaveFactory;
+import moe.kyokobot.libdave.jda.LDJDADaveSessionFactory;
+import moe.kyokobot.libdave.netty.NativeNettyDaveFactory;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.audio.AudioModuleConfig;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -19,13 +25,13 @@ import java.util.function.Consumer;
 /**
  * JDA-backed implementation of {@link DiscordClient}.
  */
-class JdaDiscordClient implements DiscordClient {
+public class JdaDiscordClient implements DiscordClient {
 
     private static final String NO_DESCRIPTION = "No description provided";
 
     private final List<CommandDefinition> commands;
     private final Consumer<CommandInteraction> interactionHandler;
-    private JDA jda;
+    public JDA jda;
 
     JdaDiscordClient(List<CommandDefinition> commands, Consumer<CommandInteraction> interactionHandler) {
         this.commands = commands;
@@ -49,6 +55,14 @@ class JdaDiscordClient implements DiscordClient {
     }
 
     @Override
+    public GuildClient guild(String guildId) {
+        if (jda == null) {
+            throw new IllegalStateException("Discord client has not been started");
+        }
+        return new JdaGuildClient(jda, guildId);
+    }
+
+    @Override
     public void shutdown() {
         if (jda != null) {
             jda.shutdown();
@@ -57,8 +71,12 @@ class JdaDiscordClient implements DiscordClient {
 
     private void connect(String token) {
         try {
+            var audio = new AudioModuleConfig();
+            audio = audio.withDaveSessionFactory(new LDJDADaveSessionFactory(new NativeDaveFactory()));
+//            audio = audio.withAudioSendFactory(new NativeAudioSendFactory());
             jda = JDABuilder.createDefault(token)
                     .addEventListeners(new JdaEventListener(interactionHandler))
+                    .setAudioModuleConfig(audio)
                     .build();
             jda.awaitReady();
         } catch (InterruptedException e) {

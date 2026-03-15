@@ -1,4 +1,4 @@
-package com.bearify.controller.commands;
+package com.bearify.controller.misc.discord;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.discord.spring.CommandRegistry;
@@ -21,7 +21,7 @@ class PokeIntegrationTest extends AbstractControllerIntegrationTest {
 
         registry.handle(interaction);
 
-        assertThat(interaction.isDeferredEphemeral()).isTrue();
+        assertThat(interaction.isDeferredEphemeral()).isFalse();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                 .contains("pokes survived");
     }

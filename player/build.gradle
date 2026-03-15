@@ -1,16 +1,17 @@
 apply plugin: 'org.springframework.boot'
 
 dependencies {
+    implementation project(':discord:starter')
+    implementation project(':discord:jda')
     implementation project(':shared')
-    implementation 'org.springframework.boot:spring-boot-starter'
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    implementation 'dev.arbjerg:lavaplayer:2.2.2'
-    implementation 'net.dv8tion:JDA:5.3.0'
-    implementation 'io.github.cdimascio:dotenv-java:3.1.0'
-    implementation 'org.springframework.boot:spring-boot-starter-json'
+    implementation libs.spring.boot.starter
+    implementation libs.spring.boot.starter.data.redis
+    implementation libs.jda
+    implementation libs.dotenv.java
+    implementation libs.spring.boot.starter.json
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.testcontainers:junit-jupiter'
-    testImplementation 'org.testcontainers:testcontainers'
-    testImplementation 'org.awaitility:awaitility'
+    testImplementation libs.spring.boot.starter.test
+    testImplementation libs.testcontainers.junit.jupiter
+    testImplementation libs.testcontainers
+    testImplementation libs.awaitility
 }

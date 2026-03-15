@@ -1,5 +1,5 @@
 // Pure Java — no framework dependencies.
 // This module defines the abstraction over any Discord library.
 dependencies {
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation libs.spring.boot.starter.test
 }

@@ -15,6 +15,9 @@ public interface DiscordClient {
     /** Connect to Discord and register commands to a specific guild (instant update — great for dev). */
     void start(String token, String guildId);
 
+    /** Access guild-scoped capabilities. */
+    GuildClient guild(String guildId);
+
     /** Disconnect and release resources. */
     void shutdown();
 }

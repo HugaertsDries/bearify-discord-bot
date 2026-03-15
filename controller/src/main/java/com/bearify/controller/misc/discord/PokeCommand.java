@@ -1,5 +1,6 @@
-package com.bearify.controller.commands;
+package com.bearify.controller.misc.discord;
 
+import com.bearify.controller.discord.BearifyEmoji;
 import com.bearify.discord.api.format.CodeBlockBuilder;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;
@@ -15,7 +16,7 @@ import java.util.LongSummaryStatistics;
 @Command
 public class PokeCommand {
 
-    private static final long THRESHOLD_GREEN  = 300;
+    private static final long THRESHOLD_GREEN = 300;
     private static final long THRESHOLD_YELLOW = 600;
 
     private final Clock clock;
@@ -31,35 +32,45 @@ public class PokeCommand {
         EditableMessage handle = interaction.defer();
 
         LongSummaryStatistics stats = new LongSummaryStatistics();
-        CodeBlockBuilder cb = new CodeBlockBuilder().append("🐻 POKING bearify...").newline();
+        CodeBlockBuilder cb = new CodeBlockBuilder().append(BearifyEmoji.BEAR + " POKING bearify...").newline();
         handle.edit(cb.toString());
 
         for (int i = 0; i < pokes; i++) {
             Instant start = clock.instant();
-            handle.edit(cb.toString()); // round-trip edit to measure latency
+            handle.edit(cb.toString());
             long ms = Duration.between(start, clock.instant()).toMillis();
             stats.accept(ms);
 
-            cb.newline().append(String.format("🐾  #%2d  %6dms  %s", i + 1, ms, indicator(ms)));
+            cb.newline().append(String.format("%s  #%2d  %6dms  %s", BearifyEmoji.PAW, i + 1, ms, indicator(ms)));
             handle.edit(cb.toString());
         }
 
-        long avg = (long) stats.getAverage();
+        long min = stats.getCount() == 0 ? 0 : stats.getMin();
+        long avg = stats.getCount() == 0 ? 0 : (long) stats.getAverage();
+        long max = stats.getCount() == 0 ? 0 : stats.getMax();
         cb.blank();
-        cb.append(String.format("🐻 %d pokes survived. %s", pokes, verdict(avg))).newline();
-        cb.append(String.format("🍯 min=%dms  avg=%dms  max=%dms  %s", stats.getMin(), avg, stats.getMax(), indicator(avg))).newline();
+        cb.append(String.format("%s %d pokes survived. %s", BearifyEmoji.BEAR, pokes, verdict(avg))).newline();
+        cb.append(String.format("%s min=%dms  avg=%dms  max=%dms  %s", BearifyEmoji.HONEY, min, avg, max, indicator(avg))).newline();
         handle.edit(cb.toString());
     }
 
     private String indicator(long ms) {
-        if (ms < THRESHOLD_GREEN)  return "🟢";
-        if (ms < THRESHOLD_YELLOW) return "🟡";
-        return "🔴";
+        if (ms < THRESHOLD_GREEN) {
+            return BearifyEmoji.GREEN;
+        }
+        if (ms < THRESHOLD_YELLOW) {
+            return BearifyEmoji.YELLOW;
+        }
+        return BearifyEmoji.RED;
     }
 
     private String verdict(long avg) {
-        if (avg < THRESHOLD_GREEN)  return "no sweat.";
-        if (avg < THRESHOLD_YELLOW) return "barely.";
+        if (avg < THRESHOLD_GREEN) {
+            return "no sweat.";
+        }
+        if (avg < THRESHOLD_YELLOW) {
+            return "barely.";
+        }
         return "send help.";
     }
 }

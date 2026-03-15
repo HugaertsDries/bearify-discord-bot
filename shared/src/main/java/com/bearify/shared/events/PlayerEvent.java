@@ -22,11 +22,12 @@ public sealed interface PlayerEvent permits
         PlayerEvent.PlayerStopped {
 
     String playerId();
+    String requestId();
 
-    record TrackStart(String playerId, Track track) implements PlayerEvent {}
-    record TrackEnd(String playerId, Track track) implements PlayerEvent {}
-    record TrackError(String playerId, Track track) implements PlayerEvent {}
-    record QueueEmpty(String playerId) implements PlayerEvent {}
-    record PlayerReady(String playerId) implements PlayerEvent {}
-    record PlayerStopped(String playerId) implements PlayerEvent {}
+    record TrackStart(String playerId, String requestId, Track track) implements PlayerEvent {}
+    record TrackEnd(String playerId, String requestId, Track track) implements PlayerEvent {}
+    record TrackError(String playerId, String requestId, Track track) implements PlayerEvent {}
+    record QueueEmpty(String playerId, String requestId) implements PlayerEvent {}
+    record PlayerReady(String playerId, String requestId) implements PlayerEvent {}
+    record PlayerStopped(String playerId, String requestId) implements PlayerEvent {}
 }
