@@ -3,8 +3,8 @@ package com.bearify.controller.music.domain.redis;
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
-import com.bearify.shared.events.MusicPlayerInteraction;
-import com.bearify.shared.player.PlayerRedisProtocol;
+import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
 
     @Autowired MusicPlayerPool pool;
     @Autowired RedisConnectionFactory redisConnectionFactory;
-    @Autowired com.bearify.shared.player.PlayerMessageCodec codec;
+    @Autowired com.bearify.music.player.bridge.protocol.PlayerMessageCodec codec;
     @Autowired StringRedisTemplate redis;
 
     @BeforeEach
@@ -76,6 +76,46 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             assertThat(connect.guildId()).isEqualTo(GUILD_ID);
             assertThat(connect.voiceChannelId()).isEqualTo(VOICE_CHANNEL_ID);
             assertThat(connect.requestId()).isNotBlank();
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void stopDeletesAssignmentKey() {
+        MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID).orElseThrow();
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isNotNull();
+
+        player.stop();
+
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isNull();
+    }
+
+    @Test
+    void stopPublishesStopToCorrectRedisChannel() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(redisConnectionFactory);
+        container.addMessageListener(
+                (message, pattern) -> received.offer(new String(message.getBody())),
+                new ChannelTopic(PlayerRedisProtocol.Channels.commands(PLAYER_ID)));
+        container.afterPropertiesSet();
+        container.start();
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID).orElseThrow();
+            player.stop();
+
+            String json = received.poll(2, TimeUnit.SECONDS);
+            assertThat(json).isNotNull();
+
+            MusicPlayerInteraction command = codec.parseInteraction(json.getBytes());
+            assertThat(command).isInstanceOf(MusicPlayerInteraction.Stop.class);
+            MusicPlayerInteraction.Stop stop = (MusicPlayerInteraction.Stop) command;
+            assertThat(stop.playerId()).isEqualTo(PLAYER_ID);
+            assertThat(stop.guildId()).isEqualTo(GUILD_ID);
+            assertThat(stop.requestId()).isNotBlank();
         } finally {
             container.stop();
         }

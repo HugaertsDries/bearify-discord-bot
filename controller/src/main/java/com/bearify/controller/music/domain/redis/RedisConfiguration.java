@@ -3,7 +3,7 @@ package com.bearify.controller.music.domain.redis;
 import com.bearify.controller.music.domain.MusicPlayerEventRouter;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
 import com.bearify.controller.music.domain.MusicPlayerPool;
-import com.bearify.shared.player.PlayerMessageCodec;
+import com.bearify.music.player.bridge.protocol.PlayerMessageCodec;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

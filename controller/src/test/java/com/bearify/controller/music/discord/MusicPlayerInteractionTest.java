@@ -3,7 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.testing.MockCommandInteraction;
-import com.bearify.shared.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -134,6 +134,10 @@ class MusicPlayerInteractionTest {
             joined = true;
             future = new CompletableFuture<>();
             return future;
+        }
+
+        @Override
+        public void stop() {
         }
     }
 }

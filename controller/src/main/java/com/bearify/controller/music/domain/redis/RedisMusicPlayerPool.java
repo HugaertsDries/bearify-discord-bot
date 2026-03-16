@@ -3,8 +3,8 @@ package com.bearify.controller.music.domain.redis;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
-import com.bearify.shared.player.PlayerMessageCodec;
-import com.bearify.shared.player.PlayerRedisProtocol;
+import com.bearify.music.player.bridge.protocol.PlayerMessageCodec;
+import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.Optional;
@@ -31,12 +31,11 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
     }
 
     private Optional<MusicPlayer> claim(String guildId, String voiceChannelId) {
-        return Optional.ofNullable(redis.opsForSet().pop(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS))
+        return Optional.ofNullable(redis.opsForSet().randomMember(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS))
                 .flatMap(playerId -> {
                     if (assign(guildId, voiceChannelId, playerId)) {
                         return Optional.of(player(playerId, guildId, voiceChannelId));
                     } else {
-                        release(playerId);
                         return acquire(guildId, voiceChannelId);
                     }
                 });
@@ -48,10 +47,6 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
 
     private boolean assign(String guildId, String voiceChannelId, String playerId) {
         return Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(PlayerRedisProtocol.Keys.assignment(guildId, voiceChannelId), playerId));
-    }
-
-    private void release(String playerId) {
-        redis.opsForSet().add(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, playerId);
     }
 
     private MusicPlayer player(String playerId, String guildId, String voiceChannelId) {

@@ -2,8 +2,8 @@ package com.bearify.controller.music.domain.redis;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
-import com.bearify.shared.events.MusicPlayerEvent;
-import com.bearify.shared.player.PlayerRedisProtocol;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +18,7 @@ class RedisMusicPlayerEventSubscriptionIntegrationTest extends AbstractControlle
     private static final String PLAYER_ID = "player-1";
 
     @Autowired StringRedisTemplate redis;
-    @Autowired com.bearify.shared.player.PlayerMessageCodec codec;
+    @Autowired com.bearify.music.player.bridge.protocol.PlayerMessageCodec codec;
     @Autowired MusicPlayerPendingRequests requests;
 
     // --- HAPPY PATH ---

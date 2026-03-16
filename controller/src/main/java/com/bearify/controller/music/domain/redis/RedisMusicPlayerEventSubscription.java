@@ -1,9 +1,9 @@
 package com.bearify.controller.music.domain.redis;
 
 import com.bearify.controller.music.domain.MusicPlayerEventRouter;
-import com.bearify.shared.events.MusicPlayerEvent;
-import com.bearify.shared.player.PlayerMessageCodec;
-import com.bearify.shared.player.PlayerRedisProtocol;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.protocol.PlayerMessageCodec;
+import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;

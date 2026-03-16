@@ -3,7 +3,7 @@ apply plugin: 'org.springframework.boot'
 dependencies {
     implementation project(':discord:starter')
     implementation project(':discord:jda')
-    implementation project(':shared')
+    implementation project(':music-player:bridge')
     implementation libs.spring.boot.starter
     implementation libs.spring.boot.starter.data.redis
     implementation libs.spring.boot.starter.json

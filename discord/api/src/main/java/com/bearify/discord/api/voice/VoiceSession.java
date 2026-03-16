@@ -1,22 +1,24 @@
 package com.bearify.discord.api.voice;
 
+import java.util.Optional;
+
 /**
  * Represents the bot's voice connection within a specific guild.
  */
 public interface VoiceSession {
 
-    /** Request that the bot joins the given voice channel. */
-    void joinChannel(String channelId);
+    /** Join a voice channel and invoke the listener once connected. */
+    void join(String channelId, VoiceSessionListener onJoined);
 
     /** Leave the current voice channel in this guild. */
     void leave();
 
-    /** Whether the bot is currently connected to voice in this guild. */
-    boolean isConnected();
-
     /** The guild this session belongs to. */
-    String guildId();
+    String getGuildId();
 
-    /** Register a listener invoked when the bot joins a voice channel in this guild. */
-    void onJoined(VoiceSessionListener listener);
+    /** The ID of the voice channel the bot is currently connected to, empty if not connected. */
+    Optional<String> getConnectedChannelId();
+
+    /** Whether no other non-bot human users are present in the current channel. */
+    boolean isAlone();
 }

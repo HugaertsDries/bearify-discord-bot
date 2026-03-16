@@ -1,0 +1,17 @@
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+    implementation project(':discord:starter')
+    implementation project(':discord:jda')
+    implementation project(':music-player:bridge')
+    implementation libs.spring.boot.starter
+    implementation libs.spring.boot.starter.data.redis
+    implementation libs.jda
+    implementation libs.dotenv.java
+    implementation libs.spring.boot.starter.json
+
+    testImplementation libs.spring.boot.starter.test
+    testImplementation libs.testcontainers.junit.jupiter
+    testImplementation libs.testcontainers
+    testImplementation libs.awaitility
+}

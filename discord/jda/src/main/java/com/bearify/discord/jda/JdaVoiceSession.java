@@ -5,12 +5,14 @@ import com.bearify.discord.api.voice.VoiceSessionListener;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.audio.AudioSendHandler;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 class JdaVoiceSession implements VoiceSession {
@@ -40,7 +42,8 @@ class JdaVoiceSession implements VoiceSession {
     }
 
     @Override
-    public void joinChannel(String channelId) {
+    public void join(String channelId, VoiceSessionListener onJoined) {
+        joinedListeners.add(onJoined);
         Guild guild = requireGuild();
         AudioChannel channel = guild.getChannelById(AudioChannel.class, channelId);
         if (channel == null) {
@@ -67,18 +70,26 @@ class JdaVoiceSession implements VoiceSession {
     }
 
     @Override
-    public boolean isConnected() {
-        return requireGuild().getAudioManager().isConnected();
+    public Optional<String> getConnectedChannelId() {
+        AudioChannel channel = requireGuild().getAudioManager().getConnectedChannel();
+        return Optional.ofNullable(channel).map(AudioChannel::getId);
     }
 
     @Override
-    public String guildId() {
+    public boolean isAlone() {
+        AudioChannel channel = requireGuild().getAudioManager().getConnectedChannel();
+        if (channel == null) {
+            return true;
+        }
+        return channel.getMembers().stream()
+                .filter(member -> !member.getUser().isBot())
+                .findAny()
+                .isEmpty();
+    }
+
+    @Override
+    public String getGuildId() {
         return guildId;
-    }
-
-    @Override
-    public void onJoined(VoiceSessionListener listener) {
-        joinedListeners.add(listener);
     }
 
     private Guild requireGuild() {

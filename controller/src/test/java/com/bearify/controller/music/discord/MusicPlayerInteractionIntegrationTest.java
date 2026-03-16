@@ -3,8 +3,8 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
-import com.bearify.shared.events.MusicPlayerInteraction;
-import com.bearify.shared.player.PlayerRedisProtocol;
+import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
     @Autowired CommandRegistry commandRegistry;
     @Autowired RedisConnectionFactory redisConnectionFactory;
     @Autowired org.springframework.data.redis.core.StringRedisTemplate redis;
-    @Autowired com.bearify.shared.player.PlayerMessageCodec codec;
+    @Autowired com.bearify.music.player.bridge.protocol.PlayerMessageCodec codec;
 
     @BeforeEach
     void seedPlayer() {
@@ -48,7 +48,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
 
         commandRegistry.handle(interaction);
 
-        assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID)).isFalse();
+        assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID)).isTrue();
         assertThat(interaction.getDeferredMessage()).isPresent();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                 .contains("Bearify is padding over to your voice channel");

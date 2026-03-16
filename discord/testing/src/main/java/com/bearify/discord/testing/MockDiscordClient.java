@@ -85,7 +85,7 @@ public class MockDiscordClient implements DiscordClient {
         }
 
         @Override
-        public void joinChannel(String channelId) {
+        public void join(String channelId, VoiceSessionListener onJoined) {
         }
 
         @Override
@@ -93,17 +93,18 @@ public class MockDiscordClient implements DiscordClient {
         }
 
         @Override
-        public boolean isConnected() {
-            return false;
+        public Optional<String> getConnectedChannelId() {
+            return Optional.empty();
         }
 
         @Override
-        public String guildId() {
+        public boolean isAlone() {
+            return true;
+        }
+
+        @Override
+        public String getGuildId() {
             return guildId;
-        }
-
-        @Override
-        public void onJoined(VoiceSessionListener listener) {
         }
     }
 

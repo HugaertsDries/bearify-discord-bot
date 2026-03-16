@@ -1,6 +1,6 @@
 package com.bearify.controller.music.domain;
 
-import com.bearify.shared.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

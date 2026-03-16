@@ -1,6 +1,6 @@
 package com.bearify.controller.music.domain;
 
-import com.bearify.shared.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
