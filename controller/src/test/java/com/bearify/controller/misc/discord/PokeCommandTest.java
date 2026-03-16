@@ -1,6 +1,6 @@
 package com.bearify.controller.misc.discord;
 
-import com.bearify.controller.discord.BearifyEmoji;
+import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.discord.testing.MockCommandInteraction;
 import org.junit.jupiter.api.Test;
 

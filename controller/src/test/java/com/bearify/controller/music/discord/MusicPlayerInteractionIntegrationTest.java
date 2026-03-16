@@ -3,8 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
-import com.bearify.shared.events.PlayerInteraction;
-import com.bearify.shared.player.PlayerMessageCodec;
+import com.bearify.shared.events.MusicPlayerInteraction;
 import com.bearify.shared.player.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,13 +27,13 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
     @Autowired CommandRegistry commandRegistry;
     @Autowired RedisConnectionFactory redisConnectionFactory;
     @Autowired org.springframework.data.redis.core.StringRedisTemplate redis;
-    @Autowired com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    @Autowired com.bearify.shared.player.PlayerMessageCodec codec;
 
     @BeforeEach
     void seedPlayer() {
-        redis.delete(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY);
-        redis.delete(PlayerRedisProtocol.assignmentKey(GUILD_ID, VOICE_CHANNEL_ID));
-        redis.opsForSet().add(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY, PLAYER_ID);
+        redis.delete(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS);
+        redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID));
+        redis.opsForSet().add(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID);
     }
 
     // --- HAPPY PATH ---
@@ -49,7 +48,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
 
         commandRegistry.handle(interaction);
 
-        assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY, PLAYER_ID)).isFalse();
+        assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID)).isFalse();
         assertThat(interaction.getDeferredMessage()).isPresent();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                 .contains("Bearify is padding over to your voice channel");
@@ -63,7 +62,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         container.setConnectionFactory(redisConnectionFactory);
         container.addMessageListener(
                 (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.commandChannel(PLAYER_ID)));
+                new ChannelTopic(PlayerRedisProtocol.Channels.commands(PLAYER_ID)));
         container.afterPropertiesSet();
         container.start();
 
@@ -79,9 +78,9 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();
 
-            PlayerInteraction command = PlayerMessageCodec.readCommand(objectMapper, json.getBytes());
-            assertThat(command).isInstanceOf(PlayerInteraction.Connect.class);
-            PlayerInteraction.Connect connect = (PlayerInteraction.Connect) command;
+            MusicPlayerInteraction command = codec.parseInteraction(json.getBytes());
+            assertThat(command).isInstanceOf(MusicPlayerInteraction.Connect.class);
+            MusicPlayerInteraction.Connect connect = (MusicPlayerInteraction.Connect) command;
             assertThat(connect.playerId()).isEqualTo(PLAYER_ID);
             assertThat(connect.requestId()).isNotBlank();
             assertThat(connect.voiceChannelId()).isEqualTo(VOICE_CHANNEL_ID);
@@ -95,7 +94,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
 
     @Test
     void showsDeferredMessageWhenNoPlayerAvailable() {
-        redis.delete(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY);
+        redis.delete(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
                 .subcommand("join")
@@ -112,14 +111,14 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
 
     @Test
     void reusesAssignedPlayerForSameVoiceChannel() throws Exception {
-        redis.opsForValue().set(PlayerRedisProtocol.assignmentKey(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
         BlockingQueue<String> received = new LinkedBlockingQueue<>();
 
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(redisConnectionFactory);
         container.addMessageListener(
                 (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.commandChannel(PLAYER_ID)));
+                new ChannelTopic(PlayerRedisProtocol.Channels.commands(PLAYER_ID)));
         container.afterPropertiesSet();
         container.start();
 
@@ -134,7 +133,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
 
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();
-            assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.AVAILABLE_PLAYERS_KEY, PLAYER_ID)).isTrue();
+            assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID)).isTrue();
         } finally {
             container.stop();
         }

@@ -1,13 +1,13 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.music.domain.MusicPlayer;
-import com.bearify.controller.music.domain.MusicPlayerEvent;
-import com.bearify.controller.music.domain.MusicPlayerEventHandler;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.shared.events.MusicPlayerEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -99,16 +99,16 @@ class MusicPlayerInteractionTest {
 
     // --- VALIDATION ---
 
-    private static final class RecordingMusicPlayerPool extends MusicPlayerPool {
+    private static final class RecordingMusicPlayerPool implements MusicPlayerPool {
         private final Optional<MusicPlayer> player;
         private String guildId;
         private String voiceChannelId;
 
         private RecordingMusicPlayerPool(Optional<MusicPlayer> player) {
-            super(null, null, interaction -> {});
             this.player = player;
         }
 
+        @Override
         public Optional<MusicPlayer> acquire(String guildId, String voiceChannelId) {
             this.guildId = guildId;
             this.voiceChannelId = voiceChannelId;
@@ -116,23 +116,24 @@ class MusicPlayerInteractionTest {
         }
     }
 
-    private static final class RecordingMusicPlayer extends MusicPlayer {
+    private static final class RecordingMusicPlayer implements MusicPlayer {
         private final String playerId;
         private boolean joined;
-        private MusicPlayerEventHandler eventHandler;
+        private CompletableFuture<MusicPlayerEvent> future;
 
         private RecordingMusicPlayer(String playerId) {
-            super(playerId, null, null, null, interaction -> {});
             this.playerId = playerId;
         }
 
         private void fireReadyEvent() {
-            eventHandler.onReady(new MusicPlayerEvent.Ready(playerId));
+            future.complete(new MusicPlayerEvent.Ready(playerId, "test"));
         }
 
-        public void join(MusicPlayerEventHandler eventHandler) {
+        @Override
+        public CompletableFuture<MusicPlayerEvent> join() {
             joined = true;
-            this.eventHandler = eventHandler;
+            future = new CompletableFuture<>();
+            return future;
         }
     }
 }

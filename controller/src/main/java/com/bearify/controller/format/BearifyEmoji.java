@@ -1,4 +1,4 @@
-package com.bearify.controller.discord;
+package com.bearify.controller.format;
 
 public final class BearifyEmoji {
 

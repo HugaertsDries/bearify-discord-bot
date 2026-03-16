@@ -1,8 +1,6 @@
 package com.bearify.controller.music.discord;
 
-import com.bearify.controller.discord.BearifyEmoji;
-import com.bearify.controller.music.domain.MusicPlayerEvent;
-import com.bearify.controller.music.domain.MusicPlayerEventHandler;
+import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;
@@ -42,15 +40,7 @@ public class MusicPlayerCommand {
         pool.acquire(guildId, voiceChannelId).ifPresentOrElse(player -> {
             EditableMessage message = interaction.defer();
             message.edit(JOINING_MESSAGE);
-            player.join(new MessageEditingEventHandler(message));
+            player.join().thenAccept(event -> message.edit(READY_MESSAGE));
         }, () -> interaction.defer().edit(UNAVAILABLE_MESSAGE));
-    }
-
-    private record MessageEditingEventHandler(EditableMessage message) implements MusicPlayerEventHandler {
-
-        @Override
-        public void onReady(MusicPlayerEvent.Ready event) {
-            message.edit(READY_MESSAGE);
-        }
     }
 }

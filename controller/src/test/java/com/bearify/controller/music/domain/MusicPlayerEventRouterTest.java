@@ -1,12 +1,7 @@
 package com.bearify.controller.music.domain;
 
-import com.bearify.shared.events.PlayerEvent;
+import com.bearify.shared.events.MusicPlayerEvent;
 import org.junit.jupiter.api.Test;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,36 +10,28 @@ class MusicPlayerEventRouterTest {
     // --- HAPPY PATH ---
 
     @Test
-    void routesEventToMatchingPendingSummon() {
-        MusicPlayerRequestRegistry requests = new MusicPlayerRequestRegistry();
+    void routesEventToMatchingPendingRequest() {
+        MusicPlayerPendingRequests requests = new MusicPlayerPendingRequests();
         MusicPlayerEventRouter router = new MusicPlayerEventRouter(requests);
-        AtomicReference<MusicPlayerEvent> handled = new AtomicReference<>();
-        PlayerEvent.PlayerReady event = new PlayerEvent.PlayerReady("player-1", "req-1");
-
-        requests.register("req-1", new MusicPlayerEventHandler() {
-            @Override
-            public void onReady(MusicPlayerEvent.Ready event) {
-                handled.set(event);
-            }
-        });
+        MusicPlayerPendingRequests.Pending pending = requests.register();
+        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", pending.requestId());
 
         router.route(event);
 
-        assertThat(handled.get()).isEqualTo(new MusicPlayerEvent.Ready("player-1"));
-        assertThat(requests.consume("req-1")).isEmpty();
+        assertThat(pending.future().isDone()).isTrue();
+        assertThat(pending.future().join()).isEqualTo(event);
     }
 
     // --- EDGE CASES ---
 
     @Test
     void consumesPendingRequestWhenEventIsRouted() {
-        MusicPlayerRequestRegistry requests = new MusicPlayerRequestRegistry();
+        MusicPlayerPendingRequests requests = new MusicPlayerPendingRequests();
         MusicPlayerEventRouter router = new MusicPlayerEventRouter(requests);
+        MusicPlayerPendingRequests.Pending pending = requests.register();
 
-        requests.register("req-1", new MusicPlayerEventHandler() {});
+        router.route(new MusicPlayerEvent.Ready("player-1", pending.requestId()));
 
-        router.route(new PlayerEvent.PlayerReady("player-1", "req-1"));
-
-        assertThat(requests.consume("req-1")).isEmpty();
+        assertThat(requests.complete(pending.requestId(), new MusicPlayerEvent.Ready("player-1", pending.requestId()))).isFalse();
     }
 }

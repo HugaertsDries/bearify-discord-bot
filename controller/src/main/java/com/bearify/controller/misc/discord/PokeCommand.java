@@ -1,6 +1,6 @@
 package com.bearify.controller.misc.discord;
 
-import com.bearify.controller.discord.BearifyEmoji;
+import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.discord.api.format.CodeBlockBuilder;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;

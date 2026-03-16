@@ -1,7 +1,10 @@
 package com.bearify.player;
 
+import com.bearify.shared.player.PlayerMessageCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
+import org.springframework.context.annotation.Bean;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -12,6 +15,11 @@ import java.util.Map;
 
 @SpringBootApplication
 public class Application {
+
+    @Bean
+    PlayerMessageCodec playerMessageCodec(ObjectMapper objectMapper) {
+        return new PlayerMessageCodec(objectMapper);
+    }
 
     public static void main(String[] args) {
         SpringApplication app = new SpringApplication(Application.class);
