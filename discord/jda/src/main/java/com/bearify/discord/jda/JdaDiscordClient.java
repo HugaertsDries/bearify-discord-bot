@@ -1,7 +1,7 @@
 package com.bearify.discord.jda;
 
 import com.bearify.discord.api.gateway.DiscordClient;
-import com.bearify.discord.api.gateway.GuildClient;
+import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
@@ -55,11 +55,11 @@ public class JdaDiscordClient implements DiscordClient {
     }
 
     @Override
-    public GuildClient guild(String guildId) {
+    public Guild guild(String guildId) {
         if (jda == null) {
             throw new IllegalStateException("Discord client has not been started");
         }
-        return new JdaGuildClient(jda, guildId);
+        return new JdaGuild(jda, guildId);
     }
 
     @Override

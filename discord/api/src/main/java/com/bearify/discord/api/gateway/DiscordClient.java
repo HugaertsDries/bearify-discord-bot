@@ -16,7 +16,7 @@ public interface DiscordClient {
     void start(String token, String guildId);
 
     /** Access guild-scoped capabilities. */
-    GuildClient guild(String guildId);
+    Guild guild(String guildId);
 
     /** Disconnect and release resources. */
     void shutdown();

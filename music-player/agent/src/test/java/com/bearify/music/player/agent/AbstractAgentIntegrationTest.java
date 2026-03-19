@@ -2,8 +2,7 @@ package com.bearify.music.player.agent;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
-import com.bearify.discord.api.gateway.GuildClient;
-import com.bearify.discord.api.voice.VoiceSession;
+import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 
 import java.util.Optional;
@@ -55,44 +54,21 @@ public abstract class AbstractAgentIntegrationTest {
         }
 
         @Override
-        public GuildClient guild(String guildId) {
-            return () -> new NoOpVoiceSession(guildId);
+        public Guild guild(String guildId) {
+            return new Guild() {
+                @Override
+                public Optional<com.bearify.discord.api.voice.VoiceSession> voice() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public void join(String channelId, VoiceSessionListener onJoined) {
+                }
+            };
         }
 
         @Override
         public void shutdown() {
-        }
-    }
-
-    private static final class NoOpVoiceSession implements VoiceSession {
-
-        private final String guildId;
-
-        private NoOpVoiceSession(String guildId) {
-            this.guildId = guildId;
-        }
-
-        @Override
-        public void join(String channelId, VoiceSessionListener onJoined) {
-        }
-
-        @Override
-        public void leave() {
-        }
-
-        @Override
-        public Optional<String> getConnectedChannelId() {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean isAlone() {
-            return true;
-        }
-
-        @Override
-        public String getGuildId() {
-            return guildId;
         }
     }
 }

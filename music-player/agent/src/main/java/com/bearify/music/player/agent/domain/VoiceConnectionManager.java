@@ -1,6 +1,7 @@
 package com.bearify.music.player.agent.domain;
 
 import com.bearify.discord.api.gateway.DiscordClient;
+import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,20 +27,20 @@ public class VoiceConnectionManager {
     }
 
     public void connect(ConnectionRequest request) {
-        var session = client.guild(request.guildId()).voice();
-        session.getConnectedChannelId().ifPresentOrElse(connectedChannelId -> {
-            if (connectedChannelId.equals(request.voiceChannelId())) {
+        var guild = client.guild(request.guildId());
+        guild.voice().ifPresentOrElse(session -> {
+            if (session.getChannelId().equals(request.voiceChannelId())) {
                 connectedGuilds.add(request.guildId());
                 eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
-            } else if (session.isAlone()) {
-                session.join(request.voiceChannelId(), _ -> {
+            } else if (session.isLonely()) {
+                guild.join(request.voiceChannelId(), _ -> {
                     connectedGuilds.add(request.guildId());
                     eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
                 });
             } else {
                 eventDispatcher.dispatch(new MusicPlayerEvent.ConnectFailed(playerId, request.requestId(), "already connected to a different channel"));
             }
-        }, () -> session.join(request.voiceChannelId(), _ -> {
+        }, () -> guild.join(request.voiceChannelId(), _ -> {
             connectedGuilds.add(request.guildId());
             eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
         }));
@@ -47,7 +48,7 @@ public class VoiceConnectionManager {
 
     public void disconnect(String guildId) {
         if (connectedGuilds.remove(guildId)) {
-            client.guild(guildId).voice().leave();
+            client.guild(guildId).voice().ifPresent(VoiceSession::leave);
         }
     }
 }

@@ -2,7 +2,7 @@ package com.bearify.music.player.agent.domain;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
-import com.bearify.discord.api.gateway.GuildClient;
+import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.VoiceSession;
@@ -93,9 +93,9 @@ class VoiceConnectionManagerTest {
     void joinsRequestedVoiceChannelWhenConnecting() {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
-        FakeVoiceSession session = discordClient.session(GUILD_ID);
-        assertThat(session.getJoinedChannelId()).isEqualTo(VOICE_CHANNEL_ID);
-        assertThat(session.hasJoinListener()).isTrue();
+        FakeGuild guild = discordClient.guild(GUILD_ID);
+        assertThat(guild.getJoinedChannelId()).isEqualTo(VOICE_CHANNEL_ID);
+        assertThat(guild.hasJoinListener()).isTrue();
     }
 
     @Test
@@ -104,7 +104,7 @@ class VoiceConnectionManagerTest {
         startListener(body -> received.set(parseEvent(body)));
 
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
-        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         await().atMost(2, TimeUnit.SECONDS)
                 .untilAsserted(() -> assertThat(received.get()).isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID)));
@@ -114,7 +114,7 @@ class VoiceConnectionManagerTest {
     void publishesReadyEventImmediatelyWhenAlreadyConnected() throws Exception {
         AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
         startListener(body -> received.set(parseEvent(body)));
-        discordClient.session(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
+        discordClient.guild(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
 
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
@@ -127,8 +127,8 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         voiceConnectionManager.connect(new ConnectionRequest("req-2", "voice-2", GUILD_ID_2));
 
-        assertThat(discordClient.session(GUILD_ID).getJoinedChannelId()).isEqualTo(VOICE_CHANNEL_ID);
-        assertThat(discordClient.session(GUILD_ID_2).getJoinedChannelId()).isEqualTo("voice-2");
+        assertThat(discordClient.guild(GUILD_ID).getJoinedChannelId()).isEqualTo(VOICE_CHANNEL_ID);
+        assertThat(discordClient.guild(GUILD_ID_2).getJoinedChannelId()).isEqualTo("voice-2");
     }
 
     // --- LIFECYCLE ---
@@ -136,42 +136,42 @@ class VoiceConnectionManagerTest {
     @Test
     void leavesConnectedGuildWhenDisconnecting() {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
-        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
 
-        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
+        assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
 
     @Test
     void doesNothingWhenDisconnectingWithoutActiveGuild() {
         voiceConnectionManager.disconnect(GUILD_ID);
 
-        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isZero();
+        assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isZero();
     }
 
     @Test
     void disconnectsOnlyOnceForSameGuild() {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
-        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
         voiceConnectionManager.disconnect(GUILD_ID);
 
-        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
+        assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
 
     @Test
     void disconnectsOnlyTargetedGuild() {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         voiceConnectionManager.connect(new ConnectionRequest("req-2", "voice-2", GUILD_ID_2));
-        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
-        discordClient.session(GUILD_ID_2).simulateJoined("voice-2");
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        discordClient.guild(GUILD_ID_2).simulateJoined("voice-2");
 
         voiceConnectionManager.disconnect(GUILD_ID);
 
-        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
-        assertThat(discordClient.session(GUILD_ID_2).getLeaveCount()).isZero();
+        assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
+        assertThat(discordClient.guild(GUILD_ID_2).getLeaveCount()).isZero();
     }
 
     // --- BUG FIXES ---
@@ -181,23 +181,23 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
         voiceConnectionManager.disconnect(GUILD_ID);
-        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isZero();
+        assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isZero();
 
-        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
-        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
+        assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
 
     @Test
     void tracksGuildAfterMovingToNewChannel() {
-        discordClient.session(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
+        discordClient.guild(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
 
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, "voice-2", GUILD_ID));
-        discordClient.session(GUILD_ID).simulateJoined("voice-2");
+        discordClient.guild(GUILD_ID).simulateJoined("voice-2");
 
         voiceConnectionManager.disconnect(GUILD_ID);
-        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
+        assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
 
     private MusicPlayerEvent parseEvent(byte[] body) {
@@ -248,7 +248,7 @@ class VoiceConnectionManagerTest {
 
     static final class FakeDiscordClient implements DiscordClient {
 
-        private final Map<String, FakeVoiceSession> sessions = new HashMap<>();
+        private final Map<String, FakeGuild> guilds = new HashMap<>();
 
         @Override
         public void start(String token) {
@@ -259,60 +259,41 @@ class VoiceConnectionManagerTest {
         }
 
         @Override
-        public GuildClient guild(String guildId) {
-            return () -> sessions.computeIfAbsent(guildId, FakeVoiceSession::new);
+        public FakeGuild guild(String guildId) {
+            return guilds.computeIfAbsent(guildId, id -> new FakeGuild());
         }
 
         @Override
         public void shutdown() {
         }
 
-        FakeVoiceSession session(String guildId) {
-            return sessions.computeIfAbsent(guildId, FakeVoiceSession::new);
-        }
-
         void reset() {
-            sessions.clear();
+            guilds.clear();
         }
     }
 
-    static final class FakeVoiceSession implements VoiceSession {
+    static final class FakeGuild implements Guild {
 
-        private final String guildId;
         private String joinedChannelId;
         private int leaveCount;
         private VoiceSessionListener joinListener;
 
-        private FakeVoiceSession(String guildId) {
-            this.guildId = guildId;
+        @Override
+        public Optional<VoiceSession> voice() {
+            if (joinedChannelId != null && leaveCount == 0) {
+                return Optional.of(new VoiceSession() {
+                    @Override public String getChannelId() { return joinedChannelId; }
+                    @Override public boolean isLonely() { return true; }
+                    @Override public void leave() { leaveCount++; }
+                });
+            }
+            return Optional.empty();
         }
 
         @Override
         public void join(String channelId, VoiceSessionListener onJoined) {
             joinedChannelId = channelId;
             joinListener = onJoined;
-        }
-
-        @Override
-        public void leave() {
-            leaveCount++;
-        }
-
-        @Override
-        public Optional<String> getConnectedChannelId() {
-            return joinedChannelId != null && leaveCount == 0
-                    ? Optional.of(joinedChannelId)
-                    : Optional.empty();
-        }
-
-        @Override
-        public boolean isAlone() {
-            return true;
-        }
-
-        @Override
-        public String getGuildId() {
-            return guildId;
         }
 
         void simulateJoined(String channelId) {
