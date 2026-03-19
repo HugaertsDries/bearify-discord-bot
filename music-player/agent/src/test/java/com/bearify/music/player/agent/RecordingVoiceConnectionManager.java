@@ -9,10 +9,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class StubVoiceConnectionManager implements VoiceConnectionManager {
+public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
 
     private final List<ConnectionRequest> calls = new ArrayList<>();
     private final Set<String> disconnectedGuilds = new HashSet<>();
+
+    public RecordingVoiceConnectionManager() {
+        super(null, null, "test");
+    }
 
     @Override
     public void connect(ConnectionRequest request) {

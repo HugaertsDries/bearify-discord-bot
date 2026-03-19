@@ -1,9 +1,9 @@
-package com.bearify.music.player.agent.domain.redis;
+package com.bearify.music.player.agent.redis;
 
 import com.bearify.music.player.agent.AbstractAgentIntegrationTest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
-import com.bearify.music.player.bridge.protocol.PlayerMessageCodec;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,12 +17,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-class RedisMusicEventPublisherIntegrationTest extends AbstractAgentIntegrationTest {
+class RedisMusicPlayerEventDispatcherIntegrationTest extends AbstractAgentIntegrationTest {
 
-    @Autowired
-    RedisEventPublisher publisher;
+    @Autowired RedisMusicPlayerEventDispatcher dispatcher;
     @Autowired RedisConnectionFactory connectionFactory;
-    @Autowired PlayerMessageCodec codec;
+    @Autowired ObjectMapper objectMapper;
 
     private RedisMessageListenerContainer container;
 
@@ -38,10 +37,16 @@ class RedisMusicEventPublisherIntegrationTest extends AbstractAgentIntegrationTe
     @Test
     void publishesEncodedEventToSharedEventsChannel() throws Exception {
         AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
-        startListener(body -> received.set(codec.parseEvent(body)));
+        startListener(body -> {
+            try {
+                received.set(objectMapper.readValue(body, MusicPlayerEvent.class));
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
 
         MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", "req-1");
-        publisher.publish(event);
+        dispatcher.dispatch(event);
 
         await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> assertThat(received.get()).isEqualTo(event));
     }

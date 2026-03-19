@@ -2,8 +2,8 @@ package com.bearify.controller.music.domain.redis;
 
 import com.bearify.controller.music.domain.MusicPlayerEventRouter;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
-import com.bearify.music.player.bridge.protocol.PlayerMessageCodec;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -21,15 +21,15 @@ class RedisMusicPlayerEventSubscription implements SmartLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(RedisMusicPlayerEventSubscription.class);
 
     private final RedisConnectionFactory connectionFactory;
-    private final PlayerMessageCodec codec;
+    private final ObjectMapper objectMapper;
     private final MusicPlayerEventRouter eventRouter;
     private RedisMessageListenerContainer container;
 
     RedisMusicPlayerEventSubscription(RedisConnectionFactory connectionFactory,
-                                      PlayerMessageCodec codec,
+                                      ObjectMapper objectMapper,
                                       MusicPlayerEventRouter eventRouter) {
         this.connectionFactory = connectionFactory;
-        this.codec = codec;
+        this.objectMapper = objectMapper;
         this.eventRouter = eventRouter;
     }
 
@@ -57,7 +57,7 @@ class RedisMusicPlayerEventSubscription implements SmartLifecycle {
     private MessageListener onMessage() {
         return (message, pattern) -> {
             try {
-                MusicPlayerEvent event = codec.parseEvent(message.getBody());
+                MusicPlayerEvent event = objectMapper.readValue(message.getBody(), MusicPlayerEvent.class);
                 eventRouter.route(event);
             } catch (Exception e) {
                 LOG.error("Failed to handle player event", e);

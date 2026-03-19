@@ -18,7 +18,7 @@ class RedisMusicPlayerEventSubscriptionIntegrationTest extends AbstractControlle
     private static final String PLAYER_ID = "player-1";
 
     @Autowired StringRedisTemplate redis;
-    @Autowired com.bearify.music.player.bridge.protocol.PlayerMessageCodec codec;
+    @Autowired ObjectMapper objectMapper;
     @Autowired MusicPlayerPendingRequests requests;
 
     // --- HAPPY PATH ---
@@ -28,7 +28,7 @@ class RedisMusicPlayerEventSubscriptionIntegrationTest extends AbstractControlle
         MusicPlayerPendingRequests.Pending pending = requests.register();
 
         MusicPlayerEvent event = new MusicPlayerEvent.Ready(PLAYER_ID, pending.requestId());
-        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, codec.serialize(event));
+        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(event));
 
         MusicPlayerEvent result = pending.future().get(2, TimeUnit.SECONDS);
         assertThat(result).isInstanceOf(MusicPlayerEvent.Ready.class);

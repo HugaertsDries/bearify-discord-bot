@@ -5,14 +5,12 @@ import com.bearify.discord.api.gateway.DiscordClientFactory;
 import com.bearify.discord.api.gateway.GuildClient;
 import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
-import com.bearify.music.player.agent.domain.VoiceConnectionManager;
 
 import java.util.Optional;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -43,12 +41,6 @@ public abstract class AbstractAgentIntegrationTest {
         @Bean
         DiscordClientFactory discordClientFactory() {
             return (commands, handler) -> new NoOpDiscordClient();
-        }
-
-        @Bean
-        @Primary
-        VoiceConnectionManager voiceConnectionManager() {
-            return new StubVoiceConnectionManager();
         }
     }
 

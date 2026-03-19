@@ -29,7 +29,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
 
     @Autowired MusicPlayerPool pool;
     @Autowired RedisConnectionFactory redisConnectionFactory;
-    @Autowired com.bearify.music.player.bridge.protocol.PlayerMessageCodec codec;
+    @Autowired ObjectMapper objectMapper;
     @Autowired StringRedisTemplate redis;
 
     @BeforeEach
@@ -58,7 +58,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
         container.setConnectionFactory(redisConnectionFactory);
         container.addMessageListener(
                 (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.Channels.commands(PLAYER_ID)));
+                new ChannelTopic(PlayerRedisProtocol.Channels.interactions(PLAYER_ID)));
         container.afterPropertiesSet();
         container.start();
 
@@ -69,9 +69,9 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();
 
-            MusicPlayerInteraction command = codec.parseInteraction(json.getBytes());
-            assertThat(command).isInstanceOf(MusicPlayerInteraction.Connect.class);
-            MusicPlayerInteraction.Connect connect = (MusicPlayerInteraction.Connect) command;
+            MusicPlayerInteraction interaction = objectMapper.readValue(json, MusicPlayerInteraction.class);
+            assertThat(interaction).isInstanceOf(MusicPlayerInteraction.Connect.class);
+            MusicPlayerInteraction.Connect connect = (MusicPlayerInteraction.Connect) interaction;
             assertThat(connect.playerId()).isEqualTo(PLAYER_ID);
             assertThat(connect.guildId()).isEqualTo(GUILD_ID);
             assertThat(connect.voiceChannelId()).isEqualTo(VOICE_CHANNEL_ID);
@@ -99,7 +99,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
         container.setConnectionFactory(redisConnectionFactory);
         container.addMessageListener(
                 (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.Channels.commands(PLAYER_ID)));
+                new ChannelTopic(PlayerRedisProtocol.Channels.interactions(PLAYER_ID)));
         container.afterPropertiesSet();
         container.start();
 
@@ -110,9 +110,9 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();
 
-            MusicPlayerInteraction command = codec.parseInteraction(json.getBytes());
-            assertThat(command).isInstanceOf(MusicPlayerInteraction.Stop.class);
-            MusicPlayerInteraction.Stop stop = (MusicPlayerInteraction.Stop) command;
+            MusicPlayerInteraction interaction = objectMapper.readValue(json, MusicPlayerInteraction.class);
+            assertThat(interaction).isInstanceOf(MusicPlayerInteraction.Stop.class);
+            MusicPlayerInteraction.Stop stop = (MusicPlayerInteraction.Stop) interaction;
             assertThat(stop.playerId()).isEqualTo(PLAYER_ID);
             assertThat(stop.guildId()).isEqualTo(GUILD_ID);
             assertThat(stop.requestId()).isNotBlank();

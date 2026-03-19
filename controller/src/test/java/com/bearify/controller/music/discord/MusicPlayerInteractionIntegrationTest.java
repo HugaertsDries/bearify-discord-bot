@@ -5,6 +5,7 @@ import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +28,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
     @Autowired CommandRegistry commandRegistry;
     @Autowired RedisConnectionFactory redisConnectionFactory;
     @Autowired org.springframework.data.redis.core.StringRedisTemplate redis;
-    @Autowired com.bearify.music.player.bridge.protocol.PlayerMessageCodec codec;
+    @Autowired ObjectMapper objectMapper;
 
     @BeforeEach
     void seedPlayer() {
@@ -55,14 +56,14 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
     }
 
     @Test
-    void publishesConnectCommandToPlayerChannel() throws Exception {
+    void publishesConnectInteractionToPlayerChannel() throws Exception {
         BlockingQueue<String> received = new LinkedBlockingQueue<>();
 
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(redisConnectionFactory);
         container.addMessageListener(
                 (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.Channels.commands(PLAYER_ID)));
+                new ChannelTopic(PlayerRedisProtocol.Channels.interactions(PLAYER_ID)));
         container.afterPropertiesSet();
         container.start();
 
@@ -78,9 +79,9 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();
 
-            MusicPlayerInteraction command = codec.parseInteraction(json.getBytes());
-            assertThat(command).isInstanceOf(MusicPlayerInteraction.Connect.class);
-            MusicPlayerInteraction.Connect connect = (MusicPlayerInteraction.Connect) command;
+            MusicPlayerInteraction playerInteraction = objectMapper.readValue(json, MusicPlayerInteraction.class);
+            assertThat(playerInteraction).isInstanceOf(MusicPlayerInteraction.Connect.class);
+            MusicPlayerInteraction.Connect connect = (MusicPlayerInteraction.Connect) playerInteraction;
             assertThat(connect.playerId()).isEqualTo(PLAYER_ID);
             assertThat(connect.requestId()).isNotBlank();
             assertThat(connect.voiceChannelId()).isEqualTo(VOICE_CHANNEL_ID);
@@ -118,7 +119,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         container.setConnectionFactory(redisConnectionFactory);
         container.addMessageListener(
                 (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.Channels.commands(PLAYER_ID)));
+                new ChannelTopic(PlayerRedisProtocol.Channels.interactions(PLAYER_ID)));
         container.afterPropertiesSet();
         container.start();
 

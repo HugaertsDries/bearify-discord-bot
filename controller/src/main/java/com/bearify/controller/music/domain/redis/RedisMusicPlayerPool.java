@@ -3,8 +3,8 @@ package com.bearify.controller.music.domain.redis;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
-import com.bearify.music.player.bridge.protocol.PlayerMessageCodec;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.Optional;
@@ -12,14 +12,14 @@ import java.util.Optional;
 class RedisMusicPlayerPool implements MusicPlayerPool {
 
     private final StringRedisTemplate redis;
-    private final PlayerMessageCodec codec;
+    private final ObjectMapper objectMapper;
     private final MusicPlayerPendingRequests pendingRequests;
 
     RedisMusicPlayerPool(StringRedisTemplate redis,
-                         PlayerMessageCodec codec,
+                         ObjectMapper objectMapper,
                          MusicPlayerPendingRequests pendingRequests) {
         this.redis = redis;
-        this.codec = codec;
+        this.objectMapper = objectMapper;
         this.pendingRequests = pendingRequests;
     }
 
@@ -50,6 +50,6 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
     }
 
     private MusicPlayer player(String playerId, String guildId, String voiceChannelId) {
-        return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, codec, pendingRequests);
+        return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingRequests);
     }
 }

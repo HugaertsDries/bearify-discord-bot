@@ -1,4 +1,4 @@
-package com.bearify.music.player.agent.discord;
+package com.bearify.music.player.agent.domain;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
@@ -7,19 +7,18 @@ import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
-import com.bearify.music.player.agent.domain.ConnectionRequest;
-import com.bearify.music.player.agent.domain.VoiceConnectionManager;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
-import com.bearify.music.player.bridge.protocol.PlayerMessageCodec;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
@@ -43,8 +42,8 @@ import static org.awaitility.Awaitility.await;
         "discord.token=test-token",
         "player.id=test-player"
 })
-@Import(DiscordVoiceConnectionManagerTest.TestConfig.class)
-class DiscordVoiceConnectionManagerTest {
+@Import(VoiceConnectionManagerTest.TestConfig.class)
+class VoiceConnectionManagerTest {
 
     private static final String PLAYER_ID = "test-player";
     private static final String REQUEST_ID = "req-1";
@@ -68,9 +67,16 @@ class DiscordVoiceConnectionManagerTest {
     @Autowired VoiceConnectionManager voiceConnectionManager;
     @Autowired FakeDiscordClient discordClient;
     @Autowired RedisConnectionFactory connectionFactory;
-    @Autowired PlayerMessageCodec codec;
+    @Autowired ObjectMapper objectMapper;
 
     private RedisMessageListenerContainer container;
+
+    @BeforeEach
+    void resetState() {
+        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID_2);
+        discordClient.reset();
+    }
 
     @AfterEach
     void stopContainer() {
@@ -95,7 +101,7 @@ class DiscordVoiceConnectionManagerTest {
     @Test
     void publishesReadyEventWhenVoiceSessionReportsJoined() throws Exception {
         AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
-        startListener(body -> received.set(codec.parseEvent(body)));
+        startListener(body -> received.set(parseEvent(body)));
 
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
@@ -107,7 +113,7 @@ class DiscordVoiceConnectionManagerTest {
     @Test
     void publishesReadyEventImmediatelyWhenAlreadyConnected() throws Exception {
         AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
-        startListener(body -> received.set(codec.parseEvent(body)));
+        startListener(body -> received.set(parseEvent(body)));
         discordClient.session(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
 
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
@@ -130,6 +136,7 @@ class DiscordVoiceConnectionManagerTest {
     @Test
     void leavesConnectedGuildWhenDisconnecting() {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
 
@@ -146,6 +153,7 @@ class DiscordVoiceConnectionManagerTest {
     @Test
     void disconnectsOnlyOnceForSameGuild() {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
         voiceConnectionManager.disconnect(GUILD_ID);
@@ -157,11 +165,47 @@ class DiscordVoiceConnectionManagerTest {
     void disconnectsOnlyTargetedGuild() {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         voiceConnectionManager.connect(new ConnectionRequest("req-2", "voice-2", GUILD_ID_2));
+        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        discordClient.session(GUILD_ID_2).simulateJoined("voice-2");
 
         voiceConnectionManager.disconnect(GUILD_ID);
 
         assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
         assertThat(discordClient.session(GUILD_ID_2).getLeaveCount()).isZero();
+    }
+
+    // --- BUG FIXES ---
+
+    @Test
+    void tracksGuildAsConnectedOnlyAfterJoinCallbackFires() {
+        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+
+        voiceConnectionManager.disconnect(GUILD_ID);
+        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isZero();
+
+        discordClient.session(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+
+        voiceConnectionManager.disconnect(GUILD_ID);
+        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
+    }
+
+    @Test
+    void tracksGuildAfterMovingToNewChannel() {
+        discordClient.session(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
+
+        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, "voice-2", GUILD_ID));
+        discordClient.session(GUILD_ID).simulateJoined("voice-2");
+
+        voiceConnectionManager.disconnect(GUILD_ID);
+        assertThat(discordClient.session(GUILD_ID).getLeaveCount()).isEqualTo(1);
+    }
+
+    private MusicPlayerEvent parseEvent(byte[] body) {
+        try {
+            return objectMapper.readValue(body, MusicPlayerEvent.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse MusicPlayerEvent", e);
+        }
     }
 
     private void startListener(MessageHandler handler) throws Exception {

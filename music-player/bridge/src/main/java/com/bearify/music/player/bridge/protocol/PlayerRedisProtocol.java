@@ -19,8 +19,8 @@ public final class PlayerRedisProtocol {
 
         public static final String EVENTS = "players:events";
 
-        public static String commands(String playerId) {
-            return "players:commands:" + playerId;
+        public static String interactions(String playerId) {
+            return "players:interactions:" + playerId;
         }
     }
 }
