@@ -1,8 +1,8 @@
 
-  ██████╗ ███████╗ █████╗ ██████╗ ██╗███████╗██╗   ██╗
+${AnsiColor.BRIGHT_GREEN}  ██████╗ ███████╗ █████╗ ██████╗ ██╗███████╗██╗   ██╗
   ██╔══██╗██╔════╝██╔══██╗██╔══██╗██║██╔════╝╚██╗ ██╔╝
   ██████╔╝█████╗  ███████║██████╔╝██║█████╗   ╚████╔╝
   ██╔══██╗██╔══╝  ██╔══██║██╔══██╗██║██╔══╝    ╚██╔╝
   ██████╔╝███████╗██║  ██║██║  ██║██║██║        ██║
-  ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝        ╚═╝
-        :: Controller ${application.formatted-version} ::  |  Bearly keeping the music alive
+  ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝        ╚═╝${AnsiColor.DEFAULT}
+${AnsiBackground.BRIGHT_YELLOW}${AnsiColor.BLACK}  ⚙  CONTROLLER ${application.formatted-version}  ${AnsiColor.DEFAULT}${AnsiBackground.DEFAULT}  |  Bearly keeping the music alive

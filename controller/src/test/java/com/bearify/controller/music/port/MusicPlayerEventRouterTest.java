@@ -1,5 +1,6 @@
-package com.bearify.controller.music.domain;
+package com.bearify.controller.music.port;
 
+import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import org.junit.jupiter.api.Test;
 

@@ -1,4 +1,4 @@
-package com.bearify.controller.music.domain.redis;
+package com.bearify.controller.music.redis;
 
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
@@ -28,6 +28,12 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
         return findAssignedTo(guildId, voiceChannelId)
                 .map(playerId -> player(playerId, guildId, voiceChannelId))
                 .or(() -> claim(guildId, voiceChannelId));
+    }
+
+    @Override
+    public Optional<MusicPlayer> find(String guildId, String voiceChannelId) {
+        return findAssignedTo(guildId, voiceChannelId)
+                .map(playerId -> player(playerId, guildId, voiceChannelId));
     }
 
     private Optional<MusicPlayer> claim(String guildId, String voiceChannelId) {

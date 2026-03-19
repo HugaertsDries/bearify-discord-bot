@@ -1,18 +1,23 @@
-package com.bearify.controller.music.domain.redis;
+package com.bearify.controller.music.redis;
 
 import com.bearify.controller.music.domain.MusicPlayer;
+import com.bearify.controller.music.domain.MusicPlayerJoinResultHandler;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 class RedisMusicPlayer implements MusicPlayer {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RedisMusicPlayer.class);
 
     private final String playerId;
     private final String guildId;
@@ -36,19 +41,31 @@ class RedisMusicPlayer implements MusicPlayer {
     }
 
     @Override
-    public CompletableFuture<MusicPlayerEvent> join() {
+    public void join(MusicPlayerJoinResultHandler handler) {
         MusicPlayerPendingRequests.Pending pending = pendingRequests.register();
-        String json = serialize(new MusicPlayerInteraction.Connect(playerId, pending.requestId(), voiceChannelId, guildId));
-        redis.convertAndSend(PlayerRedisProtocol.Channels.interactions(playerId), json);
-        return pending.future();
+        redis.convertAndSend(
+                PlayerRedisProtocol.Channels.interactions(playerId),
+                serialize(new MusicPlayerInteraction.Connect(playerId, pending.requestId(), voiceChannelId, guildId)));
+        pending.future().orTimeout(30, TimeUnit.SECONDS).whenComplete((event, ex) -> {
+            if (ex != null) {
+                handler.onFailed("Request timed out");
+            } else {
+                switch (event) {
+                    case MusicPlayerEvent.Ready r -> handler.onReady();
+                    case MusicPlayerEvent.ConnectFailed f -> handler.onFailed(f.reason());
+                    default -> LOG.warn("Unexpected event type '{}' for join request", event.getClass().getSimpleName());
+                }
+            }
+        });
     }
 
     @Override
     public void stop() {
-        redis.delete(PlayerRedisProtocol.Keys.assignment(guildId, voiceChannelId));
         String requestId = UUID.randomUUID().toString();
-        String json = serialize(new MusicPlayerInteraction.Stop(playerId, requestId, guildId));
-        redis.convertAndSend(PlayerRedisProtocol.Channels.interactions(playerId), json);
+        redis.convertAndSend(
+                PlayerRedisProtocol.Channels.interactions(playerId),
+                serialize(new MusicPlayerInteraction.Stop(playerId, requestId, guildId)));
+        redis.delete(PlayerRedisProtocol.Keys.assignment(guildId, voiceChannelId));
     }
 
     private String serialize(Object value) {

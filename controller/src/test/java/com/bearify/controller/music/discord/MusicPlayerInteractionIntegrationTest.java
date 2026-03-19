@@ -3,9 +3,11 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
+import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +40,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         redis.opsForSet().add(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID);
     }
 
-    // --- HAPPY PATH ---
+    // --- JOIN: HAPPY PATH ---
 
     @Test
     void dispatchesSummonAndClaimsPlayer() {
@@ -58,14 +61,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
     @Test
     void publishesConnectInteractionToPlayerChannel() throws Exception {
         BlockingQueue<String> received = new LinkedBlockingQueue<>();
-
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(redisConnectionFactory);
-        container.addMessageListener(
-                (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.Channels.interactions(PLAYER_ID)));
-        container.afterPropertiesSet();
-        container.start();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
 
         try {
             MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
@@ -91,7 +87,37 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         }
     }
 
-    // --- EDGE CASES ---
+    @Test
+    void showsConnectFailedMessageWhenJoinFails() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                    .subcommand("join")
+                    .voiceChannelId(VOICE_CHANNEL_ID)
+                    .guildId(GUILD_ID)
+                    .build();
+
+            commandRegistry.handle(interaction);
+
+            String json = received.poll(2, TimeUnit.SECONDS);
+            assertThat(json).isNotNull();
+            MusicPlayerInteraction.Connect connect = (MusicPlayerInteraction.Connect) objectMapper.readValue(json, MusicPlayerInteraction.class);
+
+            String failedEvent = objectMapper.writeValueAsString(
+                    new MusicPlayerEvent.ConnectFailed(PLAYER_ID, connect.requestId(), "connection refused"));
+            redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, failedEvent);
+
+            Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                            .contains("The bear couldn't reach your channel"));
+        } finally {
+            container.stop();
+        }
+    }
+
+    // --- JOIN: EDGE CASES ---
 
     @Test
     void showsDeferredMessageWhenNoPlayerAvailable() {
@@ -114,14 +140,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
     void reusesAssignedPlayerForSameVoiceChannel() throws Exception {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
         BlockingQueue<String> received = new LinkedBlockingQueue<>();
-
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(redisConnectionFactory);
-        container.addMessageListener(
-                (message, pattern) -> received.offer(new String(message.getBody())),
-                new ChannelTopic(PlayerRedisProtocol.Channels.interactions(PLAYER_ID)));
-        container.afterPropertiesSet();
-        container.start();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
 
         try {
             MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
@@ -139,4 +158,66 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
             container.stop();
         }
     }
+
+    // --- LEAVE: HAPPY PATH ---
+
+    @Test
+    void publishesStopInteractionOnLeave() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                    .subcommand("leave")
+                    .voiceChannelId(VOICE_CHANNEL_ID)
+                    .guildId(GUILD_ID)
+                    .build();
+
+            commandRegistry.handle(interaction);
+
+            String json = received.poll(2, TimeUnit.SECONDS);
+            assertThat(json).isNotNull();
+
+            MusicPlayerInteraction playerInteraction = objectMapper.readValue(json, MusicPlayerInteraction.class);
+            assertThat(playerInteraction).isInstanceOf(MusicPlayerInteraction.Stop.class);
+            MusicPlayerInteraction.Stop stop = (MusicPlayerInteraction.Stop) playerInteraction;
+            assertThat(stop.guildId()).isEqualTo(GUILD_ID);
+        } finally {
+            container.stop();
+        }
+    }
+
+    // --- LEAVE: EDGE CASES ---
+
+    @Test
+    void showsNoPlayerMessageWhenNotAssigned() {
+        redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID));
+
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                .subcommand("leave")
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .guildId(GUILD_ID)
+                .build();
+
+        commandRegistry.handle(interaction);
+
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("No bear is playing");
+    }
+
+    // --- HELPERS ---
+
+    private RedisMessageListenerContainer startListener(String topic, BlockingQueue<String> queue) {
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(redisConnectionFactory);
+        container.addMessageListener(
+                (message, pattern) -> queue.offer(new String(message.getBody())),
+                new ChannelTopic(topic));
+        container.afterPropertiesSet();
+        container.start();
+        return container;
+    }
+
 }

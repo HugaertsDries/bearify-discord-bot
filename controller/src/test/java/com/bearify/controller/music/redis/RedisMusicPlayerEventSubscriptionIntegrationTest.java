@@ -1,4 +1,4 @@
-package com.bearify.controller.music.domain.redis;
+package com.bearify.controller.music.redis;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
@@ -32,6 +32,6 @@ class RedisMusicPlayerEventSubscriptionIntegrationTest extends AbstractControlle
 
         MusicPlayerEvent result = pending.future().get(2, TimeUnit.SECONDS);
         assertThat(result).isInstanceOf(MusicPlayerEvent.Ready.class);
-        assertThat(((MusicPlayerEvent.Ready) result).playerId()).isEqualTo(PLAYER_ID);
+        assertThat(result.playerId()).isEqualTo(PLAYER_ID);
     }
 }

@@ -17,6 +17,7 @@ public class MusicPlayerPendingRequests {
         String requestId = UUID.randomUUID().toString();
         CompletableFuture<MusicPlayerEvent> future = new CompletableFuture<>();
         pending.put(requestId, future);
+        future.whenComplete((e, ex) -> pending.remove(requestId));
         return new Pending(requestId, future);
     }
 

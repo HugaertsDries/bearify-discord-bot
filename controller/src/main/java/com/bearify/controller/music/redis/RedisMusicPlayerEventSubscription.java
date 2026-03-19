@@ -1,6 +1,6 @@
-package com.bearify.controller.music.domain.redis;
+package com.bearify.controller.music.redis;
 
-import com.bearify.controller.music.domain.MusicPlayerEventRouter;
+import com.bearify.controller.music.port.MusicPlayerEventRouter;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,41 +20,33 @@ class RedisMusicPlayerEventSubscription implements SmartLifecycle {
 
     private static final Logger LOG = LoggerFactory.getLogger(RedisMusicPlayerEventSubscription.class);
 
-    private final RedisConnectionFactory connectionFactory;
-    private final ObjectMapper objectMapper;
-    private final MusicPlayerEventRouter eventRouter;
-    private RedisMessageListenerContainer container;
+    private final RedisMessageListenerContainer container;
 
     RedisMusicPlayerEventSubscription(RedisConnectionFactory connectionFactory,
                                       ObjectMapper objectMapper,
                                       MusicPlayerEventRouter eventRouter) {
-        this.connectionFactory = connectionFactory;
-        this.objectMapper = objectMapper;
-        this.eventRouter = eventRouter;
+        container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(connectionFactory);
+        container.addMessageListener(onMessage(objectMapper, eventRouter), new ChannelTopic(PlayerRedisProtocol.Channels.EVENTS));
+        container.afterPropertiesSet();
     }
 
     @Override
     public void start() {
-        container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(onMessage(), new ChannelTopic(PlayerRedisProtocol.Channels.EVENTS));
-        container.afterPropertiesSet();
         container.start();
     }
 
     @Override
     public void stop() {
-        if (container != null) {
-            container.stop();
-        }
+        container.stop();
     }
 
     @Override
     public boolean isRunning() {
-        return container != null && container.isRunning();
+        return container.isRunning();
     }
 
-    private MessageListener onMessage() {
+    private static MessageListener onMessage(ObjectMapper objectMapper, MusicPlayerEventRouter eventRouter) {
         return (message, pattern) -> {
             try {
                 MusicPlayerEvent event = objectMapper.readValue(message.getBody(), MusicPlayerEvent.class);

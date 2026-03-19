@@ -1,7 +1,8 @@
-package com.bearify.controller.music.domain.redis;
+package com.bearify.controller.music.redis;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayer;
+import com.bearify.controller.music.domain.MusicPlayerJoinResultHandler;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
@@ -15,7 +16,6 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -42,15 +42,6 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
     // --- HAPPY PATH ---
 
     @Test
-    void joinReturnsNonNullFuture() {
-        MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID).orElseThrow();
-
-        CompletableFuture<?> future = player.join();
-
-        assertThat(future).isNotNull();
-    }
-
-    @Test
     void joinPublishesConnectToCorrectRedisChannel() throws Exception {
         BlockingQueue<String> received = new LinkedBlockingQueue<>();
 
@@ -64,7 +55,10 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
 
         try {
             MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID).orElseThrow();
-            player.join();
+            player.join(new MusicPlayerJoinResultHandler() {
+                public void onReady() {}
+                public void onFailed(String reason) {}
+            });
 
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();

@@ -1,0 +1,8 @@
+
+${AnsiColor.BRIGHT_GREEN} ██████╗ ███████╗ █████╗ ██████╗ ██╗███████╗██╗   ██╗
+ ██╔══██╗██╔════╝██╔══██╗██╔══██╗██║██╔════╝╚██╗ ██╔╝
+ ██████╔╝█████╗  ███████║██████╔╝██║█████╗   ╚████╔╝
+ ██╔══██╗██╔══╝  ██╔══██║██╔══██╗██║██╔══╝    ╚██╔╝
+ ██████╔╝███████╗██║  ██║██║  ██║██║██║        ██║
+ ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝        ╚═╝${AnsiColor.DEFAULT}
+${AnsiBackground.BRIGHT_YELLOW}${AnsiColor.BLACK}  ♪  PLAYER ${application.formatted-version}  ${AnsiColor.DEFAULT}${AnsiBackground.DEFAULT}  |  Bearly keeping the music alive ♫
