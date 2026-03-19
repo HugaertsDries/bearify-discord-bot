@@ -114,7 +114,7 @@ class VoiceConnectionManagerTest {
     void publishesReadyEventImmediatelyWhenAlreadyConnected() throws Exception {
         AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
         startListener(body -> received.set(parseEvent(body)));
-        discordClient.guild(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
@@ -191,7 +191,7 @@ class VoiceConnectionManagerTest {
 
     @Test
     void tracksGuildAfterMovingToNewChannel() {
-        discordClient.guild(GUILD_ID).join(VOICE_CHANNEL_ID, channelId -> {});
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, "voice-2", GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined("voice-2");
@@ -275,16 +275,17 @@ class VoiceConnectionManagerTest {
     static final class FakeGuild implements Guild {
 
         private String joinedChannelId;
+        private String connectedChannelId;
         private int leaveCount;
         private VoiceSessionListener joinListener;
 
         @Override
         public Optional<VoiceSession> voice() {
-            if (joinedChannelId != null && leaveCount == 0) {
+            if (connectedChannelId != null) {
                 return Optional.of(new VoiceSession() {
-                    @Override public String getChannelId() { return joinedChannelId; }
+                    @Override public String getChannelId() { return connectedChannelId; }
                     @Override public boolean isLonely() { return true; }
-                    @Override public void leave() { leaveCount++; }
+                    @Override public void leave() { leaveCount++; connectedChannelId = null; }
                 });
             }
             return Optional.empty();
@@ -297,6 +298,7 @@ class VoiceConnectionManagerTest {
         }
 
         void simulateJoined(String channelId) {
+            connectedChannelId = channelId;
             if (joinListener != null) {
                 joinListener.onJoined(channelId);
             }
