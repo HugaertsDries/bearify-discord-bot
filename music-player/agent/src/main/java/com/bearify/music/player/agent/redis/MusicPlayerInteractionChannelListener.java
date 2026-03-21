@@ -3,7 +3,6 @@ package com.bearify.music.player.agent.redis;
 import com.bearify.music.player.agent.port.MusicPlayerInteractionDispatcher;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -11,6 +10,7 @@ import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import tools.jackson.databind.ObjectMapper;
 
 class MusicPlayerInteractionChannelListener implements SmartLifecycle {
 

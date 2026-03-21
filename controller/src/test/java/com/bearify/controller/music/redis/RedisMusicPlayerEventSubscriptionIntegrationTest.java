@@ -4,10 +4,10 @@ import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.TimeUnit;
 

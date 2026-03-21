@@ -2,7 +2,9 @@ dependencies {
     implementation project(':discord:starter')
     implementation libs.spring.boot.autoconfigure
     implementation libs.jda
-    implementation libs.libdave.adapter.jda
-    implementation libs.libdave.impl.jni
-    implementation libs.udpqueue.api
+    implementation libs.jdave.api
+    implementation libs.jdave.native.win.x86
+    implementation libs.jdave.native.linux.x86
+    implementation libs.jdave.native.linux.aarch
+    implementation libs.jdave.native.darwin
 }

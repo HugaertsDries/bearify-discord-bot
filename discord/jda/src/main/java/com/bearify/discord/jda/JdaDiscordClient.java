@@ -1,14 +1,11 @@
 package com.bearify.discord.jda;
 
+import club.minnced.discord.jdave.interop.JDaveSessionFactory;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
-import com.sedmelluq.discord.lavaplayer.jdaudp.NativeAudioSendFactory;
-import moe.kyokobot.libdave.NativeDaveFactory;
-import moe.kyokobot.libdave.jda.LDJDADaveSessionFactory;
-import moe.kyokobot.libdave.netty.NativeNettyDaveFactory;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.audio.AudioModuleConfig;
@@ -72,8 +69,7 @@ public class JdaDiscordClient implements DiscordClient {
     private void connect(String token) {
         try {
             var audio = new AudioModuleConfig();
-            audio = audio.withDaveSessionFactory(new LDJDADaveSessionFactory(new NativeDaveFactory()));
-//            audio = audio.withAudioSendFactory(new NativeAudioSendFactory());
+            audio = audio.withDaveSessionFactory(new JDaveSessionFactory());
             jda = JDABuilder.createDefault(token)
                     .addEventListeners(new JdaEventListener(interactionHandler))
                     .setAudioModuleConfig(audio)

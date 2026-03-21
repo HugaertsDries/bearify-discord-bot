@@ -3,11 +3,11 @@ package com.bearify.controller.music.redis;
 import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.port.MusicPlayerEventRouter;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 public class RedisConfig {

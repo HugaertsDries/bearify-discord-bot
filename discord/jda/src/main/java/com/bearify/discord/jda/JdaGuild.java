@@ -48,6 +48,7 @@ class JdaGuild implements Guild {
             }
         });
         guild.getAudioManager().setAutoReconnect(false);
+        guild.getAudioManager().setSelfDeafened(true);
         guild.getAudioManager().setSendingHandler(new AudioSendHandler() {
             @Override
             public boolean canProvide() {

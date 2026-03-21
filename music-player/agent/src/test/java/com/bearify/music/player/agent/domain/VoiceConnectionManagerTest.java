@@ -9,7 +9,6 @@ import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +25,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.List;
@@ -67,7 +67,8 @@ class VoiceConnectionManagerTest {
     @Autowired VoiceConnectionManager voiceConnectionManager;
     @Autowired FakeDiscordClient discordClient;
     @Autowired RedisConnectionFactory connectionFactory;
-    @Autowired ObjectMapper objectMapper;
+    @Autowired
+    ObjectMapper objectMapper;
 
     private RedisMessageListenerContainer container;
 
