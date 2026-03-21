@@ -5,6 +5,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
 
 player:
   id: ${PLAYER_ID:player-1}
@@ -12,3 +14,9 @@ player:
 discord:
   token: ${DISCORD_PLAYER_TOKEN}
   guild-id: ${DISCORD_GUILD_ID}
+
+music-player:
+  previous-restart-threshold-ms: 3000
+  seek-short-default-ms: 10000
+  seek-long-default-ms: 30000
+  seek-track-length-threshold-ms: 300000
