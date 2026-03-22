@@ -2,7 +2,8 @@ package com.bearify.controller.music.redis;
 
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
-import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
+import com.bearify.controller.music.domain.MusicPlayerInteractions;
+import com.bearify.controller.music.domain.MusicPlayerTextChannelRegistry;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -13,14 +14,17 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
-    private final MusicPlayerPendingRequests pendingRequests;
+    private final MusicPlayerInteractions pendingInteractions;
+    private final MusicPlayerTextChannelRegistry textChannelRegistry;
 
     RedisMusicPlayerPool(StringRedisTemplate redis,
                          ObjectMapper objectMapper,
-                         MusicPlayerPendingRequests pendingRequests) {
+                         MusicPlayerInteractions pendingInteractions,
+                         MusicPlayerTextChannelRegistry textChannelRegistry) {
         this.redis = redis;
         this.objectMapper = objectMapper;
-        this.pendingRequests = pendingRequests;
+        this.pendingInteractions = pendingInteractions;
+        this.textChannelRegistry = textChannelRegistry;
     }
 
     @Override
@@ -34,6 +38,12 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
     public Optional<MusicPlayer> find(String guildId, String voiceChannelId) {
         return findAssignedTo(guildId, voiceChannelId)
                 .map(playerId -> player(playerId, guildId, voiceChannelId));
+    }
+
+    @Override
+    public boolean hasActiveSessionFor(String guildId) {
+        var keys = redis.keys(PlayerRedisProtocol.Keys.assignment(guildId));
+        return keys != null && !keys.isEmpty();
     }
 
     private Optional<MusicPlayer> claim(String guildId, String voiceChannelId) {
@@ -56,6 +66,6 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
     }
 
     private MusicPlayer player(String playerId, String guildId, String voiceChannelId) {
-        return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingRequests);
+        return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingInteractions, textChannelRegistry);
     }
 }

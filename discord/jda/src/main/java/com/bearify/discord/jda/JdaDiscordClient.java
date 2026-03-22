@@ -3,10 +3,12 @@ package com.bearify.discord.jda;
 import club.minnced.discord.jdave.interop.JDaveSessionFactory;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.Guild;
+import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.audio.AudioModuleConfig;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
@@ -63,6 +65,18 @@ public class JdaDiscordClient implements DiscordClient {
             throw new IllegalStateException("Discord client has not been started");
         }
         return new JdaGuild(jda, guildId);
+    }
+
+    @Override
+    public TextChannel textChannel(String channelId) {
+        if (jda == null) {
+            throw new IllegalStateException("Discord client has not been started");
+        }
+        MessageChannel channel = jda.getChannelById(MessageChannel.class, channelId);
+        if (channel == null) {
+            throw new IllegalArgumentException("Text channel not found: " + channelId);
+        }
+        return new JdaTextChannel(channel);
     }
 
     @Override

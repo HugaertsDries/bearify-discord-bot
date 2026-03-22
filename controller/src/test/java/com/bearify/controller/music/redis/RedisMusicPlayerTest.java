@@ -2,7 +2,7 @@ package com.bearify.controller.music.redis;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayer;
-import com.bearify.controller.music.domain.MusicPlayerJoinResultHandler;
+import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
@@ -55,10 +55,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
 
         try {
             MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID).orElseThrow();
-            player.join(new MusicPlayerJoinResultHandler() {
-                public void onReady() {}
-                public void onFailed(String reason) {}
-            });
+            player.join(new MusicPlayerEventListener() {});
 
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();

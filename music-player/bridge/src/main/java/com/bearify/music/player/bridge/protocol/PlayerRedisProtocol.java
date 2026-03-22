@@ -9,6 +9,10 @@ public final class PlayerRedisProtocol {
 
         public static final String AVAILABLE_PLAYERS = "players:available";
 
+        public static String assignment(String guildId) {
+            return "players:assignment:" + guildId + ":*";
+        }
+
         public static String assignment(String guildId, String voiceChannelId) {
             return "players:assignment:" + guildId + ":" + voiceChannelId;
         }

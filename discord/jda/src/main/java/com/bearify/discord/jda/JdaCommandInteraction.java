@@ -27,8 +27,15 @@ class JdaCommandInteraction implements CommandInteraction {
     @Override
     public EditableMessage defer() {
         Instant createdAt = Instant.now();
-        InteractionHook hook = event.deferReply(true).complete();
+        InteractionHook hook = event.deferReply(false).complete();
         return new JdaEditableMessage(hook, createdAt);
+    }
+
+    @Override
+    public String getUserMention() {
+        return Optional.ofNullable(event.getMember())
+                .map(Member::getAsMention)
+                .orElseGet(() -> event.getUser().getAsMention());
     }
 
     @Override
@@ -62,5 +69,10 @@ class JdaCommandInteraction implements CommandInteraction {
     @Override
     public Optional<String> getGuildId() {
         return Optional.ofNullable(event.getGuild()).map(net.dv8tion.jda.api.entities.Guild::getId);
+    }
+
+    @Override
+    public Optional<String> getTextChannelId() {
+        return Optional.ofNullable(event.getChannelId());
     }
 }

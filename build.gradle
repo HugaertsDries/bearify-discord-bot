@@ -54,9 +54,8 @@ subprojects {
 
     repositories {
         mavenCentral()
-        maven {
-            url = uri("https://maven.lavalink.dev/snapshots")
-        }
+        maven { url = uri("https://maven.lavalink.dev/releases") }
+        maven { url = uri("https://maven.lavalink.dev/snapshots") }
     }
 
     dependencyManagement {

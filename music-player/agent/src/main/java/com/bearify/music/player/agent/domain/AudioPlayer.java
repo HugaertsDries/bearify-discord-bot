@@ -1,0 +1,207 @@
+package com.bearify.music.player.agent.domain;
+
+import com.bearify.discord.api.voice.AudioProvider;
+import com.bearify.music.player.agent.config.PlayerProperties;
+import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.TrackMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.UUID;
+
+public class AudioPlayer implements AudioProvider {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AudioPlayer.class);
+
+    private final AudioEngine engine;
+    private final AudioProvider audioProvider;
+    private final MusicPlayerEventDispatcher eventDispatcher;
+    private final PlayerProperties properties;
+    private final String playerId;
+    private final String guildId;
+    private final Runnable onClose;
+
+    private final Deque<Track> queue = new ArrayDeque<>();
+    private final Deque<Track> history = new ArrayDeque<>();
+    private boolean justRestarted = false;
+    private boolean closed = false;
+
+    protected AudioPlayer(AudioEngine engine,
+                          AudioProvider audioProvider,
+                          MusicPlayerEventDispatcher eventDispatcher,
+                          PlayerProperties properties, String playerId, String guildId,
+                          Runnable onClose) {
+        this.engine = engine;
+        this.audioProvider = audioProvider;
+        this.eventDispatcher = eventDispatcher;
+        this.properties = properties;
+        this.playerId = playerId;
+        this.guildId = guildId;
+        this.onClose = onClose;
+        engine.addListener(new TrackEventHandler());
+    }
+
+    // --- AudioProvider ---
+
+    @Override
+    public boolean canProvide() {
+        return audioProvider.canProvide();
+    }
+
+    @Override
+    public byte[] provide20MsAudio() {
+        return audioProvider.provide20MsAudio();
+    }
+
+    @Override
+    public boolean isOpus() {
+        return audioProvider.isOpus();
+    }
+
+    // --- Playback control ---
+
+    public synchronized void play(Track track) {
+        if (engine.getPlayingTrack() == null) {
+            engine.play(track);
+        } else {
+            queue.addLast(track);
+        }
+    }
+
+    public void togglePause(String requestId) {
+        boolean nowPaused = !engine.isPaused();
+        engine.setPaused(nowPaused);
+        if (nowPaused) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.Paused(playerId, requestId, guildId));
+        } else {
+            eventDispatcher.dispatch(new MusicPlayerEvent.Resumed(playerId, requestId, guildId));
+        }
+    }
+
+    public synchronized void next(String requestId) {
+        if (queue.isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.QueueEmpty(playerId, requestId, guildId));
+            return;
+        }
+        Track current = engine.getPlayingTrack();
+        if (current != null) {
+            history.addFirst(current.clone());
+        }
+        engine.play(queue.pollFirst());
+    }
+
+    public synchronized void previous(String requestId) {
+        Track current = engine.getPlayingTrack();
+        if (!justRestarted && current != null && current.position() > properties.previousRestartThreshold().toMillis()) {
+            current.setPosition(0);
+            justRestarted = true;
+            return;
+        }
+        justRestarted = false;
+        if (history.isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.NothingToGoBack(playerId, requestId, guildId));
+            return;
+        }
+        if (current != null) {
+            queue.addFirst(current.clone());
+        }
+        engine.play(history.pollFirst());
+    }
+
+    public void rewind(Duration seek) {
+        Track track = engine.getPlayingTrack();
+        if (track == null) return;
+        long effectiveSeekMs = seek.isZero() ? defaultSeekMs(track) : seek.toMillis();
+        long newPosition = Math.max(0, track.position() - effectiveSeekMs);
+        track.setPosition(newPosition);
+    }
+
+    public synchronized void forward(Duration seek, String requestId) {
+        Track track = engine.getPlayingTrack();
+        if (track == null) return;
+        long effectiveSeekMs = seek.isZero() ? defaultSeekMs(track) : seek.toMillis();
+        long newPosition = track.position() + effectiveSeekMs;
+        if (newPosition >= track.duration()) {
+            if (queue.isEmpty()) {
+                eventDispatcher.dispatch(new MusicPlayerEvent.QueueEmpty(playerId, requestId, guildId));
+            } else {
+                history.addFirst(track.clone());
+                engine.play(queue.pollFirst());
+            }
+        } else {
+            track.setPosition(newPosition);
+        }
+    }
+
+    public synchronized void clear() {
+        queue.clear();
+    }
+
+    public synchronized void close() {
+        if (closed) return;
+        closed = true;
+        engine.destroy();
+        queue.clear();
+        history.clear();
+        onClose.run();
+    }
+
+    // --- Private helpers ---
+
+    private long defaultSeekMs(Track track) {
+        return track.duration() >= properties.seekTrackLengthThreshold().toMillis()
+                ? properties.seekLongDefault().toMillis()
+                : properties.seekShortDefault().toMillis();
+    }
+
+    private static String randomId() {
+        return UUID.randomUUID().toString();
+    }
+
+    private TrackMetadata toTrackMetadata(Track t) {
+        return new TrackMetadata(t.title(), t.author(), t.uri(), t.duration());
+    }
+
+    private class TrackEventHandler implements AudioEngineListener {
+
+        @Override
+        public void onTrackStart(Track track) {
+            synchronized (AudioPlayer.this) {
+                justRestarted = false;
+            }
+            LOG.info("Now playing: {} by {}", track.title(), track.author());
+            eventDispatcher.dispatch(new MusicPlayerEvent.TrackStart(
+                    playerId, randomId(), guildId, toTrackMetadata(track)));
+        }
+
+        @Override
+        public void onTrackEnd(Track track, boolean mayStartNext) {
+            if (!mayStartNext) return;
+            synchronized (AudioPlayer.this) {
+                if (!queue.isEmpty()) {
+                    history.addFirst(track.clone());
+                    engine.play(queue.pollFirst());
+                } else {
+                    eventDispatcher.dispatch(new MusicPlayerEvent.QueueEmpty(
+                            playerId, randomId(), guildId));
+                }
+            }
+        }
+
+        @Override
+        public void onTrackError(Track track, String message) {
+            LOG.error("Track error for '{}': {}", track.title(), message);
+            eventDispatcher.dispatch(new MusicPlayerEvent.TrackError(
+                    playerId, randomId(), guildId, toTrackMetadata(track)));
+        }
+
+        @Override
+        public void onTrackStuck(Track track, long thresholdMs) {
+            LOG.warn("Track stuck for '{}' after {}ms", track.title(), thresholdMs);
+        }
+    }
+}

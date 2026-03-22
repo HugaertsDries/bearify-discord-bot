@@ -56,7 +56,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         assertThat(redis.opsForSet().isMember(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID)).isTrue();
         assertThat(interaction.getDeferredMessage()).isPresent();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                .contains("Bearify is padding over to your voice channel");
+                .contains("Sending a bear your way");
     }
 
     @Test
@@ -205,20 +205,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("No bear is playing");
-    }
-
-    // --- HELPERS ---
-
-    private RedisMessageListenerContainer startListener(String topic, BlockingQueue<String> queue) {
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(redisConnectionFactory);
-        container.addMessageListener(
-                (message, pattern) -> queue.offer(new String(message.getBody())),
-                new ChannelTopic(topic));
-        container.afterPropertiesSet();
-        container.start();
-        return container;
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
     }
 
 }

@@ -22,4 +22,10 @@ public interface CommandInteraction {
 
     Optional<String> getVoiceChannelId();
 
+    Optional<String> getTextChannelId();
+
+    default String getUserMention() {
+        return "Someone";
+    }
+
 }

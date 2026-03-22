@@ -4,6 +4,8 @@ spring-dependency-management = "1.1.7"
 dotenv = "3.2.0"
 jda = "6.3.1"
 jdave = "0.1.7"
+lavaplayer = "2.2.2"
+youtube-source = "1.13.1"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
@@ -26,6 +28,8 @@ jdave-native-win-x86 = {module = "club.minnced:jdave-native-win-x86-64", version
 jdave-native-linux-x86 = {module = "club.minnced:jdave-native-linux-x86-64", version.ref = "jdave"}
 jdave-native-linux-aarch = {module = "club.minnced:jdave-native-linux-aarch64", version.ref = "jdave"}
 jdave-native-darwin = {module = "club.minnced:jdave-native-darwin", version.ref = "jdave"}
+lavaplayer = { module = "dev.arbjerg:lavaplayer", version.ref = "lavaplayer" }
+youtube-source = { module = "dev.lavalink.youtube:v2", version.ref = "youtube-source" }
 testcontainers = { module = "org.testcontainers:testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter" }
 awaitility = { module = "org.awaitility:awaitility" }

@@ -1,8 +1,10 @@
 package com.bearify.controller.music.redis;
 
-import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
+import com.bearify.controller.music.domain.MusicPlayerInteractions;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.domain.MusicPlayerTextChannelRegistry;
 import com.bearify.controller.music.port.MusicPlayerEventRouter;
+import com.bearify.controller.music.port.MusicPlayerTrackAnnouncer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -13,20 +15,27 @@ import tools.jackson.databind.ObjectMapper;
 public class RedisConfig {
 
     @Bean
-    MusicPlayerPendingRequests pendingRequests() {
-        return new MusicPlayerPendingRequests();
+    MusicPlayerInteractions pendingInteractions() {
+        return new MusicPlayerInteractions();
     }
 
     @Bean
-    MusicPlayerEventRouter eventRouter(MusicPlayerPendingRequests pendingRequests) {
-        return new MusicPlayerEventRouter(pendingRequests);
+    MusicPlayerTextChannelRegistry textChannelRegistry() {
+        return new MusicPlayerTextChannelRegistry();
+    }
+
+    @Bean
+    MusicPlayerEventRouter eventRouter(MusicPlayerInteractions pendingInteractions,
+                                       MusicPlayerTrackAnnouncer trackAnnouncer) {
+        return new MusicPlayerEventRouter(pendingInteractions, trackAnnouncer);
     }
 
     @Bean
     MusicPlayerPool pool(StringRedisTemplate redis,
                          ObjectMapper objectMapper,
-                         MusicPlayerPendingRequests pendingRequests) {
-        return new RedisMusicPlayerPool(redis, objectMapper, pendingRequests);
+                         MusicPlayerInteractions pendingInteractions,
+                         MusicPlayerTextChannelRegistry textChannelRegistry) {
+        return new RedisMusicPlayerPool(redis, objectMapper, pendingInteractions, textChannelRegistry);
     }
 
     @Bean

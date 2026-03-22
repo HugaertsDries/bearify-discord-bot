@@ -12,34 +12,39 @@ public class VoiceConnectionManager {
 
     private final DiscordClient client;
     private final MusicPlayerEventDispatcher eventDispatcher;
+    private final AudioPlayerPool pool;
     private final String playerId;
 
     public VoiceConnectionManager(DiscordClient client,
                                   MusicPlayerEventDispatcher eventDispatcher,
+                                  AudioPlayerPool pool,
                                   @Value("${player.id}") String playerId) {
         this.client = client;
         this.eventDispatcher = eventDispatcher;
+        this.pool = pool;
         this.playerId = playerId;
     }
 
     public void connect(ConnectionRequest request) {
         var guild = client.guild(request.guildId());
+        AudioPlayer player = pool.getOrCreate(request.guildId());
         guild.voice().ifPresentOrElse(session -> {
             if (session.getChannelId().equals(request.voiceChannelId())) {
                 eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
             } else if (session.isLonely()) {
-                guild.join(request.voiceChannelId(), _ -> {
+                guild.join(request.voiceChannelId(), player, _ -> {
                     eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
                 });
             } else {
                 eventDispatcher.dispatch(new MusicPlayerEvent.ConnectFailed(playerId, request.requestId(), "already connected to a different channel"));
             }
-        }, () -> guild.join(request.voiceChannelId(), _ -> {
+        }, () -> guild.join(request.voiceChannelId(), player, _ -> {
             eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
         }));
     }
 
     public void disconnect(String guildId) {
         client.guild(guildId).voice().ifPresent(VoiceSession::leave);
+        pool.get(guildId).ifPresent(AudioPlayer::close);
     }
 }

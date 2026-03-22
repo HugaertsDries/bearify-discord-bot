@@ -18,6 +18,9 @@ public interface DiscordClient {
     /** Access guild-scoped capabilities. */
     Guild guild(String guildId);
 
+    /** Access a text channel by ID for sending messages. */
+    TextChannel textChannel(String channelId);
+
     /** Disconnect and release resources. */
     void shutdown();
 }

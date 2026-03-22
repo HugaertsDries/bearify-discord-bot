@@ -3,6 +3,7 @@ package com.bearify.music.player.agent;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.MapPropertySource;
@@ -11,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class Application {
 
     public static void main(String[] args) {

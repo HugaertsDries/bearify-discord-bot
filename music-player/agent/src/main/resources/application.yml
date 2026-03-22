@@ -16,7 +16,7 @@ discord:
   guild-id: ${DISCORD_GUILD_ID}
 
 music-player:
-  previous-restart-threshold-ms: 3000
-  seek-short-default-ms: 10000
-  seek-long-default-ms: 30000
-  seek-track-length-threshold-ms: 300000
+  previous-restart-threshold: 3s
+  seek-short-default: 10s
+  seek-long-default: 30s
+  seek-track-length-threshold: 5m

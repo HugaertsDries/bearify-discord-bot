@@ -3,6 +3,8 @@ package com.bearify.music.player.agent;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
 import com.bearify.discord.api.gateway.Guild;
+import com.bearify.discord.api.gateway.TextChannel;
+import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 
 import java.util.Optional;
@@ -62,9 +64,14 @@ public abstract class AbstractAgentIntegrationTest {
                 }
 
                 @Override
-                public void join(String channelId, VoiceSessionListener onJoined) {
+                public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
                 }
             };
+        }
+
+        @Override
+        public TextChannel textChannel(String channelId) {
+            return message -> {};
         }
 
         @Override

@@ -18,6 +18,16 @@ public class PingCommand {
 }
 ```
 
+Declare typed options with `@Option`:
+
+```java
+@Interaction(value = "play", description = "Play a track or search YouTube.")
+public void play(CommandInteraction interaction,
+                 @Option(name = "search", description = "Track name, URL, or search term", required = true) String query) {
+    // query is automatically extracted from the interaction options
+}
+```
+
 Group commands as subcommands by giving `@Command` a name:
 
 ```java

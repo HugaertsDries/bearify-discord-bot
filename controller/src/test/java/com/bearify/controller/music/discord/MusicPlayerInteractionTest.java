@@ -1,13 +1,12 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.music.domain.MusicPlayer;
-import com.bearify.controller.music.domain.MusicPlayerJoinResultHandler;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.discord.testing.MockCommandInteraction;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,7 +34,7 @@ class MusicPlayerInteractionTest {
         assertThat(pool.acquireVoiceChannelId).isEqualTo(VOICE_CHANNEL_ID);
         assertThat(musicPlayer.joined).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                .contains("Bearify is padding over to your voice channel");
+                .contains("Sending a bear your way");
     }
 
     @Test
@@ -51,7 +50,7 @@ class MusicPlayerInteractionTest {
         musicPlayer.fireReady();
 
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                .contains("Bearify is in the channel and ready to play");
+                .contains("Joined <#" + VOICE_CHANNEL_ID + ">");
     }
 
     @Test
@@ -133,7 +132,7 @@ class MusicPlayerInteractionTest {
         assertThat(pool.findVoiceChannelId).isEqualTo(VOICE_CHANNEL_ID);
         assertThat(musicPlayer.stopped).isTrue();
         assertThat(interaction.getReplies()).hasSize(1);
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("shuffling out of the channel");
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("cleaning up after myself");
     }
 
     @Test
@@ -149,7 +148,7 @@ class MusicPlayerInteractionTest {
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("No bear is playing");
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
     }
 
     // --- LEAVE: VALIDATION ---
@@ -208,32 +207,56 @@ class MusicPlayerInteractionTest {
             this.findVoiceChannelId = voiceChannelId;
             return player;
         }
+
+        @Override
+        public boolean hasActiveSessionFor(String guildId) {
+            return false;
+        }
     }
 
     private static final class RecordingMusicPlayer implements MusicPlayer {
         private boolean joined;
         private boolean stopped;
-        private Runnable onReady;
-        private Consumer<String> onFailed;
+        private MusicPlayerEventListener joinHandler;
 
         private void fireReady() {
-            onReady.run();
+            joinHandler.onReady();
         }
 
         private void fireFailed(String reason) {
-            onFailed.accept(reason);
+            joinHandler.onFailed(reason);
         }
 
         @Override
-        public void join(MusicPlayerJoinResultHandler handler) {
+        public void join(MusicPlayerEventListener handler) {
             joined = true;
-            onReady = handler::onReady;
-            onFailed = handler::onFailed;
+            joinHandler = handler;
         }
 
         @Override
         public void stop() {
             stopped = true;
         }
+
+        @Override
+        public void play(String query, String textChannelId, MusicPlayerEventListener handler) {}
+
+        @Override
+        public void togglePause(MusicPlayerEventListener handler) {}
+
+        @Override
+        public void previous(MusicPlayerEventListener handler) {}
+
+        @Override
+        public void next(MusicPlayerEventListener handler) {}
+
+        @Override
+        public void rewind(java.time.Duration seek) {}
+
+        @Override
+        public void forward(java.time.Duration seek, MusicPlayerEventListener handler) {}
+
+        @Override
+        public void clear() {}
     }
 }

@@ -3,8 +3,10 @@ package com.bearify.discord.testing;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
 import com.bearify.discord.api.gateway.Guild;
+import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
+import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 
 import java.util.List;
@@ -41,6 +43,11 @@ public class MockDiscordClient implements DiscordClient {
     }
 
     @Override
+    public TextChannel textChannel(String channelId) {
+        return new MockTextChannel();
+    }
+
+    @Override
     public void shutdown() {
         this.started = false;
     }
@@ -69,7 +76,14 @@ public class MockDiscordClient implements DiscordClient {
         }
 
         @Override
-        public void join(String channelId, VoiceSessionListener onJoined) {
+        public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
+        }
+    }
+
+    private static final class MockTextChannel implements TextChannel {
+
+        @Override
+        public void send(String message) {
         }
     }
 

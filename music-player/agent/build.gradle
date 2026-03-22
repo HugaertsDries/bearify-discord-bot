@@ -7,6 +7,8 @@ dependencies {
     implementation libs.spring.boot.starter
     implementation libs.spring.boot.starter.data.redis
     implementation libs.jda
+    implementation libs.lavaplayer
+    implementation libs.youtube.source
     implementation libs.dotenv.java
     implementation libs.spring.boot.starter.json
 

@@ -17,17 +17,19 @@ public class MockCommandInteraction implements CommandInteraction {
     private final String subcommandName;
     private final String voiceChannelId;
     private final String guildId;
+    private final String textChannelId;
     private MockEditableMessage deferredMessage;
     private boolean deferredEphemeral = false;
     private final List<MockReplyBuilder> replies = new ArrayList<>();
 
     private MockCommandInteraction(String name, Map<String, String> options, String subcommandName,
-                                   String voiceChannelId, String guildId) {
+                                   String voiceChannelId, String guildId, String textChannelId) {
         this.name = name;
         this.options = Map.copyOf(options);
         this.subcommandName = subcommandName;
         this.voiceChannelId = voiceChannelId;
         this.guildId = guildId;
+        this.textChannelId = textChannelId;
     }
 
     @Override
@@ -69,6 +71,11 @@ public class MockCommandInteraction implements CommandInteraction {
         return Optional.ofNullable(guildId);
     }
 
+    @Override
+    public Optional<String> getTextChannelId() {
+        return Optional.ofNullable(textChannelId);
+    }
+
     public Optional<MockEditableMessage> getDeferredMessage() {
         return Optional.ofNullable(deferredMessage);
     }
@@ -91,6 +98,7 @@ public class MockCommandInteraction implements CommandInteraction {
         private String subcommandName;
         private String voiceChannelId;
         private String guildId;
+        private String textChannelId;
 
         private Builder(String name) {
             this.name = name;
@@ -116,8 +124,13 @@ public class MockCommandInteraction implements CommandInteraction {
             return this;
         }
 
+        public Builder textChannelId(String textChannelId) {
+            this.textChannelId = textChannelId;
+            return this;
+        }
+
         public MockCommandInteraction build() {
-            return new MockCommandInteraction(name, options, subcommandName, voiceChannelId, guildId);
+            return new MockCommandInteraction(name, options, subcommandName, voiceChannelId, guildId, textChannelId);
         }
     }
 }

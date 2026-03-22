@@ -1,6 +1,6 @@
 # Bearify Discord Bot
 
-A Discord music bot built with Java 24 and Spring Boot. Uses a controller + player architecture where a main bot handles user commands and separate player agents handle audio playback per voice channel.
+A Discord music bot built with Java 25 and Spring Boot. Uses a controller + player architecture where a main bot handles user commands and separate player agents handle audio playback per guild.
 
 ## Architecture
 
@@ -9,47 +9,48 @@ flowchart TD
     User(👤 User) -->|slash command| Discord(Discord)
     Discord -->|interaction| controller(controller)
 
-    controller -->|PlayerCommand| Redis[(Redis)]
-    Redis -->|PlayerCommand| player1(player 1)
-    Redis -->|PlayerCommand| player2(player 2)
+    controller -->|MusicPlayerInteraction| Redis[(Redis)]
+    Redis -->|MusicPlayerInteraction| player1(music-player/agent 1)
+    Redis -->|MusicPlayerInteraction| player2(music-player/agent 2)
 
-    player1 -->|PlayerEvent| Redis
-    player2 -->|PlayerEvent| Redis
-    Redis -->|PlayerEvent| controller
+    player1 -->|MusicPlayerEvent| Redis
+    player2 -->|MusicPlayerEvent| Redis
+    Redis -->|MusicPlayerEvent| controller
 ```
 
-- **controller** — the bot users interact with. Receives slash commands and dispatches `PlayerCommand`s to players over Redis.
-- **player** — audio player agent. Each instance handles one voice channel. Multiple players can run simultaneously, each with its own Discord bot token.
+- **controller** — the bot users interact with. Receives slash commands, dispatches `MusicPlayerInteraction`s to player agents over Redis, and posts feedback messages back to Discord text channels when it receives `MusicPlayerEvent`s.
+- **music-player/agent** — audio player agent. Each instance can serve multiple guilds simultaneously using LavaPlayer. Multiple agents can run in parallel, each with its own Discord bot token.
 
 ## Modules
 
 | Module | Description |
 |---|---|
-| [`discord/api`](discord/api/README.md) | Pure Java interfaces — `DiscordClient`, `CommandInteraction`, `ReplyBuilder` |
+| [`discord/api`](discord/api/README.md) | Pure Java interfaces — `DiscordClient`, `Guild`, `TextChannel`, `AudioProvider`, `CommandInteraction` |
 | [`discord/jda`](discord/jda/README.md) | JDA 5 implementation of `discord-api` |
-| [`discord/starter`](discord/starter/README.md) | Spring Boot auto-configuration — `@Command`, `@Interaction`, `@DiscordControllerAdvice` |
-| [`shared`](shared/README.md) | Shared DTOs — `Track`, `PlayerCommand`, `PlayerEvent` |
+| [`discord/starter`](discord/starter/README.md) | Spring Boot auto-configuration — `@Command`, `@Interaction`, `@Option`, `@DiscordControllerAdvice` |
+| [`discord/testing`](discord/testing) | Test doubles — `MockDiscordClient`, `MockCommandInteraction` |
+| [`music-player/bridge`](music-player/bridge) | Shared protocol — `MusicPlayerInteraction`, `MusicPlayerEvent`, `Track` |
 | [`controller`](controller/README.md) | Main bot application |
-| [`player`](player/README.md) | Audio player agent |
+| [`music-player/agent`](music-player/agent) | Audio player agent |
 
 ## Tech Stack
 
-- Java 24 (Spring Boot 3.4.3 does not support Java 25 yet)
+- Java 25
 - Spring Boot 3.4.3
 - JDA 5.3.0
 - LavaPlayer 2.2.2
-- Redis (pub/sub + registry)
+- Redis (pub/sub + player registry)
 
 ## Prerequisites
 
-- JDK 24
-- Docker (for local Redis + PostgreSQL)
+- JDK 25
+- Docker (for local Redis)
 
 ## Getting Started
 
 **1. Start infrastructure:**
 ```bash
-docker-compose up -d
+docker-compose -f infra/docker-compose.yml up -d
 ```
 
 **2. Configure environment — copy `.env.example` and fill in your values:**
@@ -62,9 +63,9 @@ cp .env.example .env
 ./gradlew :controller:bootRun
 ```
 
-**4. Run a player:**
+**4. Run a player agent:**
 ```bash
-./gradlew :player:bootRun
+./gradlew :music-player:agent:bootRun
 ```
 
 ## Building
@@ -73,4 +74,4 @@ cp .env.example .env
 ./gradlew build
 ```
 
-> On Windows, set `JAVA_HOME` to your JDK 24 installation before running Gradle.
+> On Windows, set `JAVA_HOME` to your JDK 25 installation before running Gradle.

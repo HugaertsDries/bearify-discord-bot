@@ -1,23 +1,22 @@
 package com.bearify.controller.music.port;
 
-import com.bearify.controller.music.domain.MusicPlayerPendingRequests;
+import com.bearify.controller.music.domain.MusicPlayerInteractions;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MusicPlayerEventRouter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MusicPlayerEventRouter.class);
+    private final MusicPlayerInteractions pendingInteractions;
+    private final MusicPlayerTrackAnnouncer trackAnnouncer;
 
-    private final MusicPlayerPendingRequests musicPlayerPendingRequests;
-
-    public MusicPlayerEventRouter(MusicPlayerPendingRequests musicPlayerPendingRequests) {
-        this.musicPlayerPendingRequests = musicPlayerPendingRequests;
+    public MusicPlayerEventRouter(MusicPlayerInteractions pendingInteractions,
+                                  MusicPlayerTrackAnnouncer trackAnnouncer) {
+        this.pendingInteractions = pendingInteractions;
+        this.trackAnnouncer = trackAnnouncer;
     }
 
     public void route(MusicPlayerEvent event) {
-        if (!musicPlayerPendingRequests.complete(event.requestId(), event)) {
-            LOG.warn("No pending request for requestId '{}'", event.requestId());
+        if (!pendingInteractions.complete(event.requestId(), event)) {
+            trackAnnouncer.announce(event);
         }
     }
 }
