@@ -17,6 +17,9 @@ import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -27,12 +30,15 @@ public class JdaDiscordClient implements DiscordClient {
     private static final String NO_DESCRIPTION = "No description provided";
 
     private final List<CommandDefinition> commands;
+    private final ExecutorService interactionExecutor;
     private final Consumer<CommandInteraction> interactionHandler;
+
     public JDA jda;
 
     JdaDiscordClient(List<CommandDefinition> commands, Consumer<CommandInteraction> interactionHandler) {
         this.commands = commands;
         this.interactionHandler = interactionHandler;
+        this.interactionExecutor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
     @Override
@@ -64,6 +70,15 @@ public class JdaDiscordClient implements DiscordClient {
         if (jda != null) {
             jda.shutdown();
         }
+        interactionExecutor.shutdown();
+        try {
+            if (!interactionExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+                interactionExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            interactionExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void connect(String token) {
@@ -71,7 +86,7 @@ public class JdaDiscordClient implements DiscordClient {
             var audio = new AudioModuleConfig();
             audio = audio.withDaveSessionFactory(new JDaveSessionFactory());
             jda = JDABuilder.createDefault(token)
-                    .addEventListeners(new JdaEventListener(interactionHandler))
+                    .addEventListeners(new JdaEventListener(interactionExecutor, interactionHandler))
                     .setAudioModuleConfig(audio)
                     .build();
             jda.awaitReady();

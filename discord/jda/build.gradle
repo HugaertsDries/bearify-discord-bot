@@ -7,4 +7,6 @@ dependencies {
     implementation libs.jdave.native.linux.x86
     implementation libs.jdave.native.linux.aarch
     implementation libs.jdave.native.darwin
+
+    testImplementation libs.spring.boot.starter.test
 }
