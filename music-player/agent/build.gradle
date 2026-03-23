@@ -9,11 +9,10 @@ dependencies {
     implementation libs.jda
     implementation libs.lavaplayer
     implementation libs.youtube.source
-    implementation libs.dotenv.java
     implementation libs.spring.boot.starter.json
+    implementation libs.spring.boot.starter.validation
 
     testImplementation libs.spring.boot.starter.test
-//    testImplementation libs.testcontainers.junit.jupiter
     testImplementation libs.testcontainers
     testImplementation libs.awaitility
 }

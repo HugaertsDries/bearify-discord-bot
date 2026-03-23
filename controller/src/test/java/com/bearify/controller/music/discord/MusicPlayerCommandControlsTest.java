@@ -31,9 +31,7 @@ class MusicPlayerCommandControlsTest extends AbstractControllerIntegrationTest {
 
     @BeforeEach
     void seedPlayer() {
-        redis.delete(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS);
         redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID));
-        redis.opsForSet().add(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS, PLAYER_ID);
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
     }
 

@@ -69,21 +69,6 @@ class MusicPlayerInteractionTest {
                 .contains("The bear couldn't reach your channel");
     }
 
-    @Test
-    void showsUnavailableMessageWhenNoPlayerCanBeSummoned() {
-        MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
-                .subcommand("join")
-                .voiceChannelId(VOICE_CHANNEL_ID)
-                .guildId(GUILD_ID)
-                .build();
-
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.empty())).join(interaction);
-
-        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                .contains("No music bears are free right now")
-                .contains("Try again in a moment");
-    }
-
     // --- JOIN: VALIDATION ---
 
     @Test
@@ -195,10 +180,10 @@ class MusicPlayerInteractionTest {
         }
 
         @Override
-        public Optional<MusicPlayer> acquire(String guildId, String voiceChannelId) {
+        public MusicPlayer acquire(String guildId, String voiceChannelId) {
             this.acquireGuildId = guildId;
             this.acquireVoiceChannelId = voiceChannelId;
-            return player;
+            return player.orElseThrow(() -> new IllegalStateException("No player available"));
         }
 
         @Override

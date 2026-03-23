@@ -1,7 +1,7 @@
 package com.bearify.music.player.agent.redis;
 
-import com.bearify.music.player.agent.port.MusicPlayerInteractionDispatcher;
-import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.agent.domain.VoiceConnectionManager;
+import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,20 +12,20 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
-class MusicPlayerInteractionChannelListener implements SmartLifecycle {
+class JoinRequestChannelListener implements SmartLifecycle {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MusicPlayerInteractionChannelListener.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JoinRequestChannelListener.class);
 
     private final RedisMessageListenerContainer container;
 
-    MusicPlayerInteractionChannelListener(
-            RedisConnectionFactory connectionFactory,
-            ObjectMapper objectMapper,
-            MusicPlayerInteractionDispatcher dispatcher,
-            String playerId) {
+    JoinRequestChannelListener(RedisConnectionFactory connectionFactory,
+                               ObjectMapper objectMapper,
+                               VoiceConnectionManager voiceConnectionManager) {
         container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(onInteraction(objectMapper, dispatcher), new ChannelTopic(PlayerRedisProtocol.Channels.interactions(playerId)));
+        container.addMessageListener(
+                onRequest(objectMapper, voiceConnectionManager),
+                new ChannelTopic(PlayerRedisProtocol.Channels.REQUESTS));
         container.afterPropertiesSet();
     }
 
@@ -44,13 +44,13 @@ class MusicPlayerInteractionChannelListener implements SmartLifecycle {
         return container.isRunning();
     }
 
-    private static MessageListener onInteraction(ObjectMapper objectMapper, MusicPlayerInteractionDispatcher dispatcher) {
+    private static MessageListener onRequest(ObjectMapper objectMapper, VoiceConnectionManager manager) {
         return (message, pattern) -> {
             try {
-                MusicPlayerInteraction interaction = objectMapper.readValue(message.getBody(), MusicPlayerInteraction.class);
-                dispatcher.handle(interaction);
+                JoinRequest request = objectMapper.readValue(message.getBody(), JoinRequest.class);
+                manager.claim(request);
             } catch (Exception e) {
-                LOG.error("Failed to handle player interaction", e);
+                LOG.error("Failed to handle connect request", e);
             }
         };
     }

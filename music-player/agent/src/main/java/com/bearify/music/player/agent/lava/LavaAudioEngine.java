@@ -1,4 +1,4 @@
-package com.bearify.music.player.agent.infrastructure.lava;
+package com.bearify.music.player.agent.lava;
 
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.music.player.agent.domain.AudioEngine;

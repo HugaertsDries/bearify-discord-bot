@@ -1,12 +1,14 @@
 package com.bearify.music.player.agent.domain;
 
 import com.bearify.music.player.agent.config.PlayerProperties;
-import com.bearify.music.player.agent.infrastructure.lava.LavaAudioEngine;
+import com.bearify.music.player.agent.lava.LavaAudioEngine;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -37,6 +39,10 @@ public class AudioPlayerPool {
 
     public Optional<AudioPlayer> get(String guildId) {
         return Optional.ofNullable(entries.get(guildId)).map(GuildEntry::player);
+    }
+
+    public Set<String> activeGuildIds() {
+        return new HashSet<>(entries.keySet());
     }
 
     private GuildEntry getOrCreateEntry(String guildId) {

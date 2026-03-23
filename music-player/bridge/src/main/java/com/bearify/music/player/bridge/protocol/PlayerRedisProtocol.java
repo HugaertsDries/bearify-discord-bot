@@ -7,7 +7,9 @@ public final class PlayerRedisProtocol {
     public static final class Keys {
         private Keys() {}
 
-        public static final String AVAILABLE_PLAYERS = "players:available";
+        public static String connectRequest(String requestId) {
+            return "players:request:" + requestId;
+        }
 
         public static String assignment(String guildId) {
             return "players:assignment:" + guildId + ":*";
@@ -22,6 +24,7 @@ public final class PlayerRedisProtocol {
         private Channels() {}
 
         public static final String EVENTS = "players:events";
+        public static final String REQUESTS = "players:requests";
 
         public static String interactions(String playerId) {
             return "players:interactions:" + playerId;

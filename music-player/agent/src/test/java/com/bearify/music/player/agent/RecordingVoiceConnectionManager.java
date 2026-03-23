@@ -15,7 +15,7 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
     private final Set<String> disconnectedGuilds = new HashSet<>();
 
     public RecordingVoiceConnectionManager() {
-        super(null, null, null, "test");  // null args safe: connect/disconnect are fully overridden
+        super(null, null, null, null, null, "test");  // null args safe: connect/disconnect are fully overridden
     }
 
     @Override

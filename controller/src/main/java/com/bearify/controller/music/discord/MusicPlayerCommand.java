@@ -53,14 +53,14 @@ public class MusicPlayerCommand {
     @Interaction(value = "join", description = "I'll gladly join you")
     public void join(CommandInteraction interaction) {
         requireVoiceSession(interaction).ifPresent(ctx -> {
-            pool.acquire(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(player -> {
-                EditableMessage message = interaction.defer();
-                message.edit(JOINING_MESSAGE);
-                player.join(new MusicPlayerEventListener() {
-                    public void onReady() { message.edit(joinedMessage(ctx.voiceChannelId())); }
-                    public void onFailed(String reason) { message.edit(CONNECT_FAILED_MESSAGE); }
-                });
-            }, () -> interaction.defer().edit(UNAVAILABLE_MESSAGE));
+            var player = pool.acquire(ctx.guildId(), ctx.voiceChannelId());
+            EditableMessage message = interaction.defer();
+            message.edit(JOINING_MESSAGE);
+            player.join(new MusicPlayerEventListener() {
+                public void onReady() { message.edit(joinedMessage(ctx.voiceChannelId())); }
+                public void onFailed(String reason) { message.edit(CONNECT_FAILED_MESSAGE); }
+                public void onNoPlayersAvailable() { message.edit(UNAVAILABLE_MESSAGE); }
+            });
         });
     }
 
@@ -94,25 +94,22 @@ public class MusicPlayerCommand {
                     });
                     msg.edit(trackQueuedMessage(userMention));
                 },
-                () -> pool.acquire(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                    player -> {
-                        EditableMessage message = interaction.defer();
-                        message.edit(JOINING_MESSAGE);
-                        player.join(new MusicPlayerEventListener() {
-                            public void onReady() {
-                                player.play(resolvedQuery, textChannelId, new MusicPlayerEventListener() {
-                                    public void onTrackNotFound(String q) { message.edit(TRACK_NOT_FOUND_MESSAGE); }
-                                    public void onTrackLoadFailed(String reason) { message.edit(TRACK_LOAD_FAILED_MESSAGE); }
-                                });
-                                message.edit(trackQueuedMessage(userMention));
-                            }
-                            public void onFailed(String reason) {
-                                message.edit(CONNECT_FAILED_MESSAGE);
-                            }
-                        });
-                    },
-                    () -> interaction.defer().edit(UNAVAILABLE_MESSAGE)
-                )
+                () -> {
+                    var player = pool.acquire(ctx.guildId(), ctx.voiceChannelId());
+                    EditableMessage message = interaction.defer();
+                    message.edit(JOINING_MESSAGE);
+                    player.join(new MusicPlayerEventListener() {
+                        public void onReady() {
+                            player.play(resolvedQuery, textChannelId, new MusicPlayerEventListener() {
+                                public void onTrackNotFound(String q) { message.edit(TRACK_NOT_FOUND_MESSAGE); }
+                                public void onTrackLoadFailed(String reason) { message.edit(TRACK_LOAD_FAILED_MESSAGE); }
+                            });
+                            message.edit(trackQueuedMessage(userMention));
+                        }
+                        public void onFailed(String reason) { message.edit(CONNECT_FAILED_MESSAGE); }
+                        public void onNoPlayersAvailable() { message.edit(UNAVAILABLE_MESSAGE); }
+                    });
+                }
             );
         });
     }

@@ -2,7 +2,7 @@ package com.bearify.controller.music.redis;
 
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
-import com.bearify.controller.music.domain.MusicPlayerInteractions;
+import com.bearify.controller.music.domain.MusicPlayerQueue;
 import com.bearify.controller.music.domain.MusicPlayerTextChannelRegistry;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -14,30 +14,33 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
-    private final MusicPlayerInteractions pendingInteractions;
+    private final MusicPlayerQueue pendingInteractions;
     private final MusicPlayerTextChannelRegistry textChannelRegistry;
+    private final MusicPlayerPoolProperties properties;
 
     RedisMusicPlayerPool(StringRedisTemplate redis,
                          ObjectMapper objectMapper,
-                         MusicPlayerInteractions pendingInteractions,
-                         MusicPlayerTextChannelRegistry textChannelRegistry) {
+                         MusicPlayerQueue pendingInteractions,
+                         MusicPlayerTextChannelRegistry textChannelRegistry,
+                         MusicPlayerPoolProperties properties) {
         this.redis = redis;
         this.objectMapper = objectMapper;
         this.pendingInteractions = pendingInteractions;
         this.textChannelRegistry = textChannelRegistry;
+        this.properties = properties;
     }
 
     @Override
-    public Optional<MusicPlayer> acquire(String guildId, String voiceChannelId) {
+    public MusicPlayer acquire(String guildId, String voiceChannelId) {
         return findAssignedTo(guildId, voiceChannelId)
-                .map(playerId -> player(playerId, guildId, voiceChannelId))
-                .or(() -> claim(guildId, voiceChannelId));
+                .map(playerId -> connected(playerId, guildId, voiceChannelId))
+                .orElseGet(() -> pending(guildId, voiceChannelId));
     }
 
     @Override
     public Optional<MusicPlayer> find(String guildId, String voiceChannelId) {
         return findAssignedTo(guildId, voiceChannelId)
-                .map(playerId -> player(playerId, guildId, voiceChannelId));
+                .map(playerId -> connected(playerId, guildId, voiceChannelId));
     }
 
     @Override
@@ -46,26 +49,32 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
         return keys != null && !keys.isEmpty();
     }
 
-    private Optional<MusicPlayer> claim(String guildId, String voiceChannelId) {
-        return Optional.ofNullable(redis.opsForSet().randomMember(PlayerRedisProtocol.Keys.AVAILABLE_PLAYERS))
-                .flatMap(playerId -> {
-                    if (assign(guildId, voiceChannelId, playerId)) {
-                        return Optional.of(player(playerId, guildId, voiceChannelId));
-                    } else {
-                        return acquire(guildId, voiceChannelId);
-                    }
-                });
-    }
-
     private Optional<String> findAssignedTo(String guildId, String voiceChannelId) {
         return Optional.ofNullable(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(guildId, voiceChannelId)));
     }
 
-    private boolean assign(String guildId, String voiceChannelId, String playerId) {
-        return Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(PlayerRedisProtocol.Keys.assignment(guildId, voiceChannelId), playerId));
+    private MusicPlayer connected(String playerId, String guildId, String voiceChannelId) {
+        return RedisMusicPlayer.connected()
+                .withPlayerId(playerId)
+                .withGuildId(guildId)
+                .withVoiceChannelId(voiceChannelId)
+                .withRedis(redis)
+                .withObjectMapper(objectMapper)
+                .withPendingInteractions(pendingInteractions)
+                .withTextChannelRegistry(textChannelRegistry)
+                .withProperties(properties)
+                .build();
     }
 
-    private MusicPlayer player(String playerId, String guildId, String voiceChannelId) {
-        return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingInteractions, textChannelRegistry);
+    private MusicPlayer pending(String guildId, String voiceChannelId) {
+        return RedisMusicPlayer.pending()
+                .withGuildId(guildId)
+                .withVoiceChannelId(voiceChannelId)
+                .withRedis(redis)
+                .withObjectMapper(objectMapper)
+                .withPendingInteractions(pendingInteractions)
+                .withTextChannelRegistry(textChannelRegistry)
+                .withProperties(properties)
+                .build();
     }
 }

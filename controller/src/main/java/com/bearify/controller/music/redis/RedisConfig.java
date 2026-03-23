@@ -1,6 +1,6 @@
 package com.bearify.controller.music.redis;
 
-import com.bearify.controller.music.domain.MusicPlayerInteractions;
+import com.bearify.controller.music.domain.MusicPlayerQueue;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.MusicPlayerTextChannelRegistry;
 import com.bearify.controller.music.port.MusicPlayerEventRouter;
@@ -15,8 +15,8 @@ import tools.jackson.databind.ObjectMapper;
 public class RedisConfig {
 
     @Bean
-    MusicPlayerInteractions pendingInteractions() {
-        return new MusicPlayerInteractions();
+    MusicPlayerQueue pendingInteractions() {
+        return new MusicPlayerQueue();
     }
 
     @Bean
@@ -25,7 +25,7 @@ public class RedisConfig {
     }
 
     @Bean
-    MusicPlayerEventRouter eventRouter(MusicPlayerInteractions pendingInteractions,
+    MusicPlayerEventRouter eventRouter(MusicPlayerQueue pendingInteractions,
                                        MusicPlayerTrackAnnouncer trackAnnouncer) {
         return new MusicPlayerEventRouter(pendingInteractions, trackAnnouncer);
     }
@@ -33,9 +33,10 @@ public class RedisConfig {
     @Bean
     MusicPlayerPool pool(StringRedisTemplate redis,
                          ObjectMapper objectMapper,
-                         MusicPlayerInteractions pendingInteractions,
-                         MusicPlayerTextChannelRegistry textChannelRegistry) {
-        return new RedisMusicPlayerPool(redis, objectMapper, pendingInteractions, textChannelRegistry);
+                         MusicPlayerQueue pendingInteractions,
+                         MusicPlayerTextChannelRegistry textChannelRegistry,
+                         MusicPlayerPoolProperties properties) {
+        return new RedisMusicPlayerPool(redis, objectMapper, pendingInteractions, textChannelRegistry, properties);
     }
 
     @Bean

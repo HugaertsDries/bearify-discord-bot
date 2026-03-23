@@ -1,4 +1,4 @@
-package com.bearify.music.player.agent.infrastructure.lava;
+package com.bearify.music.player.agent.lava;
 
 import com.bearify.music.player.agent.domain.Track;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;

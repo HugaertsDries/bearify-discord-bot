@@ -1,6 +1,6 @@
 package com.bearify.controller.music.port;
 
-import com.bearify.controller.music.domain.MusicPlayerInteractions;
+import com.bearify.controller.music.domain.MusicPlayerQueue;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import org.junit.jupiter.api.Test;
 
@@ -14,33 +14,33 @@ class MusicPlayerEventRouterTest {
 
     @Test
     void routesEventToMatchingPendingRequest() {
-        MusicPlayerInteractions interactions = new MusicPlayerInteractions();
+        MusicPlayerQueue interactions = new MusicPlayerQueue();
         MusicPlayerEventRouter router = new MusicPlayerEventRouter(interactions, NO_OP_ANNOUNCER);
-        MusicPlayerInteractions.Request request = interactions.queue();
-        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", request.requestId());
+        MusicPlayerQueue.Ticket ticket = interactions.enqueue();
+        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", ticket.requestId());
 
         router.route(event);
 
-        assertThat(request.future().isDone()).isTrue();
-        assertThat(request.future().join()).isEqualTo(event);
+        assertThat(ticket.future().isDone()).isTrue();
+        assertThat(ticket.future().join()).isEqualTo(event);
     }
 
     // --- EDGE CASES ---
 
     @Test
     void consumesPendingRequestWhenEventIsRouted() {
-        MusicPlayerInteractions interactions = new MusicPlayerInteractions();
+        MusicPlayerQueue interactions = new MusicPlayerQueue();
         MusicPlayerEventRouter router = new MusicPlayerEventRouter(interactions, NO_OP_ANNOUNCER);
-        MusicPlayerInteractions.Request request = interactions.queue();
+        MusicPlayerQueue.Ticket ticket = interactions.enqueue();
 
-        router.route(new MusicPlayerEvent.Ready("player-1", request.requestId()));
+        router.route(new MusicPlayerEvent.Ready("player-1", ticket.requestId()));
 
-        assertThat(interactions.complete(request.requestId(), new MusicPlayerEvent.Ready("player-1", request.requestId()))).isFalse();
+        assertThat(interactions.complete(ticket.requestId(), new MusicPlayerEvent.Ready("player-1", ticket.requestId()))).isFalse();
     }
 
     @Test
     void routesUnmatchedEventToTrackAnnouncer() {
-        MusicPlayerInteractions interactions = new MusicPlayerInteractions();
+        MusicPlayerQueue interactions = new MusicPlayerQueue();
         MusicPlayerEvent[] announced = {null};
         MusicPlayerEventRouter router = new MusicPlayerEventRouter(interactions, event -> announced[0] = event);
 

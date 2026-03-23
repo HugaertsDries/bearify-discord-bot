@@ -7,18 +7,18 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class MusicPlayerInteractions {
+public class MusicPlayerQueue {
 
-    public record Request(String requestId, CompletableFuture<MusicPlayerEvent> future) {}
+    public record Ticket(String requestId, CompletableFuture<MusicPlayerEvent> future) {}
 
     private final Map<String, CompletableFuture<MusicPlayerEvent>> pending = new ConcurrentHashMap<>();
 
-    public Request queue() {
+    public Ticket enqueue() {
         String requestId = UUID.randomUUID().toString();
         CompletableFuture<MusicPlayerEvent> future = new CompletableFuture<>();
         pending.put(requestId, future);
         future.whenComplete((e, ex) -> pending.remove(requestId));
-        return new Request(requestId, future);
+        return new Ticket(requestId, future);
     }
 
     public boolean complete(String requestId, MusicPlayerEvent event) {

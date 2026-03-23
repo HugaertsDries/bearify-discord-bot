@@ -1,34 +1,43 @@
 package com.bearify.music.player.agent;
 
-import io.github.cdimascio.dotenv.Dotenv;
+import com.bearify.music.player.agent.domain.VoiceConnectionManager;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-import org.springframework.context.ApplicationContextInitializer;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.env.MapPropertySource;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
+@EnableScheduling
 public class Application {
 
-    public static void main(String[] args) {
-        SpringApplication app = new SpringApplication(Application.class);
-        app.addInitializers(new DotenvInitializer());
-        app.run(args);
+    @Bean
+    public SmartLifecycle cleanup(VoiceConnectionManager manager) {
+        return new SmartLifecycle() {
+
+            private volatile boolean running = false;
+
+            @Override
+            public void start() {
+                running = true;
+            }
+
+            @Override
+            public void stop() {
+                manager.close();
+                running = false;
+            }
+
+            @Override
+            public boolean isRunning() {
+                return running;
+            }
+        };
     }
 
-    static class DotenvInitializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
-        @Override
-        public void initialize(ConfigurableApplicationContext ctx) {
-            Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
-            Map<String, Object> props = new HashMap<>();
-            dotenv.entries().forEach(e -> props.put(e.getKey(), e.getValue()));
-            ctx.getEnvironment().getPropertySources()
-                    .addLast(new MapPropertySource("dotenv", props));
-        }
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
     }
 }

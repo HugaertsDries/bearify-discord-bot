@@ -1,5 +1,6 @@
 package com.bearify.music.player.agent.redis;
 
+import com.bearify.music.player.agent.domain.VoiceConnectionManager;
 import com.bearify.music.player.agent.port.MusicPlayerInteractionDispatcher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -27,17 +28,18 @@ public class RedisConfig {
     }
 
     @Bean
-    MusicPlayerRegistration musicPlayerRegistration() {
-        return new MusicPlayerRegistration(stringRedisTemplate, playerId);
+    InteractionChannelListener interactionChannelListener(MusicPlayerInteractionDispatcher dispatcher) {
+        return new InteractionChannelListener(connectionFactory, objectMapper, dispatcher, playerId);
     }
 
     @Bean
-    MusicPlayerInteractionChannelListener musicPlayerInteractionChannelListener(MusicPlayerInteractionDispatcher dispatcher) {
-        return new MusicPlayerInteractionChannelListener(connectionFactory, objectMapper, dispatcher, playerId);
+    JoinRequestChannelListener connectRequestChannelListener(VoiceConnectionManager voiceConnectionManager) {
+        return new JoinRequestChannelListener(connectionFactory, objectMapper, voiceConnectionManager);
     }
 
     @Bean
     RedisMusicPlayerEventDispatcher redisMusicPlayerEventDispatcher() {
         return new RedisMusicPlayerEventDispatcher(stringRedisTemplate, objectMapper);
     }
+
 }
