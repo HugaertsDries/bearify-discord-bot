@@ -5,7 +5,7 @@ dotenv = "3.2.0"
 jda = "6.3.1"
 jdave = "0.1.7"
 lavaplayer = "2.2.2"
-youtube-source = "1.13.1"
+youtube-source = "1.18.0"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
@@ -31,7 +31,6 @@ jdave-native-darwin = {module = "club.minnced:jdave-native-darwin", version.ref 
 lavaplayer = { module = "dev.arbjerg:lavaplayer", version.ref = "lavaplayer" }
 youtube-source = { module = "dev.lavalink.youtube:v2", version.ref = "youtube-source" }
 testcontainers = { module = "org.testcontainers:testcontainers" }
-testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter" }
 awaitility = { module = "org.awaitility:awaitility" }
 
 [plugins]
