@@ -15,6 +15,7 @@ import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
 import dev.lavalink.youtube.YoutubeAudioSourceManager;
 
 import java.nio.ByteBuffer;
+import java.util.Optional;
 
 /**
  * LavaPlayer-backed implementation of {@link AudioEngine} and {@link AudioProvider}.
@@ -28,10 +29,12 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
     private final ByteBuffer frameBuffer = ByteBuffer.allocate(4096);
     private byte[] audioData = new byte[0];
 
-    public LavaAudioEngine() {
+    public LavaAudioEngine(Optional<String> youtubeRefreshToken) {
         this.playerManager = new DefaultAudioPlayerManager();
         var source = new YoutubeAudioSourceManager();
-        source.useOauth2(null, false);
+        youtubeRefreshToken.ifPresentOrElse(
+                token -> source.useOauth2(token, true),
+                () -> source.useOauth2(null, false));
         playerManager.registerSourceManager(source);
         this.audioPlayer = playerManager.createPlayer();
         this.frame.setBuffer(frameBuffer);

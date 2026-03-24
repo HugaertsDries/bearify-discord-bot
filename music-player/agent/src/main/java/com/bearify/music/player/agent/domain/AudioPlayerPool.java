@@ -47,7 +47,7 @@ public class AudioPlayerPool {
 
     private GuildEntry getOrCreateEntry(String guildId) {
         return entries.computeIfAbsent(guildId, id -> {
-            LavaAudioEngine engine = new LavaAudioEngine();
+            LavaAudioEngine engine = new LavaAudioEngine(properties.engine().youtube().refreshToken());
             AudioTrackLoader loader = engine.getLoader();
             AudioPlayer player = new AudioPlayer(
                     engine, engine, eventDispatcher, properties, playerId, id,

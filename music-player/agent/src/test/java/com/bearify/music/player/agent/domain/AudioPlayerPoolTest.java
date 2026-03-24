@@ -22,7 +22,8 @@ class AudioPlayerPoolTest {
                         Duration.ofMinutes(5),
                         new PlayerProperties.Assignment(
                                 Duration.ofSeconds(30),
-                                Duration.ofSeconds(10))),
+                                Duration.ofSeconds(10)),
+                        new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null))),
                 "player-1");
 
         pool.getOrCreate("guild-1");
@@ -47,7 +48,8 @@ class AudioPlayerPoolTest {
                         Duration.ofMinutes(5),
                         new PlayerProperties.Assignment(
                                 Duration.ofSeconds(30),
-                                Duration.ofSeconds(10))),
+                                Duration.ofSeconds(10)),
+                        new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null))),
                 "player-1");
 
         assertThat(pool.activeGuildIds()).isEmpty();

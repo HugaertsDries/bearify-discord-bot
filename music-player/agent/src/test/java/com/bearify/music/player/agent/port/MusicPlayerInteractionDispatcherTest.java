@@ -30,7 +30,8 @@ class MusicPlayerInteractionDispatcherTest {
     private static final String TEXT_CHANNEL_ID = "text-1";
     private static final PlayerProperties PROPS = new PlayerProperties(
             Duration.ofSeconds(3), Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofMinutes(5),
-            new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)));
+            new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
+            new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null)));
 
     @Test
     void connectsVoiceManagerWhenConnectInteractionIsHandled() {

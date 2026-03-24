@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.time.Duration;
+import java.util.Optional;
 
 @ConfigurationProperties("music-player")
 public record PlayerProperties(
@@ -12,7 +13,8 @@ public record PlayerProperties(
         @DefaultValue("10s") Duration seekShortDefault,
         @DefaultValue("30s") Duration seekLongDefault,
         @DefaultValue("5m")  Duration seekTrackLengthThreshold,
-        @DefaultValue Assignment assignment) {
+        @DefaultValue Assignment assignment,
+        @DefaultValue Engine engine) {
 
     public record Assignment(
             @DefaultValue("30s") Duration ttl,
@@ -21,6 +23,21 @@ public record PlayerProperties(
         @AssertTrue(message = "music-player.assignment.ttl must be greater than music-player.assignment.heartbeat-interval")
         public boolean isTtlGreaterThanHeartbeatInterval() {
             return ttl.compareTo(heartbeatInterval) > 0;
+        }
+    }
+
+    public record Engine(@DefaultValue Youtube youtube) {
+
+        public static final class Youtube {
+            private final Optional<String> refreshToken;
+
+            public Youtube(String refreshToken) {
+                this.refreshToken = Optional.ofNullable(refreshToken);
+            }
+
+            public Optional<String> refreshToken() {
+                return refreshToken;
+            }
         }
     }
 }

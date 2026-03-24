@@ -20,3 +20,6 @@ music-player:
   seek-short-default: 10s
   seek-long-default: 30s
   seek-track-length-threshold: 5m
+  engine:
+    youtube:
+      refresh-token: ${YOUTUBE_REFRESH_TOKEN:}
