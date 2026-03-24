@@ -30,7 +30,9 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
 
     public LavaAudioEngine() {
         this.playerManager = new DefaultAudioPlayerManager();
-        playerManager.registerSourceManager(new YoutubeAudioSourceManager());
+        var source = new YoutubeAudioSourceManager();
+        source.useOauth2(null, false);
+        playerManager.registerSourceManager(source);
         this.audioPlayer = playerManager.createPlayer();
         this.frame.setBuffer(frameBuffer);
     }
