@@ -12,6 +12,8 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class AudioPlayer implements AudioProvider {
 
@@ -21,6 +23,7 @@ public class AudioPlayer implements AudioProvider {
     private final AudioProvider audioProvider;
     private final MusicPlayerEventDispatcher eventDispatcher;
     private final PlayerProperties properties;
+    private final ScheduledExecutorService scheduler;
     private final String playerId;
     private final String guildId;
     private final Runnable onClose;
@@ -29,16 +32,21 @@ public class AudioPlayer implements AudioProvider {
     private final Deque<Track> history = new ArrayDeque<>();
     private boolean justRestarted = false;
     private boolean closed = false;
+    private volatile boolean lastTrackWasError = false;
 
     protected AudioPlayer(AudioEngine engine,
                           AudioProvider audioProvider,
                           MusicPlayerEventDispatcher eventDispatcher,
-                          PlayerProperties properties, String playerId, String guildId,
+                          PlayerProperties properties,
+                          ScheduledExecutorService scheduler,
+                          String playerId,
+                          String guildId,
                           Runnable onClose) {
         this.engine = engine;
         this.audioProvider = audioProvider;
         this.eventDispatcher = eventDispatcher;
         this.properties = properties;
+        this.scheduler = scheduler;
         this.playerId = playerId;
         this.guildId = guildId;
         this.onClose = onClose;
@@ -96,6 +104,7 @@ public class AudioPlayer implements AudioProvider {
 
     public synchronized void previous(String requestId) {
         Track current = engine.getPlayingTrack();
+        // TODO why is this justRestarted needed? Why is the second validation not enough?
         if (!justRestarted && current != null && current.position() > properties.previousRestartThreshold().toMillis()) {
             current.setPosition(0);
             justRestarted = true;
@@ -174,20 +183,26 @@ public class AudioPlayer implements AudioProvider {
                 justRestarted = false;
             }
             LOG.info("Now playing: {} by {}", track.title(), track.author());
-            eventDispatcher.dispatch(new MusicPlayerEvent.TrackStart(
-                    playerId, randomId(), guildId, toTrackMetadata(track)));
+            eventDispatcher.dispatch(new MusicPlayerEvent.TrackStart(playerId, randomId(), guildId, toTrackMetadata(track), track.requesterTag()));
         }
 
         @Override
         public void onTrackEnd(Track track, boolean mayStartNext) {
             if (!mayStartNext) return;
+            boolean wasError = lastTrackWasError;
+            lastTrackWasError = false;
             synchronized (AudioPlayer.this) {
                 if (!queue.isEmpty()) {
                     history.addFirst(track.clone());
-                    engine.play(queue.pollFirst());
+                    Track next = queue.pollFirst();
+                    if (wasError) {
+                        long delayMs = properties.errorSkipDelay().toMillis();
+                        scheduler.schedule(() -> engine.play(next), delayMs, TimeUnit.MILLISECONDS);
+                    } else {
+                        engine.play(next);
+                    }
                 } else {
-                    eventDispatcher.dispatch(new MusicPlayerEvent.QueueEmpty(
-                            playerId, randomId(), guildId));
+                    eventDispatcher.dispatch(new MusicPlayerEvent.QueueEmpty(playerId, randomId(), guildId));
                 }
             }
         }
@@ -195,8 +210,8 @@ public class AudioPlayer implements AudioProvider {
         @Override
         public void onTrackError(Track track, String message) {
             LOG.error("Track error for '{}': {}", track.title(), message);
-            eventDispatcher.dispatch(new MusicPlayerEvent.TrackError(
-                    playerId, randomId(), guildId, toTrackMetadata(track)));
+            lastTrackWasError = true;
+            eventDispatcher.dispatch(new MusicPlayerEvent.TrackError(playerId, randomId(), guildId, toTrackMetadata(track)));
         }
 
         @Override

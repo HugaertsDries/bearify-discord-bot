@@ -6,6 +6,9 @@ package com.bearify.discord.api.gateway;
  */
 public interface TextChannel {
 
-    /** Send a message to this channel. */
+    /** Send a plain text message to this channel. */
     void send(String message);
+
+    /** Send an embed (optionally with file attachments) and return a handle to delete it later. */
+    SentMessage send(EmbedMessage embed);
 }

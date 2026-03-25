@@ -13,6 +13,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -82,6 +83,7 @@ public class VoiceConnectionManager implements AutoCloseable {
             session.leave();
         });
         pool.get(guildId).ifPresent(AudioPlayer::close);
+        eventDispatcher.dispatch(new MusicPlayerEvent.Stopped(playerId, UUID.randomUUID().toString(), guildId));
     }
 
     private void handleInVoice(JoinRequest request, Guild guild, VoiceSession session) {

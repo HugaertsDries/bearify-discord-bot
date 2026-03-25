@@ -2,7 +2,9 @@ package com.bearify.music.player.agent;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
+import com.bearify.discord.api.gateway.EmbedMessage;
 import com.bearify.discord.api.gateway.Guild;
+import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSessionListener;
@@ -71,7 +73,15 @@ public abstract class AbstractAgentIntegrationTest {
 
         @Override
         public TextChannel textChannel(String channelId) {
-            return message -> {};
+            return new TextChannel() {
+                @Override public void send(String message) {}
+                @Override public SentMessage send(EmbedMessage embed) {
+                    return new SentMessage() {
+                        @Override public void delete() {}
+                        @Override public void update(EmbedMessage updated) {}
+                    };
+                }
+            };
         }
 
         @Override

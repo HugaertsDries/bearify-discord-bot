@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
 
 @Component
 public class AudioPlayerPool {
@@ -19,13 +20,16 @@ public class AudioPlayerPool {
     private final ConcurrentHashMap<String, GuildEntry> entries = new ConcurrentHashMap<>();
     private final MusicPlayerEventDispatcher eventDispatcher;
     private final PlayerProperties properties;
+    private final ScheduledExecutorService scheduler;
     private final String playerId;
 
     public AudioPlayerPool(MusicPlayerEventDispatcher eventDispatcher,
                            PlayerProperties properties,
+                           ScheduledExecutorService scheduler,
                            @Value("${player.id}") String playerId) {
         this.eventDispatcher = eventDispatcher;
         this.properties = properties;
+        this.scheduler = scheduler;
         this.playerId = playerId;
     }
 
@@ -49,8 +53,9 @@ public class AudioPlayerPool {
         return entries.computeIfAbsent(guildId, id -> {
             LavaAudioEngine engine = new LavaAudioEngine(properties.engine().youtube().refreshToken());
             AudioTrackLoader loader = engine.getLoader();
+            // TODO can't we use a inner-builder pattern here. It's getting a bit to much.
             AudioPlayer player = new AudioPlayer(
-                    engine, engine, eventDispatcher, properties, playerId, id,
+                    engine, engine, eventDispatcher, properties, scheduler, playerId, id,
                     () -> this.remove(guildId));
             return new GuildEntry(player, loader);
         });

@@ -1,10 +1,13 @@
 package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.spring.annotation.CommandAdvice;
 import com.bearify.discord.spring.annotation.HandleException;
 import com.bearify.discord.testing.MockCommandInteraction;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -14,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CommandExceptionHandlerRegistryTest {
 
+    @CommandAdvice
     static class TestAdvice {
         final List<Throwable> caught = new ArrayList<>();
 
@@ -28,21 +32,28 @@ class CommandExceptionHandlerRegistryTest {
         }
     }
 
+    private AnnotationConfigApplicationContext context;
     private CommandExceptionHandlerRegistry registry;
     private TestAdvice advice;
 
     @BeforeEach
     void setUp() throws NoSuchMethodException {
-        advice = new TestAdvice();
-        registry = new CommandExceptionHandlerRegistry();
+        context = new AnnotationConfigApplicationContext();
+        context.registerBean("testAdvice", TestAdvice.class, TestAdvice::new);
+        context.refresh();
 
-        Method onRuntime = TestAdvice.class.getDeclaredMethod(
-                "onRuntime", CommandInteraction.class, RuntimeException.class);
-        registry.register(onRuntime.getAnnotation(HandleException.class), advice, onRuntime);
+        advice = context.getBean(TestAdvice.class);
 
-        Method onIllegalArg = TestAdvice.class.getDeclaredMethod(
-                "onIllegalArg", CommandInteraction.class, IllegalArgumentException.class);
-        registry.register(onIllegalArg.getAnnotation(HandleException.class), advice, onIllegalArg);
+        registry = new CommandExceptionHandlerRegistry(context);
+        Method onRuntime = TestAdvice.class.getDeclaredMethod("onRuntime", CommandInteraction.class, RuntimeException.class);
+        registry.register("testAdvice", onRuntime.getAnnotation(HandleException.class), onRuntime);
+        Method onIllegalArg = TestAdvice.class.getDeclaredMethod("onIllegalArg", CommandInteraction.class, IllegalArgumentException.class);
+        registry.register("testAdvice", onIllegalArg.getAnnotation(HandleException.class), onIllegalArg);
+    }
+
+    @AfterEach
+    void tearDown() {
+        context.close();
     }
 
     // --- HAPPY PATH ---

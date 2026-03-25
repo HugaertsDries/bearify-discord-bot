@@ -8,10 +8,13 @@ import com.bearify.discord.spring.annotation.Command;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.Option;
 import com.bearify.discord.testing.MockCommandInteraction;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,8 +25,11 @@ class CommandRegistryTest {
 
     @Command
     static class TestController {
+        final List<String> invocations = new ArrayList<>();
+
         @Interaction(value = "greet", description = "Say hello")
         void greet(CommandInteraction interaction) {
+            invocations.add("greet");
             interaction.reply("Hi!").send();
         }
 
@@ -51,11 +57,22 @@ class CommandRegistryTest {
         }
     }
 
+    private AnnotationConfigApplicationContext context;
     private CommandRegistry registry;
 
     @BeforeEach
     void setUp() {
-        registry = new CommandRegistry(new CommandExceptionHandlerRegistry());
+       context = new AnnotationConfigApplicationContext();
+       context.registerBean("testController", TestController.class, TestController::new);
+       context.registerBean("musicController", MusicController.class, MusicController::new);
+       context.refresh();
+
+       registry = new CommandRegistry(context, new CommandExceptionHandlerRegistry(context));
+    }
+
+    @AfterEach
+    void tearDown() {
+        context.close();
     }
 
     // --- HAPPY PATH ---
@@ -63,7 +80,7 @@ class CommandRegistryTest {
     @Test
     void registersCommandWithDefinition() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("greet", CommandInteraction.class);
-        registry.register(method.getAnnotation(Interaction.class), new TestController(), method);
+        registry.register("testController", method.getAnnotation(Interaction.class), method);
 
         assertThat(registry.getDefinitions()).hasSize(1);
         CommandDefinition def = registry.getDefinitions().getFirst();
@@ -75,7 +92,7 @@ class CommandRegistryTest {
     @Test
     void includesOptionsInCommandDefinition() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("poke", CommandInteraction.class, int.class, String.class);
-        registry.register(method.getAnnotation(Interaction.class), new TestController(), method);
+        registry.register("testController", method.getAnnotation(Interaction.class), method);
 
         List<OptionDefinition> options = registry.getDefinitions().getFirst().options();
         assertThat(options).hasSize(2);
@@ -94,7 +111,7 @@ class CommandRegistryTest {
     @Test
     void handlesCommandInteraction() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("greet", CommandInteraction.class);
-        registry.register(method.getAnnotation(Interaction.class), new TestController(), method);
+        registry.register("testController", method.getAnnotation(Interaction.class), method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("greet").build();
         registry.handle(interaction);
@@ -109,7 +126,7 @@ class CommandRegistryTest {
     @Test
     void exposesUnmodifiableDefinitionList() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("greet", CommandInteraction.class);
-        registry.register(method.getAnnotation(Interaction.class), new TestController(), method);
+        registry.register("testController", method.getAnnotation(Interaction.class), method);
 
         assertThatThrownBy(() -> registry.getDefinitions().add(null))
                 .isInstanceOf(UnsupportedOperationException.class);
@@ -121,11 +138,10 @@ class CommandRegistryTest {
     void rejectsDuplicateCommandName() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("greet", CommandInteraction.class);
         Interaction annotation = method.getAnnotation(Interaction.class);
-        TestController bean = new TestController();
 
-        registry.register(annotation, bean, method);
+        registry.register("testController", annotation, method);
 
-        assertThatThrownBy(() -> registry.register(annotation, bean, method))
+        assertThatThrownBy(() -> registry.register("testController", annotation, method))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("greet");
     }
@@ -135,7 +151,7 @@ class CommandRegistryTest {
     @Test
     void doesNotPropagateExceptionThrownByHandler() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("crash", CommandInteraction.class);
-        registry.register(method.getAnnotation(Interaction.class), new TestController(), method);
+        registry.register("testController", method.getAnnotation(Interaction.class), method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("crash").build();
 
@@ -159,10 +175,9 @@ class CommandRegistryTest {
     void groupsInteractionsIntoSubcommandDefinition() throws NoSuchMethodException {
         Method playMethod = MusicController.class.getDeclaredMethod("play", CommandInteraction.class);
         Method stopMethod = MusicController.class.getDeclaredMethod("stop", CommandInteraction.class);
-        MusicController bean = new MusicController();
 
-        registry.register(playMethod.getAnnotation(Interaction.class), bean, playMethod);
-        registry.register(stopMethod.getAnnotation(Interaction.class), bean, stopMethod);
+        registry.register("musicController", playMethod.getAnnotation(Interaction.class), playMethod);
+        registry.register("musicController", stopMethod.getAnnotation(Interaction.class), stopMethod);
 
         assertThat(registry.getDefinitions()).hasSize(1);
         CommandDefinition def = registry.getDefinitions().getFirst();
@@ -176,7 +191,7 @@ class CommandRegistryTest {
     @Test
     void handlesSubcommandInteraction() throws NoSuchMethodException {
         Method playMethod = MusicController.class.getDeclaredMethod("play", CommandInteraction.class);
-        registry.register(playMethod.getAnnotation(Interaction.class), new MusicController(), playMethod);
+        registry.register("musicController", playMethod.getAnnotation(Interaction.class), playMethod);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("music")
                 .subcommand("play")
@@ -191,11 +206,10 @@ class CommandRegistryTest {
     void rejectsDuplicateSubcommandName() throws NoSuchMethodException {
         Method method = MusicController.class.getDeclaredMethod("play", CommandInteraction.class);
         Interaction annotation = method.getAnnotation(Interaction.class);
-        MusicController bean = new MusicController();
 
-        registry.register(annotation, bean, method);
+        registry.register("musicController", annotation, method);
 
-        assertThatThrownBy(() -> registry.register(annotation, bean, method))
+        assertThatThrownBy(() -> registry.register("testController", annotation, method))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("music/play");
     }

@@ -11,10 +11,15 @@ import com.bearify.discord.spring.annotation.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
+import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Maps interaction names to their handler methods and builds the list of
@@ -39,41 +44,48 @@ public class CommandRegistry {
     private final Map<String, CommandHandler> handlers = new HashMap<>();
     private final Map<String, CommandDefinition> definitions = new HashMap<>();
 
+    private final ApplicationContext context;
     private final CommandExceptionHandlerRegistry exceptionHandlerRegistry;
 
-    CommandRegistry(CommandExceptionHandlerRegistry exceptionHandlerRegistry) {
+    CommandRegistry(ApplicationContext context, CommandExceptionHandlerRegistry exceptionHandlerRegistry) {
+        this.context = context;
         this.exceptionHandlerRegistry = exceptionHandlerRegistry;
     }
 
-    void register(Interaction interaction, Object host, Method method) {
-        Command command = AnnotationUtils.findAnnotation(AopUtils.getTargetClass(host), Command.class);
+    void register(String name, Interaction interaction, Method method) {
+        if (context == null) {
+            throw new IllegalStateException("Lazy command registration requires an ApplicationContext");
+        }
+        Command command = AnnotationUtils.findAnnotation(method.getDeclaringClass(), Command.class);
+        register(command, interaction, method, new CommandHandler(context, name, method));
+    }
 
+    private void register(Command command, Interaction interaction, Method method, CommandHandler handler) {
         if (command == null) {
             throw new IllegalStateException("Interaction " + interaction + " has no @Command annotation");
         }
 
-        var isGrouped = !command.value().isBlank();
-
-        var name = interaction.value();
-        var key = isGrouped ? command.value() + "/" + name : name;
+        boolean isGrouped = !command.value().isBlank();
+        String name = interaction.value();
+        String key = isGrouped ? command.value() + "/" + name : name;
 
         if (handlers.containsKey(key)) {
-            throw new IllegalStateException("Duplicate interaction '" + key + "' — already registered by: " + handlers.get(key));
+            throw new IllegalStateException("Duplicate interaction '" + key + "' - already registered by: " + handlers.get(key));
         }
 
-        handlers.put(key, new CommandHandler(host, method));
+        handlers.put(key, handler);
 
         List<OptionDefinition> options = introspectOptions(method);
         if (isGrouped) {
             definitions.computeIfAbsent(command.value(), group -> new CommandDefinition(group, command.description()));
             definitions.computeIfPresent(command.value(), (group, def) -> {
-                var subcommand = new SubcommandDefinition(name, interaction.description(), options);
+                SubcommandDefinition subcommand = new SubcommandDefinition(name, interaction.description(), options);
                 var subcommands = new ArrayList<>(def.subcommands());
                 subcommands.add(subcommand);
                 return CommandDefinition.group(group, def.description(), subcommands);
             });
         } else {
-            definitions.put(name, CommandDefinition.command(name, interaction.description(), options) );
+            definitions.put(name, CommandDefinition.command(name, interaction.description(), options));
         }
 
         LOG.info("Registered command '{}'", key);

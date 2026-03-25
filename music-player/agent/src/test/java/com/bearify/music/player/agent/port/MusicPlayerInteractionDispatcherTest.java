@@ -10,6 +10,7 @@ import com.bearify.music.player.agent.domain.AudioPlayerPool;
 import com.bearify.music.player.agent.domain.AudioTrackLoader;
 import com.bearify.music.player.agent.domain.Track;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -30,6 +31,7 @@ class MusicPlayerInteractionDispatcherTest {
     private static final String TEXT_CHANNEL_ID = "text-1";
     private static final PlayerProperties PROPS = new PlayerProperties(
             Duration.ofSeconds(3), Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofMinutes(5),
+            Duration.ofSeconds(5),
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null)));
 
@@ -65,7 +67,7 @@ class MusicPlayerInteractionDispatcherTest {
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
 
-        dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, TEXT_CHANNEL_ID, "bohemian rhapsody", GUILD_ID));
+        dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("bohemian rhapsody", TEXT_CHANNEL_ID, null)));
 
         assertThat(pool.loaderCalls).containsExactly("bohemian rhapsody");
     }
@@ -144,7 +146,7 @@ class MusicPlayerInteractionDispatcherTest {
         private final Set<String> primedGuilds = new HashSet<>();
 
         StubAudioPlayerPool() {
-            super(null, null, "test");
+            super(null, null, null, "test");
         }
 
         void primeGuild(String guildId) {
@@ -159,7 +161,7 @@ class MusicPlayerInteractionDispatcherTest {
 
         @Override
         public AudioTrackLoader getLoader(String guildId) {
-            return (query, cb) -> loaderCalls.add(query);
+            return (query, requesterTag, cb) -> loaderCalls.add(query);
         }
 
         @Override
@@ -175,7 +177,7 @@ class MusicPlayerInteractionDispatcherTest {
             private final String guildId;
 
             StubPlayer(String guildId) {
-                super(new NoOpEngine(), new NoOpAudioProvider(), null, PROPS, "test", guildId, () -> {});
+                super(new NoOpEngine(), new NoOpAudioProvider(), null, PROPS, null, "test", guildId, () -> {});
                 this.guildId = guildId;
             }
 

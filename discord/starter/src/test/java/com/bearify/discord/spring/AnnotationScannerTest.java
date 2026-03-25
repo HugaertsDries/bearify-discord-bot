@@ -46,24 +46,24 @@ class AnnotationScannerTest {
 
             List<String> names = new ArrayList<>();
             new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
-                    (ann, _, _) -> names.add(ann.value()));
+                    (_, ann, _) -> names.add(ann.value()));
 
             assertThat(names).containsExactlyInAnyOrder("ping", "pong", "foo");
         }
     }
 
     @Test
-    void passesCorrectBeanAndMethodToHandler() {
+    void passesCorrectBeanNameAndMethodToHandler() {
         try (var ctx = new AnnotationConfigApplicationContext()) {
             ctx.register(SomeCommand.class);
             ctx.refresh();
 
-            List<Object> beans = new ArrayList<>();
+            List<String> beanNames = new ArrayList<>();
             List<Method> methods = new ArrayList<>();
             new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
-                    (_, bean, method) -> { beans.add(bean); methods.add(method); });
+                    (beanName, _, method) -> { beanNames.add(beanName); methods.add(method); });
 
-            assertThat(beans).allMatch(bean -> bean instanceof SomeCommand);
+            assertThat(beanNames).containsOnly("annotationScannerTest.SomeCommand");
             assertThat(methods).extracting(Method::getName)
                     .containsExactlyInAnyOrder("ping", "pong");
         }
@@ -79,7 +79,7 @@ class AnnotationScannerTest {
 
             List<String> names = new ArrayList<>();
             new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
-                    (ann, _, _) -> names.add(ann.value()));
+                    (_, ann, _) -> names.add(ann.value()));
 
             assertThat(names).isEmpty();
         }
@@ -93,7 +93,7 @@ class AnnotationScannerTest {
 
             List<Method> methods = new ArrayList<>();
             new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
-                    (_, _, method) -> methods.add(method));
+                    (_, __, method) -> methods.add(method));
 
             assertThat(methods).hasSize(2);
         }

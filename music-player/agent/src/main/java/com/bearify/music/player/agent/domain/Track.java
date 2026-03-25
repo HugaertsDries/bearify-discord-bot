@@ -14,5 +14,8 @@ public interface Track {
     long position();
     void setPosition(long positionMs);
 
+    /** The Discord mention string (e.g. {@code <@123456>}) of the user who requested this track. May be null. */
+    String requesterTag();
+
     Track clone();
 }

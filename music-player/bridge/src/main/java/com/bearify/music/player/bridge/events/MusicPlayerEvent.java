@@ -38,7 +38,7 @@ public sealed interface MusicPlayerEvent permits
     String playerId();
     String requestId();
 
-    record TrackStart(String playerId, String requestId, String guildId, TrackMetadata track) implements MusicPlayerEvent {}
+    record TrackStart(String playerId, String requestId, String guildId, TrackMetadata track, String requesterTag) implements MusicPlayerEvent {}
     record TrackEnd(String playerId, String requestId, String guildId, TrackMetadata track) implements MusicPlayerEvent {}
     record TrackError(String playerId, String requestId, String guildId, TrackMetadata track) implements MusicPlayerEvent {}
     record QueueEmpty(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
@@ -48,7 +48,7 @@ public sealed interface MusicPlayerEvent permits
     record TrackNotFound(String playerId, String requestId, String guildId, String query) implements MusicPlayerEvent {}
     record TrackLoadFailed(String playerId, String requestId, String guildId, String reason) implements MusicPlayerEvent {}
     record Ready(String playerId, String requestId) implements MusicPlayerEvent {}
-    record Stopped(String playerId, String requestId) implements MusicPlayerEvent {}
+    record Stopped(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record ConnectFailed(String playerId, String requestId, String reason) implements MusicPlayerEvent {}
     record PlayerNotFound(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
 }

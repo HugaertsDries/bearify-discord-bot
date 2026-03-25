@@ -1,11 +1,13 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
+import com.bearify.discord.testing.MockDiscordClient;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +37,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
     @Autowired RedisConnectionFactory redisConnectionFactory;
     @Autowired StringRedisTemplate redis;
     @Autowired ObjectMapper objectMapper;
+    @Autowired MockDiscordClient.Factory discordClientFactory;
 
     @BeforeEach
     void seedPlayer() {
@@ -204,6 +207,43 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
         assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
+    }
+
+    @Test
+    void playFromTwoTextChannelsSubscribesBothChannelsToTheSamePlayer() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+
+        MockCommandInteraction first = MockCommandInteraction.forCommand("player")
+                .subcommand("play")
+                .guildId(GUILD_ID)
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .textChannelId("text-1")
+                .option("search", "song a")
+                .build();
+        MockCommandInteraction second = MockCommandInteraction.forCommand("player")
+                .subcommand("play")
+                .guildId(GUILD_ID)
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .textChannelId("text-2")
+                .option("search", "song b")
+                .build();
+
+        commandRegistry.handle(first);
+        commandRegistry.handle(second);
+
+        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
+                new MusicPlayerEvent.TrackStart(
+                        PLAYER_ID,
+                        "event-1",
+                        GUILD_ID,
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000),
+                        "@user")));
+
+        Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
+            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
+            assertThat(discord.sentEmbeds("text-2")).hasSize(1);
+        });
     }
 
 }

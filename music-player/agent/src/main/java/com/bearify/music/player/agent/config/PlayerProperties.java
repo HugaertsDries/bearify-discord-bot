@@ -13,6 +13,7 @@ public record PlayerProperties(
         @DefaultValue("10s") Duration seekShortDefault,
         @DefaultValue("30s") Duration seekLongDefault,
         @DefaultValue("5m")  Duration seekTrackLengthThreshold,
+        @DefaultValue("5s")  Duration errorSkipDelay,
         @DefaultValue Assignment assignment,
         @DefaultValue Engine engine) {
 

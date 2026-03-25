@@ -26,14 +26,14 @@ public class DiscordAutoConfiguration {
 
     @Bean
     public CommandExceptionHandlerRegistry commandExceptionHandlerRegistry(ApplicationContext context) {
-        CommandExceptionHandlerRegistry registry = new CommandExceptionHandlerRegistry();
+        CommandExceptionHandlerRegistry registry = new CommandExceptionHandlerRegistry(context);
         scanner.scan(context, CommandAdvice.class, HandleException.class, registry::register);
         return registry;
     }
 
     @Bean
     public CommandRegistry commandRegistry(ApplicationContext context, CommandExceptionHandlerRegistry exceptionHandlerRegistry) {
-        CommandRegistry registry = new CommandRegistry(exceptionHandlerRegistry);
+        CommandRegistry registry = new CommandRegistry(context, exceptionHandlerRegistry);
         long start = System.currentTimeMillis();
         scanner.scan(context, Command.class, Interaction.class, registry::register);
         LOG.info("Finished scanning for commands: {} registered in {} ms", registry.getDefinitions().size(), System.currentTimeMillis() - start);

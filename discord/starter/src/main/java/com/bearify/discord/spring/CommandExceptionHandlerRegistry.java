@@ -2,6 +2,7 @@ package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.spring.annotation.HandleException;
+import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -13,10 +14,19 @@ import java.util.Map;
  */
 public class CommandExceptionHandlerRegistry {
 
+    private final ApplicationContext context;
+
     private final Map<Class<? extends Throwable>, CommandExceptionHandler> handlers = new HashMap<>();
 
-    void register(HandleException annotation, Object bean, Method method) {
-        handlers.put(annotation.value(), new CommandExceptionHandler(bean, method));
+    public CommandExceptionHandlerRegistry(ApplicationContext context) {
+        this.context = context;
+    }
+
+    void register(String name, HandleException annotation, Method method) {
+        if (context == null) {
+            throw new IllegalStateException("Lazy exception handler registration requires an ApplicationContext");
+        }
+        handlers.put(annotation.value(), new CommandExceptionHandler(context, name, method));
     }
 
     public void handle(CommandInteraction interaction, Throwable exception) {

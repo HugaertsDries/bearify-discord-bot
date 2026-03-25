@@ -1,7 +1,7 @@
 package com.bearify.controller.music.redis;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
-import com.bearify.controller.music.domain.MusicPlayerQueue;
+import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.Test;
@@ -20,13 +20,13 @@ class RedisMusicPlayerEventSubscriptionIntegrationTest extends AbstractControlle
     @Autowired StringRedisTemplate redis;
     @Autowired ObjectMapper objectMapper;
     @Autowired
-    MusicPlayerQueue pendingInteractions;
+    MusicPlayerPendingInteractions pendingInteractions;
 
     // --- HAPPY PATH ---
 
     @Test
     void routesPlayerReadyEventsToPendingRequests() throws Exception {
-        MusicPlayerQueue.Ticket pending = pendingInteractions.enqueue();
+        MusicPlayerPendingInteractions.PendingInteraction pending = pendingInteractions.register();
 
         MusicPlayerEvent event = new MusicPlayerEvent.Ready(PLAYER_ID, pending.requestId());
         redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(event));

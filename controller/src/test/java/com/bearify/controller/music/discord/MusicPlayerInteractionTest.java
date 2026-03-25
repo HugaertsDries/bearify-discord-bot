@@ -3,6 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
+import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.discord.testing.MockCommandInteraction;
 import org.junit.jupiter.api.Test;
 
@@ -224,7 +225,7 @@ class MusicPlayerInteractionTest {
         }
 
         @Override
-        public void play(String query, String textChannelId, MusicPlayerEventListener handler) {}
+        public void play(TrackRequest request, MusicPlayerEventListener handler) {}
 
         @Override
         public void togglePause(MusicPlayerEventListener handler) {}

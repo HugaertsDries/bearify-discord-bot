@@ -19,11 +19,12 @@ class LavaAudioTrackLoader implements AudioTrackLoader {
     }
 
     @Override
-    public void load(String identifier, AudioTrackLoadCallback callback) {
-        playerManager.loadItem(identifier, new AudioLoadResultHandler() {
+    public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+        playerManager.loadItem(query, new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack track) {
-                callback.trackLoaded(new LavaTrack(track));
+                track.setUserData(requesterTag);
+                callback.trackLoaded(new LavaTrack(track, requesterTag));
             }
 
             @Override
@@ -31,7 +32,8 @@ class LavaAudioTrackLoader implements AudioTrackLoader {
                 AudioTrack first = playlist.getSelectedTrack() != null
                         ? playlist.getSelectedTrack()
                         : playlist.getTracks().getFirst();
-                callback.playlistLoaded(new LavaTrack(first));
+                first.setUserData(requesterTag);
+                callback.playlistLoaded(new LavaTrack(first, requesterTag));
             }
 
             @Override

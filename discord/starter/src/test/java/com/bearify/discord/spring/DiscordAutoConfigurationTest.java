@@ -2,6 +2,7 @@ package com.bearify.discord.spring;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.spring.annotation.Command;
 import com.bearify.discord.spring.annotation.CommandAdvice;
 import com.bearify.discord.spring.annotation.HandleException;
@@ -13,6 +14,9 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -45,6 +49,43 @@ class DiscordAutoConfigurationTest {
         }
     }
 
+    @Command
+    @Lazy
+    static class LazyInitCommand {
+        static final AtomicInteger instantiations = new AtomicInteger();
+
+        LazyInitCommand() {
+            instantiations.incrementAndGet();
+        }
+
+        @Interaction(value = "lazy", description = "Lazy command")
+        void lazy(CommandInteraction interaction) {
+            interaction.reply("lazy").send();
+        }
+    }
+
+    @Command
+    static class DiscordDependentCommand {
+        DiscordDependentCommand(DiscordClient client) {
+        }
+
+        @Interaction(value = "dependent", description = "Depends on DiscordClient")
+        void dependent(CommandInteraction interaction) {
+            interaction.reply("ok").send();
+        }
+    }
+
+    @CommandAdvice
+    static class DiscordDependentAdvice {
+        DiscordDependentAdvice(DiscordClient client) {
+        }
+
+        @HandleException(RuntimeException.class)
+        void onError(CommandInteraction interaction, RuntimeException e) {
+            interaction.reply("handled").send();
+        }
+    }
+
     // --- HAPPY PATH ---
 
     @Test
@@ -56,6 +97,19 @@ class DiscordAutoConfigurationTest {
                     CommandRegistry registry = ctx.getBean(CommandRegistry.class);
                     assertThat(registry.getDefinitions()).hasSize(1);
                     assertThat(registry.getDefinitions().getFirst().name()).isEqualTo("hello");
+                });
+    }
+
+    @Test
+    void registersScannedCommandsWithoutInstantiatingCommandBean() {
+        LazyInitCommand.instantiations.set(0);
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, LazyInitCommand.class)
+                .run(ctx -> {
+                    CommandRegistry registry = ctx.getBean(CommandRegistry.class);
+                    assertThat(registry.getDefinitions()).extracting(CommandDefinition::name).contains("lazy");
+                    assertThat(LazyInitCommand.instantiations.get()).isZero();
                 });
     }
 
@@ -95,6 +149,38 @@ class DiscordAutoConfigurationTest {
                 .withPropertyValues("discord.token=test-token")
                 .withUserConfiguration(MockClientConfig.class, TestAdvice.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(CommandExceptionHandlerRegistry.class));
+    }
+
+    @Test
+    void startsContextWhenCommandDependsOnDiscordClient() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, DiscordDependentCommand.class)
+                .run(ctx -> assertThat(ctx).hasSingleBean(CommandRegistry.class));
+    }
+
+    @Test
+    void startsContextWhenAdviceDependsOnDiscordClient() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, DiscordDependentAdvice.class)
+                .run(ctx -> assertThat(ctx).hasSingleBean(CommandExceptionHandlerRegistry.class));
+    }
+
+    @Test
+    void dispatchesInteractionAfterLazyStartup() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, DiscordDependentCommand.class)
+                .run(ctx -> {
+                    MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
+                    MockCommandInteraction interaction = MockCommandInteraction.forCommand("dependent").build();
+
+                    client.dispatch(interaction);
+
+                    assertThat(interaction.getReplies()).hasSize(1);
+                    assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo("ok");
+                });
     }
 
     // --- EDGE CASES ---

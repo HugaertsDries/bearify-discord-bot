@@ -1,11 +1,13 @@
 package com.bearify.controller.music.domain;
 
+import com.bearify.music.player.bridge.model.TrackRequest;
+
 import java.time.Duration;
 
 public interface MusicPlayer {
     void join(MusicPlayerEventListener handler);
     void stop();
-    void play(String query, String textChannelId, MusicPlayerEventListener handler);
+    void play(TrackRequest request, MusicPlayerEventListener handler);
     void togglePause(MusicPlayerEventListener handler);
     void previous(MusicPlayerEventListener handler);
     void next(MusicPlayerEventListener handler);

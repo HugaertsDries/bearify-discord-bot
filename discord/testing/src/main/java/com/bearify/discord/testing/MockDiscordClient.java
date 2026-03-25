@@ -2,15 +2,21 @@ package com.bearify.discord.testing;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
+import com.bearify.discord.api.gateway.EmbedMessage;
 import com.bearify.discord.api.gateway.Guild;
+import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
+import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class MockDiscordClient implements DiscordClient {
@@ -19,6 +25,7 @@ public class MockDiscordClient implements DiscordClient {
     private boolean started = false;
     private String startedWithToken;
     private String startedWithGuildId;
+    private final Map<String, List<EmbedMessage>> sentEmbedsByChannel = new ConcurrentHashMap<>();
 
     private MockDiscordClient(List<CommandDefinition> commands, Consumer<CommandInteraction> handler) {
         this.handler = handler;
@@ -44,7 +51,7 @@ public class MockDiscordClient implements DiscordClient {
 
     @Override
     public TextChannel textChannel(String channelId) {
-        return new MockTextChannel();
+        return new MockTextChannel(channelId);
     }
 
     @Override
@@ -68,10 +75,14 @@ public class MockDiscordClient implements DiscordClient {
         return Optional.ofNullable(startedWithGuildId);
     }
 
+    public List<EmbedMessage> sentEmbeds(String channelId) {
+        return List.copyOf(sentEmbedsByChannel.getOrDefault(channelId, List.of()));
+    }
+
     private static final class MockGuild implements Guild {
 
         @Override
-        public Optional<com.bearify.discord.api.voice.VoiceSession> voice() {
+        public Optional<VoiceSession> voice() {
             return Optional.empty();
         }
 
@@ -80,10 +91,29 @@ public class MockDiscordClient implements DiscordClient {
         }
     }
 
-    private static final class MockTextChannel implements TextChannel {
+    private final class MockTextChannel implements TextChannel {
+
+        private final String channelId;
+
+        private MockTextChannel(String channelId) {
+            this.channelId = channelId;
+        }
 
         @Override
         public void send(String message) {
+        }
+
+        @Override
+        public SentMessage send(EmbedMessage embed) {
+            sentEmbedsByChannel.computeIfAbsent(channelId, ignored -> new ArrayList<>()).add(embed);
+            return new SentMessage() {
+                @Override public void delete() {}
+                @Override
+                public void update(EmbedMessage updated) {
+                    List<EmbedMessage> embeds = sentEmbedsByChannel.get(channelId);
+                    embeds.set(embeds.size() - 1, updated);
+                }
+            };
         }
     }
 

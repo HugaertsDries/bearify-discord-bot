@@ -1,5 +1,6 @@
 package com.bearify.music.player.bridge.events;
 
+import com.bearify.music.player.bridge.model.TrackRequest;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -29,7 +30,7 @@ public sealed interface MusicPlayerInteraction permits
     String playerId();
     String requestId();
 
-    record Play(String playerId, String requestId, String textChannelId, String query, String guildId) implements MusicPlayerInteraction {}
+    record Play(String playerId, String requestId, String guildId, TrackRequest trackRequest) implements MusicPlayerInteraction {}
     record TogglePause(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
     record Next(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
     record Previous(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}

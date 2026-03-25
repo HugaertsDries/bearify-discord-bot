@@ -1,10 +1,11 @@
 package com.bearify.controller.music.redis;
 
-import com.bearify.controller.music.domain.MusicPlayerQueue;
+import com.bearify.controller.music.domain.MusicPlayerAnnouncementConsumer;
+import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
+import com.bearify.controller.music.domain.MusicPlayerEventDispatcher;
+import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
 import com.bearify.controller.music.domain.MusicPlayerPool;
-import com.bearify.controller.music.domain.MusicPlayerTextChannelRegistry;
-import com.bearify.controller.music.port.MusicPlayerEventRouter;
-import com.bearify.controller.music.port.MusicPlayerTrackAnnouncer;
+import com.bearify.controller.music.discord.TextChannelMusicPlayerTrackAnnouncerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -15,34 +16,40 @@ import tools.jackson.databind.ObjectMapper;
 public class RedisConfig {
 
     @Bean
-    MusicPlayerQueue pendingInteractions() {
-        return new MusicPlayerQueue();
+    MusicPlayerPendingInteractions pendingInteractions() {
+        return new MusicPlayerPendingInteractions();
     }
 
     @Bean
-    MusicPlayerTextChannelRegistry textChannelRegistry() {
-        return new MusicPlayerTextChannelRegistry();
+    MusicPlayerAnnouncementRegistry announcementRegistry() {
+        return new MusicPlayerAnnouncementRegistry();
     }
 
     @Bean
-    MusicPlayerEventRouter eventRouter(MusicPlayerQueue pendingInteractions,
-                                       MusicPlayerTrackAnnouncer trackAnnouncer) {
-        return new MusicPlayerEventRouter(pendingInteractions, trackAnnouncer);
+    MusicPlayerAnnouncementConsumer announcementConsumer(MusicPlayerAnnouncementRegistry announcementRegistry) {
+        return new MusicPlayerAnnouncementConsumer(announcementRegistry);
+    }
+
+    @Bean
+    MusicPlayerEventDispatcher eventDispatcher(MusicPlayerPendingInteractions pendingInteractions,
+                                               MusicPlayerAnnouncementConsumer announcementConsumer) {
+        return new MusicPlayerEventDispatcher(java.util.List.of(pendingInteractions, announcementConsumer));
     }
 
     @Bean
     MusicPlayerPool pool(StringRedisTemplate redis,
                          ObjectMapper objectMapper,
-                         MusicPlayerQueue pendingInteractions,
-                         MusicPlayerTextChannelRegistry textChannelRegistry,
+                         MusicPlayerPendingInteractions pendingInteractions,
+                         MusicPlayerAnnouncementRegistry announcementRegistry,
+                         TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory,
                          MusicPlayerPoolProperties properties) {
-        return new RedisMusicPlayerPool(redis, objectMapper, pendingInteractions, textChannelRegistry, properties);
+        return new RedisMusicPlayerPool(redis, objectMapper, pendingInteractions, announcementRegistry, trackAnnouncerFactory, properties);
     }
 
     @Bean
     RedisMusicPlayerEventSubscription eventSubscription(RedisConnectionFactory connectionFactory,
                                                         ObjectMapper objectMapper,
-                                                        MusicPlayerEventRouter eventRouter) {
-        return new RedisMusicPlayerEventSubscription(connectionFactory, objectMapper, eventRouter);
+                                                        MusicPlayerEventDispatcher eventDispatcher) {
+        return new RedisMusicPlayerEventSubscription(connectionFactory, objectMapper, eventDispatcher);
     }
 }

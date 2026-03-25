@@ -70,8 +70,8 @@ class MusicPlayerCommandPlayTest extends AbstractControllerIntegrationTest {
             MusicPlayerInteraction playerInteraction = objectMapper.readValue(json, MusicPlayerInteraction.class);
             assertThat(playerInteraction).isInstanceOf(MusicPlayerInteraction.Play.class);
             MusicPlayerInteraction.Play play = (MusicPlayerInteraction.Play) playerInteraction;
-            assertThat(play.query()).isEqualTo(RESOLVED_QUERY);
-            assertThat(play.textChannelId()).isEqualTo(TEXT_CHANNEL_ID);
+            assertThat(play.trackRequest().query()).isEqualTo(RESOLVED_QUERY);
+            assertThat(play.trackRequest().textChannelId()).isEqualTo(TEXT_CHANNEL_ID);
         } finally {
             container.stop();
         }
@@ -118,8 +118,8 @@ class MusicPlayerCommandPlayTest extends AbstractControllerIntegrationTest {
                 String playJson = interactionQueue.poll(2, TimeUnit.SECONDS);
                 assertThat(playJson).isNotNull();
                 MusicPlayerInteraction.Play play = (MusicPlayerInteraction.Play) objectMapper.readValue(playJson, MusicPlayerInteraction.class);
-                assertThat(play.query()).isEqualTo(RESOLVED_QUERY);
-                assertThat(play.textChannelId()).isEqualTo(TEXT_CHANNEL_ID);
+                assertThat(play.trackRequest().query()).isEqualTo(RESOLVED_QUERY);
+                assertThat(play.trackRequest().textChannelId()).isEqualTo(TEXT_CHANNEL_ID);
 
                 Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())

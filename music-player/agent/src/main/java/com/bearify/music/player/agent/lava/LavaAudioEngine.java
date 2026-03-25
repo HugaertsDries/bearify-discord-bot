@@ -47,15 +47,20 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
 
     // --- AudioEngine ---
 
+    // TODO if track is nullable, return an optional
     @Override
     public Track getPlayingTrack() {
         AudioTrack track = audioPlayer.getPlayingTrack();
-        return track != null ? new LavaTrack(track) : null;
+        if (track == null) return null;
+        String requesterTag = track.getUserData(String.class);
+        return new LavaTrack(track, requesterTag);
     }
 
     @Override
     public void play(Track track) {
-        audioPlayer.playTrack(unwrap(track));
+        AudioTrack lavaTrack = unwrap(track);
+        lavaTrack.setUserData(track.requesterTag());
+        audioPlayer.playTrack(lavaTrack);
     }
 
     @Override
@@ -73,22 +78,26 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
         audioPlayer.addListener(new AudioEventAdapter() {
             @Override
             public void onTrackStart(AudioPlayer player, AudioTrack track) {
-                listener.onTrackStart(new LavaTrack(track));
+                String requesterTag = track.getUserData(String.class);
+                listener.onTrackStart(new LavaTrack(track, requesterTag));
             }
 
             @Override
             public void onTrackEnd(AudioPlayer player, AudioTrack track, AudioTrackEndReason endReason) {
-                listener.onTrackEnd(new LavaTrack(track), endReason.mayStartNext);
+                String requesterTag = track.getUserData(String.class);
+                listener.onTrackEnd(new LavaTrack(track, requesterTag), endReason.mayStartNext);
             }
 
             @Override
             public void onTrackException(AudioPlayer player, AudioTrack track, FriendlyException exception) {
-                listener.onTrackError(new LavaTrack(track), exception.getMessage());
+                String requesterTag = track.getUserData(String.class);
+                listener.onTrackError(new LavaTrack(track, requesterTag), exception.getMessage());
             }
 
             @Override
             public void onTrackStuck(AudioPlayer player, AudioTrack track, long thresholdMs) {
-                listener.onTrackStuck(new LavaTrack(track), thresholdMs);
+                String requesterTag = track.getUserData(String.class);
+                listener.onTrackStuck(new LavaTrack(track, requesterTag), thresholdMs);
             }
         });
     }

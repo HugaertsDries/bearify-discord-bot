@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,8 +21,10 @@ class AudioPlayerTest {
     private static final String GUILD_ID = "guild-1";
     private static final PlayerProperties PROPS = new PlayerProperties(
             Duration.ofSeconds(3), Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofMinutes(5),
+            Duration.ofSeconds(5),
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null)));
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
 
     private InMemoryAudioEngine engine;
     private RecordingEventDispatcher eventDispatcher;
@@ -30,7 +34,7 @@ class AudioPlayerTest {
     void setUp() {
         engine = new InMemoryAudioEngine();
         eventDispatcher = new RecordingEventDispatcher();
-        player = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, PLAYER_ID, GUILD_ID, () -> {});
+        player = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, () -> {});
     }
 
     // --- PLAY ---
@@ -245,7 +249,7 @@ class AudioPlayerTest {
     @Test
     void runnsOnCloseCallbackWhenClosed() {
         boolean[] closed = {false};
-        AudioPlayer closeable = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, PLAYER_ID, GUILD_ID, () -> closed[0] = true);
+        AudioPlayer closeable = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, () -> closed[0] = true);
 
         closeable.close();
 
@@ -277,6 +281,7 @@ class AudioPlayerTest {
         @Override public String title() { return title; }
         @Override public String author() { return "Author"; }
         @Override public String uri() { return "https://example.com/" + title; }
+        @Override public String requesterTag() { return null; }
     }
 
     static final class InMemoryAudioEngine implements AudioEngine {

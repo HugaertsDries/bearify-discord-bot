@@ -9,9 +9,11 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 class LavaTrack implements Track {
 
     private final AudioTrack track;
+    private final String requesterTag;
 
-    LavaTrack(AudioTrack track) {
+    LavaTrack(AudioTrack track, String requesterTag) {
         this.track = track;
+        this.requesterTag = requesterTag;
     }
 
     @Override
@@ -30,8 +32,17 @@ class LavaTrack implements Track {
     }
 
     @Override
+    public String requesterTag() {
+        return requesterTag;
+    }
+
+    @Override
     public Track clone() {
-        return new LavaTrack(track.makeClone());
+        AudioTrack cloned = track.makeClone();
+        if (requesterTag != null) {
+            cloned.setUserData(requesterTag);
+        }
+        return new LavaTrack(cloned, requesterTag);
     }
 
     @Override

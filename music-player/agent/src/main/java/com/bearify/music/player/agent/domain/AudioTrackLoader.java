@@ -6,7 +6,7 @@ package com.bearify.music.player.agent.domain;
  */
 public interface AudioTrackLoader {
 
-    void load(String identifier, AudioTrackLoadCallback callback);
+    void load(String query, String requesterTag, AudioTrackLoadCallback callback);
 
     interface AudioTrackLoadCallback {
         void trackLoaded(Track track);

@@ -1,9 +1,10 @@
 package com.bearify.controller.music.redis;
 
 import com.bearify.controller.music.domain.MusicPlayer;
+import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
+import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
 import com.bearify.controller.music.domain.MusicPlayerPool;
-import com.bearify.controller.music.domain.MusicPlayerQueue;
-import com.bearify.controller.music.domain.MusicPlayerTextChannelRegistry;
+import com.bearify.controller.music.discord.TextChannelMusicPlayerTrackAnnouncerFactory;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -14,19 +15,22 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
-    private final MusicPlayerQueue pendingInteractions;
-    private final MusicPlayerTextChannelRegistry textChannelRegistry;
+    private final MusicPlayerPendingInteractions pendingInteractions;
+    private final MusicPlayerAnnouncementRegistry announcementRegistry;
+    private final TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
     private final MusicPlayerPoolProperties properties;
 
     RedisMusicPlayerPool(StringRedisTemplate redis,
                          ObjectMapper objectMapper,
-                         MusicPlayerQueue pendingInteractions,
-                         MusicPlayerTextChannelRegistry textChannelRegistry,
+                         MusicPlayerPendingInteractions pendingInteractions,
+                         MusicPlayerAnnouncementRegistry announcementRegistry,
+                         TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory,
                          MusicPlayerPoolProperties properties) {
         this.redis = redis;
         this.objectMapper = objectMapper;
         this.pendingInteractions = pendingInteractions;
-        this.textChannelRegistry = textChannelRegistry;
+        this.announcementRegistry = announcementRegistry;
+        this.trackAnnouncerFactory = trackAnnouncerFactory;
         this.properties = properties;
     }
 
@@ -61,7 +65,8 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
                 .withRedis(redis)
                 .withObjectMapper(objectMapper)
                 .withPendingInteractions(pendingInteractions)
-                .withTextChannelRegistry(textChannelRegistry)
+                .withAnnouncementRegistry(announcementRegistry)
+                .withTrackAnnouncerFactory(trackAnnouncerFactory)
                 .withProperties(properties)
                 .build();
     }
@@ -73,7 +78,8 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
                 .withRedis(redis)
                 .withObjectMapper(objectMapper)
                 .withPendingInteractions(pendingInteractions)
-                .withTextChannelRegistry(textChannelRegistry)
+                .withAnnouncementRegistry(announcementRegistry)
+                .withTrackAnnouncerFactory(trackAnnouncerFactory)
                 .withProperties(properties)
                 .build();
     }

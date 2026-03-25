@@ -5,25 +5,30 @@ import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 class AudioPlayerPoolTest {
 
+    private static final PlayerProperties PROPERTIES = new PlayerProperties(
+            Duration.ofSeconds(3),
+            Duration.ofSeconds(10),
+            Duration.ofSeconds(30),
+            Duration.ofMinutes(5),
+            Duration.ofSeconds(5),
+            new PlayerProperties.Assignment(
+                    Duration.ofSeconds(30),
+                    Duration.ofSeconds(10)),
+            new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null)));
+
     @Test
     void returnsSnapshotOfActiveGuildIds() {
         var pool = new AudioPlayerPool(
                 mock(MusicPlayerEventDispatcher.class),
-                new PlayerProperties(
-                        Duration.ofSeconds(3),
-                        Duration.ofSeconds(10),
-                        Duration.ofSeconds(30),
-                        Duration.ofMinutes(5),
-                        new PlayerProperties.Assignment(
-                                Duration.ofSeconds(30),
-                                Duration.ofSeconds(10)),
-                        new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null))),
+                PROPERTIES,
+                Executors.newScheduledThreadPool(1),
                 "player-1");
 
         pool.getOrCreate("guild-1");
@@ -41,15 +46,8 @@ class AudioPlayerPoolTest {
     void returnsEmptySetWhenNoActiveGuilds() {
         var pool = new AudioPlayerPool(
                 mock(MusicPlayerEventDispatcher.class),
-                new PlayerProperties(
-                        Duration.ofSeconds(3),
-                        Duration.ofSeconds(10),
-                        Duration.ofSeconds(30),
-                        Duration.ofMinutes(5),
-                        new PlayerProperties.Assignment(
-                                Duration.ofSeconds(30),
-                                Duration.ofSeconds(10)),
-                        new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null))),
+                PROPERTIES,
+                Executors.newScheduledThreadPool(1),
                 "player-1");
 
         assertThat(pool.activeGuildIds()).isEmpty();

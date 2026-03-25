@@ -1,7 +1,10 @@
 package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.context.ApplicationContext;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
@@ -9,20 +12,29 @@ import java.lang.reflect.Method;
  */
 class CommandExceptionHandler {
 
-    private final Object bean;
+    private final ApplicationContext context;
+
+    private final String name;
     private final Method method;
 
-    CommandExceptionHandler(Object bean, Method method) {
-        this.bean = bean;
+    CommandExceptionHandler(ApplicationContext context, String name, Method method) {
+        this.context = context;
+        this.name = name;
         this.method = method;
         this.method.setAccessible(true);
     }
 
     void handle(CommandInteraction interaction, Throwable exception) {
+        Object target = context.getBean(name);
+        Method invocable = AopUtils.selectInvocableMethod(method, target.getClass());
         try {
-            method.invoke(bean, interaction, exception);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to invoke exception handler: " + method, e);
+            invocable.invoke(target, interaction, exception);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) throw re;
+            throw new RuntimeException("Exception handler threw a checked exception: " + invocable, cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Failed to invoke exception handler: " + invocable, e);
         }
     }
 }

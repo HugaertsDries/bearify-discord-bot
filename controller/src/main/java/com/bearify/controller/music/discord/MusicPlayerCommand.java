@@ -2,6 +2,7 @@ package com.bearify.controller.music.discord;
 
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
+import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;
 import com.bearify.discord.spring.annotation.Command;
@@ -84,11 +85,12 @@ public class MusicPlayerCommand {
                     .orElseThrow(() -> new IllegalStateException("No text channel ID on interaction"));
             String resolvedQuery = query.startsWith("http://") || query.startsWith("https://") ? query : "ytsearch:" + query;
             String userMention = interaction.getUserMention();
+            var trackRequest = new TrackRequest(resolvedQuery, textChannelId, userMention);
 
             pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                 player -> {
                     EditableMessage msg = interaction.defer();
-                    player.play(resolvedQuery, textChannelId, new MusicPlayerEventListener() {
+                    player.play(trackRequest, new MusicPlayerEventListener() {
                         public void onTrackNotFound(String q) { msg.edit(TRACK_NOT_FOUND_MESSAGE); }
                         public void onTrackLoadFailed(String reason) { msg.edit(TRACK_LOAD_FAILED_MESSAGE); }
                     });
@@ -100,7 +102,7 @@ public class MusicPlayerCommand {
                     message.edit(JOINING_MESSAGE);
                     player.join(new MusicPlayerEventListener() {
                         public void onReady() {
-                            player.play(resolvedQuery, textChannelId, new MusicPlayerEventListener() {
+                            player.play(trackRequest, new MusicPlayerEventListener() {
                                 public void onTrackNotFound(String q) { message.edit(TRACK_NOT_FOUND_MESSAGE); }
                                 public void onTrackLoadFailed(String reason) { message.edit(TRACK_LOAD_FAILED_MESSAGE); }
                             });

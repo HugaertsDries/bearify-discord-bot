@@ -1,9 +1,13 @@
 package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.spring.annotation.HandleException;
 import com.bearify.discord.spring.annotation.Option;
 import com.bearify.discord.testing.MockCommandInteraction;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -50,13 +54,29 @@ class CommandHandlerTest {
         void withUnsupported(@Option(name = "obj") Object obj) {}
     }
 
+    private AnnotationConfigApplicationContext context;
+    private TestController bean;
+
+    @BeforeEach
+    void setUp() {
+        context = new AnnotationConfigApplicationContext();
+        context.registerBean("testController", TestController.class, TestController::new);
+        context.refresh();
+
+        bean = context.getBean(TestController.class);
+    }
+
+    @AfterEach
+    void tearDown() {
+        context.close();
+    }
+
     // --- HAPPY PATH ---
 
     @Test
     void passesInteractionAsArgument() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withInteraction", CommandInteraction.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test").build();
         handler.invoke(interaction);
@@ -67,9 +87,8 @@ class CommandHandlerTest {
 
     @Test
     void resolvesStringOptionFromInteraction() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withStringOption", String.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test")
                 .option("msg", "hello world")
@@ -81,9 +100,8 @@ class CommandHandlerTest {
 
     @Test
     void resolvesIntOptionFromInteraction() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withIntOption", int.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test")
                 .option("count", "42")
@@ -95,9 +113,8 @@ class CommandHandlerTest {
 
     @Test
     void resolvesBooleanOptionFromInteraction() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withBooleanOption", boolean.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test")
                 .option("flag", "true")
@@ -109,9 +126,8 @@ class CommandHandlerTest {
 
     @Test
     void resolvesLongOptionFromInteraction() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withLongOption", long.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test")
                 .option("id", "9876543210")
@@ -123,10 +139,9 @@ class CommandHandlerTest {
 
     @Test
     void resolvesMixedInteractionAndOptionParameters() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withMixed",
                 CommandInteraction.class, int.class, String.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test")
                 .option("x", "7")
@@ -145,7 +160,7 @@ class CommandHandlerTest {
     void rejectsUnsupportedOptionTypeAtConstruction() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("withUnsupported", Object.class);
 
-        assertThatThrownBy(() -> new CommandHandler(new TestController(), method))
+        assertThatThrownBy(() -> new CommandHandler(context, "testController", method))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Unsupported");
     }
@@ -154,9 +169,8 @@ class CommandHandlerTest {
 
     @Test
     void usesDefaultValueWhenOptionIsAbsent() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withIntDefault", int.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test").build();
         handler.invoke(interaction);
@@ -166,9 +180,8 @@ class CommandHandlerTest {
 
     @Test
     void defaultsIntToZeroWhenOptionAndDefaultAreBothAbsent() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withIntOption", int.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test").build();
         handler.invoke(interaction);
@@ -178,9 +191,8 @@ class CommandHandlerTest {
 
     @Test
     void defaultsLongToZeroWhenOptionAndDefaultAreBothAbsent() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withLongOption", long.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test").build();
         handler.invoke(interaction);
@@ -190,9 +202,8 @@ class CommandHandlerTest {
 
     @Test
     void defaultsBooleanToFalseWhenOptionAndDefaultAreBothAbsent() throws NoSuchMethodException {
-        TestController bean = new TestController();
         Method method = TestController.class.getDeclaredMethod("withBooleanOption", boolean.class);
-        CommandHandler handler = new CommandHandler(bean, method);
+        CommandHandler handler = new CommandHandler(context, "testController", method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("test").build();
         handler.invoke(interaction);

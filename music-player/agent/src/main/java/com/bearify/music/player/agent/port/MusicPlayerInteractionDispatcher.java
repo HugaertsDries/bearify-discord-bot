@@ -1,10 +1,6 @@
 package com.bearify.music.player.agent.port;
 
-import com.bearify.music.player.agent.domain.AudioPlayer;
-import com.bearify.music.player.agent.domain.AudioPlayerPool;
-import com.bearify.music.player.agent.domain.AudioTrackLoader;
-import com.bearify.music.player.agent.domain.ConnectionRequest;
-import com.bearify.music.player.agent.domain.VoiceConnectionManager;
+import com.bearify.music.player.agent.domain.*;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import org.slf4j.Logger;
@@ -71,26 +67,27 @@ public class MusicPlayerInteractionDispatcher {
     private void loadAndPlay(MusicPlayerInteraction.Play play) {
         var player = pool.getOrCreate(play.guildId());
         AudioTrackLoader loader = pool.getLoader(play.guildId());
-        loader.load(play.query(), new AudioTrackLoader.AudioTrackLoadCallback() {
+        var trackRequest = play.trackRequest();
+        loader.load(trackRequest.query(), trackRequest.requesterTag(), new AudioTrackLoader.AudioTrackLoadCallback() {
             @Override
-            public void trackLoaded(com.bearify.music.player.agent.domain.Track track) {
+            public void trackLoaded(Track track) {
                 player.play(track);
             }
 
             @Override
-            public void playlistLoaded(com.bearify.music.player.agent.domain.Track firstTrack) {
+            public void playlistLoaded(Track firstTrack) {
                 player.play(firstTrack);
             }
 
             @Override
             public void noMatches() {
                 eventDispatcher.dispatch(new MusicPlayerEvent.TrackNotFound(
-                        playerId, play.requestId(), play.guildId(), play.query()));
+                        playerId, play.requestId(), play.guildId(), trackRequest.query()));
             }
 
             @Override
             public void loadFailed(String message) {
-                LOG.warn("Failed to load track '{}': {}", play.query(), message);
+                LOG.warn("Failed to load track '{}': {}", trackRequest.query(), message);
                 eventDispatcher.dispatch(new MusicPlayerEvent.TrackLoadFailed(
                         playerId, play.requestId(), play.guildId(), message));
             }

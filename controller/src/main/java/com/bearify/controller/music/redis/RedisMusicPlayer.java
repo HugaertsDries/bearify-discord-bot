@@ -1,12 +1,14 @@
 package com.bearify.controller.music.redis;
 
 import com.bearify.controller.music.domain.MusicPlayer;
+import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
-import com.bearify.controller.music.domain.MusicPlayerQueue;
-import com.bearify.controller.music.domain.MusicPlayerTextChannelRegistry;
+import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
+import com.bearify.controller.music.discord.TextChannelMusicPlayerTrackAnnouncerFactory;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,8 +32,9 @@ class RedisMusicPlayer implements MusicPlayer {
     private final String voiceChannelId;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
-    private final MusicPlayerQueue queue;
-    private final MusicPlayerTextChannelRegistry textChannelRegistry;
+    private final MusicPlayerPendingInteractions pendingInteractions;
+    private final MusicPlayerAnnouncementRegistry announcementRegistry;
+    private final TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
     private final MusicPlayerPoolProperties properties;
 
     static PendingBuilder pending() {
@@ -46,16 +49,18 @@ class RedisMusicPlayer implements MusicPlayer {
                              String voiceChannelId,
                              StringRedisTemplate redis,
                              ObjectMapper objectMapper,
-                             MusicPlayerQueue queue,
-                             MusicPlayerTextChannelRegistry textChannelRegistry,
+                             MusicPlayerPendingInteractions pendingInteractions,
+                             MusicPlayerAnnouncementRegistry announcementRegistry,
+                             TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory,
                              MusicPlayerPoolProperties properties) {
         this.state = new Pending();
         this.guildId = guildId;
         this.voiceChannelId = voiceChannelId;
         this.redis = redis;
         this.objectMapper = objectMapper;
-        this.queue = queue;
-        this.textChannelRegistry = textChannelRegistry;
+        this.pendingInteractions = pendingInteractions;
+        this.announcementRegistry = announcementRegistry;
+        this.trackAnnouncerFactory = trackAnnouncerFactory;
         this.properties = properties;
     }
 
@@ -64,16 +69,18 @@ class RedisMusicPlayer implements MusicPlayer {
                              String voiceChannelId,
                              StringRedisTemplate redis,
                              ObjectMapper objectMapper,
-                             MusicPlayerQueue queue,
-                             MusicPlayerTextChannelRegistry textChannelRegistry,
+                             MusicPlayerPendingInteractions pendingInteractions,
+                             MusicPlayerAnnouncementRegistry announcementRegistry,
+                             TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory,
                              MusicPlayerPoolProperties properties) {
         this.state = new Connected(playerId);
         this.guildId = guildId;
         this.voiceChannelId = voiceChannelId;
         this.redis = redis;
         this.objectMapper = objectMapper;
-        this.queue = queue;
-        this.textChannelRegistry = textChannelRegistry;
+        this.pendingInteractions = pendingInteractions;
+        this.announcementRegistry = announcementRegistry;
+        this.trackAnnouncerFactory = trackAnnouncerFactory;
         this.properties = properties;
     }
 
@@ -84,7 +91,7 @@ class RedisMusicPlayer implements MusicPlayer {
     public void stop() { state.stop(); }
 
     @Override
-    public void play(String query, String textChannelId, MusicPlayerEventListener handler) { state.play(query, textChannelId, handler); }
+    public void play(TrackRequest request, MusicPlayerEventListener handler) { state.play(request, handler); }
 
     @Override
     public void togglePause(MusicPlayerEventListener handler) { state.togglePause(handler); }
@@ -116,7 +123,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void join(MusicPlayerEventListener handler) {
-            MusicPlayerQueue.Ticket pending = queue.enqueue();
+            MusicPlayerPendingInteractions.PendingInteraction pending = pendingInteractions.register();
             redis.opsForValue().set(
                     PlayerRedisProtocol.Keys.connectRequest(pending.requestId()), "1",
                     properties.connectRequestTTL());
@@ -143,11 +150,10 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void stop() {
-            textChannelRegistry.remove(guildId);
         }
 
         @Override
-        public void play(String query, String textChannelId, MusicPlayerEventListener handler) {
+        public void play(TrackRequest request, MusicPlayerEventListener handler) {
             LOG.warn("play() called on player in Pending state for guild '{}' — ignoring", guildId);
         }
 
@@ -192,7 +198,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void join(MusicPlayerEventListener handler) {
-            MusicPlayerQueue.Ticket pending = queue.enqueue();
+            MusicPlayerPendingInteractions.PendingInteraction pending = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.Connect(playerId, pending.requestId(), voiceChannelId, guildId)));
@@ -216,16 +222,15 @@ class RedisMusicPlayer implements MusicPlayer {
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.Stop(playerId, UUID.randomUUID().toString(), guildId)));
-            textChannelRegistry.remove(guildId);
         }
 
         @Override
-        public void play(String query, String textChannelId, MusicPlayerEventListener handler) {
-            textChannelRegistry.store(guildId, textChannelId);
-            MusicPlayerQueue.Ticket p = queue.enqueue();
+        public void play(TrackRequest request, MusicPlayerEventListener handler) {
+            announcementRegistry.subscribe(playerId, trackAnnouncerFactory.create(request.textChannelId()));
+            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Play(playerId, p.requestId(), textChannelId, query, guildId)));
+                    serialize(new MusicPlayerInteraction.Play(playerId, p.requestId(), guildId, request)));
             p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
                 if (ex != null) return;
                 switch (event) {
@@ -239,7 +244,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void togglePause(MusicPlayerEventListener handler) {
-            MusicPlayerQueue.Ticket p = queue.enqueue();
+            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.TogglePause(playerId, p.requestId(), guildId)));
@@ -256,7 +261,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void next(MusicPlayerEventListener handler) {
-            MusicPlayerQueue.Ticket p = queue.enqueue();
+            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.Next(playerId, p.requestId(), guildId)));
@@ -272,7 +277,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void previous(MusicPlayerEventListener handler) {
-            MusicPlayerQueue.Ticket p = queue.enqueue();
+            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.Previous(playerId, p.requestId(), guildId)));
@@ -295,7 +300,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void forward(Duration seek, MusicPlayerEventListener handler) {
-            MusicPlayerQueue.Ticket p = queue.enqueue();
+            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.Forward(playerId, p.requestId(), guildId, seek.toMillis())));
@@ -322,20 +327,22 @@ class RedisMusicPlayer implements MusicPlayer {
         private String voiceChannelId;
         private StringRedisTemplate redis;
         private ObjectMapper objectMapper;
-        private MusicPlayerQueue pendingInteractions;
-        private MusicPlayerTextChannelRegistry textChannelRegistry;
+        private MusicPlayerPendingInteractions pendingInteractions;
+        private MusicPlayerAnnouncementRegistry announcementRegistry;
+        private TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
         private MusicPlayerPoolProperties properties;
 
         PendingBuilder withGuildId(String guildId) { this.guildId = guildId; return this; }
         PendingBuilder withVoiceChannelId(String voiceChannelId) { this.voiceChannelId = voiceChannelId; return this; }
         PendingBuilder withRedis(StringRedisTemplate redis) { this.redis = redis; return this; }
         PendingBuilder withObjectMapper(ObjectMapper objectMapper) { this.objectMapper = objectMapper; return this; }
-        PendingBuilder withPendingInteractions(MusicPlayerQueue pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
-        PendingBuilder withTextChannelRegistry(MusicPlayerTextChannelRegistry textChannelRegistry) { this.textChannelRegistry = textChannelRegistry; return this; }
+        PendingBuilder withPendingInteractions(MusicPlayerPendingInteractions pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
+        PendingBuilder withAnnouncementRegistry(MusicPlayerAnnouncementRegistry announcementRegistry) { this.announcementRegistry = announcementRegistry; return this; }
+        PendingBuilder withTrackAnnouncerFactory(TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
         PendingBuilder withProperties(MusicPlayerPoolProperties properties) { this.properties = properties; return this; }
 
         RedisMusicPlayer build() {
-            return new RedisMusicPlayer(guildId, voiceChannelId, redis, objectMapper, pendingInteractions, textChannelRegistry, properties);
+            return new RedisMusicPlayer(guildId, voiceChannelId, redis, objectMapper, pendingInteractions, announcementRegistry, trackAnnouncerFactory, properties);
         }
     }
 
@@ -345,8 +352,9 @@ class RedisMusicPlayer implements MusicPlayer {
         private String voiceChannelId;
         private StringRedisTemplate redis;
         private ObjectMapper objectMapper;
-        private MusicPlayerQueue pendingInteractions;
-        private MusicPlayerTextChannelRegistry textChannelRegistry;
+        private MusicPlayerPendingInteractions pendingInteractions;
+        private MusicPlayerAnnouncementRegistry announcementRegistry;
+        private TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
         private MusicPlayerPoolProperties properties;
 
         ConnectedBuilder withPlayerId(String playerId) { this.playerId = playerId; return this; }
@@ -354,12 +362,13 @@ class RedisMusicPlayer implements MusicPlayer {
         ConnectedBuilder withVoiceChannelId(String voiceChannelId) { this.voiceChannelId = voiceChannelId; return this; }
         ConnectedBuilder withRedis(StringRedisTemplate redis) { this.redis = redis; return this; }
         ConnectedBuilder withObjectMapper(ObjectMapper objectMapper) { this.objectMapper = objectMapper; return this; }
-        ConnectedBuilder withPendingInteractions(MusicPlayerQueue pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
-        ConnectedBuilder withTextChannelRegistry(MusicPlayerTextChannelRegistry textChannelRegistry) { this.textChannelRegistry = textChannelRegistry; return this; }
+        ConnectedBuilder withPendingInteractions(MusicPlayerPendingInteractions pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
+        ConnectedBuilder withAnnouncementRegistry(MusicPlayerAnnouncementRegistry announcementRegistry) { this.announcementRegistry = announcementRegistry; return this; }
+        ConnectedBuilder withTrackAnnouncerFactory(TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
         ConnectedBuilder withProperties(MusicPlayerPoolProperties properties) { this.properties = properties; return this; }
 
         RedisMusicPlayer build() {
-            return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingInteractions, textChannelRegistry, properties);
+            return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingInteractions, announcementRegistry, trackAnnouncerFactory, properties);
         }
     }
 }
