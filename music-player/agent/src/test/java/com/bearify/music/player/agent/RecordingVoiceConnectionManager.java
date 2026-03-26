@@ -28,6 +28,10 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
         disconnectedGuilds.add(guildId);
     }
 
+    @Override
+    public void close() {
+    }
+
     public List<ConnectionRequest> getCalls() {
         return List.copyOf(calls);
     }

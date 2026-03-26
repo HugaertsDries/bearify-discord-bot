@@ -15,6 +15,7 @@ public record PlayerProperties(
         @DefaultValue("5m")  Duration seekTrackLengthThreshold,
         @DefaultValue("5s")  Duration errorSkipDelay,
         @DefaultValue Assignment assignment,
+        @DefaultValue VoiceSession voiceSession,
         @DefaultValue Engine engine) {
 
     public record Assignment(
@@ -24,6 +25,21 @@ public record PlayerProperties(
         @AssertTrue(message = "music-player.assignment.ttl must be greater than music-player.assignment.heartbeat-interval")
         public boolean isTtlGreaterThanHeartbeatInterval() {
             return ttl.compareTo(heartbeatInterval) > 0;
+        }
+    }
+
+    public record VoiceSession(
+            @DefaultValue("10s") Duration heartbeatInterval,
+            @DefaultValue("5m") Duration lonelyTimeout) {
+
+        @AssertTrue(message = "music-player.voice-session.heartbeat-interval must be greater than 0")
+        public boolean hasPositiveHeartbeatInterval() {
+            return heartbeatInterval.compareTo(Duration.ZERO) > 0;
+        }
+
+        @AssertTrue(message = "music-player.voice-session.lonely-timeout must be greater than 0")
+        public boolean hasPositiveLonelyTimeout() {
+            return lonelyTimeout.compareTo(Duration.ZERO) > 0;
         }
     }
 

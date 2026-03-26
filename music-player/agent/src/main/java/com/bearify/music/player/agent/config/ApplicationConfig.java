@@ -3,11 +3,17 @@ package com.bearify.music.player.agent.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Clock;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 @Configuration
 public class ApplicationConfig {
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
 
     @Bean
     ScheduledExecutorService audioScheduler() {

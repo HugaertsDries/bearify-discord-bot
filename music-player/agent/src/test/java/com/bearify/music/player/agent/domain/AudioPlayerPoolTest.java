@@ -21,6 +21,9 @@ class AudioPlayerPoolTest {
             new PlayerProperties.Assignment(
                     Duration.ofSeconds(30),
                     Duration.ofSeconds(10)),
+            new PlayerProperties.VoiceSession(
+                    Duration.ofSeconds(10),
+                    Duration.ofMinutes(5)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null)));
 
     @Test
