@@ -117,6 +117,79 @@ This includes both direct replies and deferred/edit flows.
 
 - all output: ephemeral
 
+## Approved Message Catalog
+
+This section captures the approved slash-command messages by state for the current controller surface.
+
+### Shared Validation Messages
+
+- not in voice channel: `Looks like you're not in a voice channel! Jump in one and try again.`
+- not in guild: `I only lumber around inside a server.`
+- no player in your voice channel: `Seems like I'm not even playing songs! If you'd like me to, have you tried the /player play command?`
+
+### `/player join`
+
+- initial deferred status: `Sending a bear your way!`
+- success when ready: `Joined <#channel>, [random celebratory ending]`
+- no players available: `No music bears are free right now. Try again in a moment.`
+- connect failed: `The bear couldn't reach your channel. Try again in a moment.`
+
+### `/player leave`
+
+- success: `Alright, cleaning up after myself. Talk to you later!`
+- no player in your voice channel: `Seems like I'm not even playing songs! If you'd like me to, have you tried the /player play command?`
+- player is active elsewhere in the guild, not with the caller: `Bear with me, I can't lumber out of your voice channel when I'm not with you.`
+
+### `/player play`
+
+- initial deferred status while joining first: `Sending a bear your way!`
+- success after queueing: `@user added your track to the mix.`
+- no players available: `Bearly any bears left! They're all busy right now. Try again in a moment.`
+- connect failed: `The bear couldn't reach your channel. Try again in a moment.`
+- track not found: `I couldn't sniff out that track. Try a different search or link?`
+- track load failed: `Oops! Something went wrong loading this track. This could be due to age-restrictions or region lock. (I'm technically less than 1 year old)`
+
+### Ephemeral Playback Control Successes
+
+These messages should read as personal confirmations with light bear tone, not room narration.
+
+#### `/player pause`
+
+- paused: `Paused the current track for you.`
+- resumed: `Resumed the current track for you.`
+
+#### `/player previous`
+
+- success: `Back on the trail to the previous track.`
+- nothing to go back to: `This is where the trail begins. Nothing to go back to!`
+
+#### `/player next`
+
+- success: `On to the next track.`
+- queue empty: `This is where the trail ends. Try adding more using /player play.`
+
+#### `/player rewind`
+
+- success without duration: `Rewound the current track for you.`
+- success with duration: `Rewound the current track by <seconds>s for you.`
+- zero seconds: `Bold strategy. Rewinding by exactly 0 seconds.`
+
+#### `/player forward`
+
+- success without duration: `Forwarded the current track for you.`
+- success with duration: `Forwarded the current track by <seconds>s for you.`
+- zero seconds: `Bold strategy. Forwarding by exactly 0 seconds.`
+- queue empty: `This is where the trail ends. Try adding more using /player play.`
+
+#### `/player clear`
+
+- success: `Cleared the playlist. Fresh paws.`
+
+### `/poke`
+
+- keep the existing latency transcript and summary wording unchanged
+- make the full interaction ephemeral
+
 ## Announcer Policy
 
 The announcer embed is the only public surface for routine playback updates.
