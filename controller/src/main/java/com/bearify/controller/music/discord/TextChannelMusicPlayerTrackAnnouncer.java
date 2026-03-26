@@ -1,6 +1,7 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.music.discord.images.DiskGIF;
+import com.bearify.controller.music.discord.images.SpacerPng;
 import com.bearify.controller.music.discord.images.VibingGIF;
 import com.bearify.controller.music.domain.MusicPlayerTrackAnnouncer;
 import com.bearify.discord.api.gateway.DiscordClient;
@@ -12,29 +13,49 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnnouncer {
 
+    private enum PlaybackState {
+        PLAYING("\uD83D\uDD34 ON THE AIR", "vibing.gif"),
+        PAUSED("\u26AA ON THE AIR", "spacer.png");
+
+        private final String authorText;
+        private final String imageFilename;
+
+        PlaybackState(String authorText, String imageFilename) {
+            this.authorText = authorText;
+            this.imageFilename = imageFilename;
+        }
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(TextChannelMusicPlayerTrackAnnouncer.class);
-    private static final Random RANDOM = new Random();
-    private static final List<String> FOOTER_ENDINGS = List.of(
-            "Certified banger detector\u2122",
-            "Press play, regret nothing",
-            "This is un-bear-ably good",
-            "100% bug-free (probably)",
-            "Compiled with love",
-            "Running on caffeine & vibes"
-    );
-    private static final String DISK_FILENAME = "disk.gif";
-    private static final String VIBING_FILENAME = "vibing.gif";
+    private final ScheduledExecutorService actionTimeouts =
+            Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
+
+    private static final String DISK_FILENAME  = "disk.gif";
+    private static final byte[] SPACER_BYTES   = new SpacerPng().toBytes();
 
     private final DiscordClient discord;
     private final AnnouncerProperties properties;
     private final String textChannelId;
     private volatile SentMessage activeEmbed;
+    private volatile PlaybackState playbackState = PlaybackState.PLAYING;
+    private volatile String temporaryAction;
+    private volatile ScheduledFuture<?> clearActionTask;
+    private volatile TrackMetadata currentTrack;
+    private volatile List<TrackMetadata> currentUpNext = List.of();
+    private volatile String currentRequesterTag;
+    private volatile byte[] diskBytes;
+    private volatile byte[] vibingBytes;
 
     public TextChannelMusicPlayerTrackAnnouncer(DiscordClient discord,
                                                 AnnouncerProperties properties,
@@ -45,10 +66,18 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
     }
 
     @Override
-    public void accept(MusicPlayerEvent event) {
+    public synchronized void accept(MusicPlayerEvent event) {
         switch (event) {
             case MusicPlayerEvent.TrackStart started -> onTrackStart(started);
             case MusicPlayerEvent.TrackError error -> onTrackError(error);
+            case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackState.PAUSED);
+            case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackState.PLAYING);
+            case MusicPlayerEvent.Skipped skipped -> notify("Last track skipped by " + skipped.request().requesterTag());
+            case MusicPlayerEvent.WentBack wentBack -> notify("Jumped back by " + wentBack.request().requesterTag());
+            case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
+            case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
+            case MusicPlayerEvent.Cleared cleared -> notify("Cleared by " + cleared.request().requesterTag());
+            case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
             case MusicPlayerEvent.QueueEmpty ignored -> deleteEmbed();
             case MusicPlayerEvent.Stopped ignored -> deleteEmbed();
             default -> {
@@ -57,20 +86,67 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
     }
 
     private void onTrackStart(MusicPlayerEvent.TrackStart event) {
+        cancelClearTask();
+        temporaryAction = null;
         try {
-            byte[] diskBytes = new DiskGIF().toBytes();
-            byte[] vibingBytes = new VibingGIF().toBytes();
-            updateOrPost(nowPlayingEmbed(event.track(), event.requesterTag(), diskBytes, vibingBytes));
+            currentTrack = event.track();
+            currentUpNext = event.upNext();
+            currentRequesterTag = event.request().requesterTag();
+            playbackState = PlaybackState.PLAYING;
+            diskBytes = new DiskGIF().toBytes();
+            vibingBytes = new VibingGIF().toBytes();
+            updateOrPost(nowPlayingEmbed());
         } catch (Exception e) {
             LOG.warn("Failed to post now-playing embed for channel {}", textChannelId, e);
         }
     }
 
     private void onTrackError(MusicPlayerEvent.TrackError event) {
+        currentTrack = event.track();
+        currentRequesterTag = null;
+        cancelClearTask();
+        temporaryAction = null;
         try {
             updateOrPost(errorEmbed(event.track()));
         } catch (Exception e) {
             LOG.warn("Failed to post error embed for channel {}", textChannelId, e);
+        }
+    }
+
+    private void onQueueUpdated(MusicPlayerEvent.QueueUpdated event) {
+        currentUpNext = event.upNext();
+        refreshNowPlayingEmbed();
+    }
+
+    private void updatePlaybackState(PlaybackState state) {
+        playbackState = state;
+        refreshNowPlayingEmbed();
+    }
+
+    private void notify(String action) {
+        temporaryAction = action;
+        cancelClearTask();
+        clearActionTask = actionTimeouts.schedule(this::clearTemporaryActionSafely,
+                properties.actionTimeout().toMillis(), TimeUnit.MILLISECONDS);
+        refreshNowPlayingEmbed();
+    }
+
+    private void clearTemporaryActionSafely() {
+        synchronized (this) {
+            clearActionTask = null;
+            temporaryAction = null;
+            refreshNowPlayingEmbed();
+        }
+    }
+
+    private void refreshNowPlayingEmbed() {
+        if (currentTrack == null || activeEmbed == null) {
+            return;
+        }
+        try {
+            updateOrPost(nowPlayingEmbed());
+        } catch (Exception e) {
+            LOG.warn("Failed to refresh embed for channel {}", textChannelId, e);
         }
     }
 
@@ -89,6 +165,11 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
     }
 
     private void deleteEmbed() {
+        cancelClearTask();
+        currentTrack = null;
+        currentRequesterTag = null;
+        currentUpNext = List.of();
+        temporaryAction = null;
         SentMessage existing = activeEmbed;
         activeEmbed = null;
         if (existing != null) {
@@ -100,25 +181,39 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         }
     }
 
-    private EmbedMessage nowPlayingEmbed(TrackMetadata track, String requesterTag, byte[] diskBytes, byte[] vibingBytes) {
-        String addedBy = requesterTag != null ? requesterTag : "Unknown";
+    private void cancelClearTask() {
+        ScheduledFuture<?> existingTask = clearActionTask;
+        clearActionTask = null;
+        if (existingTask != null) {
+            existingTask.cancel(false);
+        }
+    }
+
+    private EmbedMessage nowPlayingEmbed() {
+        String requestedBy = currentRequesterTag != null ? currentRequesterTag : "Unknown";
+        String description = temporaryAction != null && !temporaryAction.isBlank()
+                ? "*" + temporaryAction + "*"
+                : null;
+
+        List<EmbedMessage.Field> fields = new ArrayList<>();
+        fields.add(new EmbedMessage.Field("Author",       truncate(currentTrack.author(), 40), true));
+        fields.add(new EmbedMessage.Field("Length",       humanReadable(Duration.ofMillis(currentTrack.durationMs())), true));
+        fields.add(new EmbedMessage.Field("Requested by", requestedBy,                         true));
+        if (!currentUpNext.isEmpty()) {
+            fields.add(new EmbedMessage.Field("Up Next", formatUpNext(currentUpNext), false));
+        }
+
         return EmbedMessage.builder()
-                .authorText("LISTENING TO")
-                .title(track.title())
-                .titleUrl(track.uri())
+                .authorText(playbackState.authorText)
+                .title(truncate(currentTrack.title(), 30))
+                .titleUrl(currentTrack.uri())
+                .description(description)
                 .color(properties.colorNowPlayingInt())
-                .imageFilename(VIBING_FILENAME)
+                .imageFilename(playbackState.imageFilename)
                 .thumbnailFilename(DISK_FILENAME)
-                .footer(footer())
-                .fields(List.of(
-                        new EmbedMessage.Field("Added by", addedBy, true),
-                        new EmbedMessage.Field("Author", track.author(), true),
-                        new EmbedMessage.Field("Length", humanReadable(Duration.ofMillis(track.durationMs())), true)
-                ))
-                .attachments(List.of(
-                        new EmbedMessage.Attachment(DISK_FILENAME, diskBytes),
-                        new EmbedMessage.Attachment(VIBING_FILENAME, vibingBytes)
-                ))
+                .footer(properties.footer())
+                .fields(fields)
+                .attachments(attachments())
                 .build();
     }
 
@@ -128,8 +223,32 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
                 .titleUrl(track.uri())
                 .description("Something went wrong loading this track. Skipping in 5 seconds\u2026")
                 .color(properties.colorErrorInt())
-                .footer(footer())
+                .footer(properties.footer())
                 .build();
+    }
+
+    private List<EmbedMessage.Attachment> attachments() {
+        byte[] stateImageBytes = playbackState == PlaybackState.PLAYING ? vibingBytes : SPACER_BYTES;
+        return List.of(
+                new EmbedMessage.Attachment(DISK_FILENAME, diskBytes),
+                new EmbedMessage.Attachment(playbackState.imageFilename, stateImageBytes)
+        );
+    }
+
+    private static String formatUpNext(List<TrackMetadata> tracks) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < tracks.size(); i++) {
+            TrackMetadata t = tracks.get(i);
+            if (i > 0) sb.append('\n');
+            sb.append(i + 1).append(". ")
+              .append(truncate(t.title(), 35));
+        }
+        return sb.toString();
+    }
+
+    private static String truncate(String text, int limit) {
+        if (text == null) return "";
+        return text.length() <= limit ? text : text.substring(0, limit - 1) + "\u2026";
     }
 
     private static String humanReadable(Duration duration) {
@@ -139,23 +258,24 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
                 .toLowerCase();
     }
 
-    private String footer() {
-        return properties.footerMain() + " \u2022 " + FOOTER_ENDINGS.get(RANDOM.nextInt(FOOTER_ENDINGS.size()));
-    }
-
     @Override
     public boolean equals(Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof TextChannelMusicPlayerTrackAnnouncer that)) {
-            return false;
-        }
+        if (this == other) return true;
+        if (!(other instanceof TextChannelMusicPlayerTrackAnnouncer that)) return false;
         return Objects.equals(textChannelId, that.textChannelId);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(textChannelId);
+    }
+
+    private static final class AnnouncerThreadFactory implements ThreadFactory {
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread = new Thread(runnable, "bearify-announcer-timeouts");
+            thread.setDaemon(true);
+            return thread;
+        }
     }
 }

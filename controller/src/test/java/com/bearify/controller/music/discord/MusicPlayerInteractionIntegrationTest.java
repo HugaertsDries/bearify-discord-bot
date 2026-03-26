@@ -7,6 +7,7 @@ import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.awaitility.Awaitility;
@@ -20,6 +21,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -134,9 +136,10 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         commandRegistry.handle(interaction);
 
         assertThat(interaction.getDeferredMessage()).isPresent();
+        assertThat(interaction.isDeferredEphemeral()).isFalse();
         Awaitility.await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
                 assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                        .contains("No music bears are free right now"));
+                        .contains("No music bears are free right now. Try again in a moment."));
     }
 
     @Test
@@ -234,15 +237,82 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
                 new MusicPlayerEvent.TrackStart(
                         PLAYER_ID,
-                        "event-1",
+                        new Request("event-1", "@user"),
                         GUILD_ID,
-                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000),
-                        "@user")));
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of())));
 
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
             assertThat(discord.sentEmbeds("text-1")).hasSize(1);
             assertThat(discord.sentEmbeds("text-2")).hasSize(1);
+        });
+    }
+
+    @Test
+    void announcerUpdatesEmbedDescriptionWhenPausedEventArrives() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                .subcommand("play")
+                .guildId(GUILD_ID)
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .textChannelId("text-1")
+                .option("search", "song a")
+                .build();
+
+        commandRegistry.handle(interaction);
+
+        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
+                new MusicPlayerEvent.TrackStart(
+                        PLAYER_ID,
+                        new Request("event-1", "@user"),
+                        GUILD_ID,
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of())));
+        Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
+            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
+        });
+        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
+                new MusicPlayerEvent.Paused(PLAYER_ID, new Request("event-2", "@user"), GUILD_ID)));
+
+        Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
+            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
+            assertThat(discord.sentEmbeds("text-1").getFirst().authorText()).hasValue("\u26AA ON THE AIR");
+        });
+    }
+
+    @Test
+    void announcerShowsTemporarySkippedActionWhenSkippedEventArrives() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                .subcommand("play")
+                .guildId(GUILD_ID)
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .textChannelId("text-1")
+                .option("search", "song a")
+                .build();
+
+        commandRegistry.handle(interaction);
+
+        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
+                new MusicPlayerEvent.TrackStart(
+                        PLAYER_ID,
+                        new Request("event-1", "@user"),
+                        GUILD_ID,
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of())));
+        Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
+            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
+        });
+        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
+                new MusicPlayerEvent.Skipped(PLAYER_ID, new Request("event-2", "@user"), GUILD_ID)));
+
+        Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
+            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
+            assertThat(discord.sentEmbeds("text-1").getFirst().description()).hasValue("*Last track skipped by @user*");
         });
     }
 

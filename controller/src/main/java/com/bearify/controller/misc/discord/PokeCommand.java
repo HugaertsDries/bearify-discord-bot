@@ -29,7 +29,7 @@ public class PokeCommand {
     @Interaction(value = "poke", description = "Poke the bear. Dare you.")
     public void poke(CommandInteraction interaction,
                      @Option(name = "pokes", description = "Number of times to poke the bear", defaultValue = "4") int pokes) {
-        EditableMessage handle = interaction.defer();
+        EditableMessage handle = interaction.defer(true);
 
         LongSummaryStatistics stats = new LongSummaryStatistics();
         CodeBlockBuilder cb = new CodeBlockBuilder().append(BearifyEmoji.BEAR + " POKING bearify...").newline();

@@ -10,6 +10,7 @@ import com.bearify.music.player.agent.domain.AudioPlayerPool;
 import com.bearify.music.player.agent.domain.AudioTrackLoader;
 import com.bearify.music.player.agent.domain.Track;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
 
@@ -80,9 +81,9 @@ class MusicPlayerInteractionDispatcherTest {
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
 
-        dispatcher.handle(new MusicPlayerInteraction.TogglePause(PLAYER_ID, REQUEST_ID, GUILD_ID));
+        dispatcher.handle(new MusicPlayerInteraction.TogglePause(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
-        assertThat(pool.togglePauseCalls).containsExactly(GUILD_ID);
+        assertThat(pool.togglePauseCalls).containsExactly(GUILD_ID + "|@user");
     }
 
     @Test
@@ -92,9 +93,9 @@ class MusicPlayerInteractionDispatcherTest {
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
 
-        dispatcher.handle(new MusicPlayerInteraction.Next(PLAYER_ID, REQUEST_ID, GUILD_ID));
+        dispatcher.handle(new MusicPlayerInteraction.Next(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
-        assertThat(pool.nextCalls).containsExactly(GUILD_ID);
+        assertThat(pool.nextCalls).containsExactly(GUILD_ID + "|@user");
     }
 
     @Test
@@ -104,9 +105,9 @@ class MusicPlayerInteractionDispatcherTest {
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
 
-        dispatcher.handle(new MusicPlayerInteraction.Previous(PLAYER_ID, REQUEST_ID, GUILD_ID));
+        dispatcher.handle(new MusicPlayerInteraction.Previous(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
-        assertThat(pool.previousCalls).containsExactly(GUILD_ID);
+        assertThat(pool.previousCalls).containsExactly(GUILD_ID + "|@user");
     }
 
     @Test
@@ -116,9 +117,9 @@ class MusicPlayerInteractionDispatcherTest {
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
 
-        dispatcher.handle(new MusicPlayerInteraction.Rewind(PLAYER_ID, REQUEST_ID, GUILD_ID, 15000));
+        dispatcher.handle(new MusicPlayerInteraction.Rewind(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 15000));
 
-        assertThat(pool.rewindCalls).containsExactly("15000|" + GUILD_ID);
+        assertThat(pool.rewindCalls).containsExactly("15000|" + GUILD_ID + "|@user");
     }
 
     @Test
@@ -128,9 +129,9 @@ class MusicPlayerInteractionDispatcherTest {
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
 
-        dispatcher.handle(new MusicPlayerInteraction.Forward(PLAYER_ID, REQUEST_ID, GUILD_ID, 30000));
+        dispatcher.handle(new MusicPlayerInteraction.Forward(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 30000));
 
-        assertThat(pool.forwardCalls).containsExactly("30000|" + GUILD_ID);
+        assertThat(pool.forwardCalls).containsExactly("30000|" + GUILD_ID + "|@user");
     }
 
     // --- STUB ---
@@ -183,28 +184,32 @@ class MusicPlayerInteractionDispatcherTest {
             }
 
             @Override
-            public void togglePause(String requestId) {
-                togglePauseCalls.add(guildId);
+            public void togglePause(Request request) {
+                togglePauseCalls.add(guildId + "|" + request.requesterTag());
             }
 
             @Override
-            public void next(String requestId) {
-                nextCalls.add(guildId);
+            public void next(Request request) {
+                nextCalls.add(guildId + "|" + request.requesterTag());
             }
 
             @Override
-            public void previous(String requestId) {
-                previousCalls.add(guildId);
+            public void previous(Request request) {
+                previousCalls.add(guildId + "|" + request.requesterTag());
             }
 
             @Override
-            public void rewind(Duration seek) {
-                rewindCalls.add(seek.toMillis() + "|" + guildId);
+            public void rewind(Duration seek, Request request) {
+                rewindCalls.add(seek.toMillis() + "|" + guildId + "|" + request.requesterTag());
             }
 
             @Override
-            public void forward(Duration seek, String requestId) {
-                forwardCalls.add(seek.toMillis() + "|" + guildId);
+            public void forward(Duration seek, Request request) {
+                forwardCalls.add(seek.toMillis() + "|" + guildId + "|" + request.requesterTag());
+            }
+
+            @Override
+            public void clear(Request request) {
             }
         }
 

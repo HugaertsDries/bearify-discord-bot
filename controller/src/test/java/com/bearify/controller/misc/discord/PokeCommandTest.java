@@ -50,6 +50,7 @@ class PokeCommandTest {
 
         command.poke(interaction, 4);
 
+        assertThat(interaction.isDeferredEphemeral()).isTrue();
         String output = interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow();
         assertThat(output).contains("POKING bearify");
         assertThat(output).contains("# 1", "# 2", "# 3", "# 4");

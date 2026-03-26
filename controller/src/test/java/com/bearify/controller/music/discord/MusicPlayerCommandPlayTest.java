@@ -62,6 +62,7 @@ class MusicPlayerCommandPlayTest extends AbstractControllerIntegrationTest {
             commandRegistry.handle(interaction);
 
             assertThat(interaction.getDeferredMessage()).isPresent();
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
             assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                     .contains("added your track to the mix");
 
@@ -96,6 +97,7 @@ class MusicPlayerCommandPlayTest extends AbstractControllerIntegrationTest {
 
             // First message is deferred with JOINING
             assertThat(interaction.getDeferredMessage()).isPresent();
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
             assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                     .contains("Sending a bear your way");
 
@@ -163,9 +165,10 @@ class MusicPlayerCommandPlayTest extends AbstractControllerIntegrationTest {
         commandRegistry.handle(interaction);
 
         assertThat(interaction.getDeferredMessage()).isPresent();
+        assertThat(interaction.isDeferredEphemeral()).isTrue();
         Awaitility.await().atMost(Duration.ofSeconds(3)).untilAsserted(() ->
                 assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                        .contains("No music bears are free right now"));
+                        .contains("Bearly any bears left! They're all busy right now. Try again in a moment."));
     }
 
     @Test

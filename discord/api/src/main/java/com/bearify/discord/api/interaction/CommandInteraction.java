@@ -8,7 +8,11 @@ import java.util.Optional;
  */
 public interface CommandInteraction {
 
-    EditableMessage defer();
+    default EditableMessage defer() {
+        return defer(false);
+    }
+
+    EditableMessage defer(boolean ephemeral);
 
     ReplyBuilder reply(String message);
 

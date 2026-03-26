@@ -33,9 +33,9 @@ public class MockCommandInteraction implements CommandInteraction {
     }
 
     @Override
-    public EditableMessage defer() {
+    public EditableMessage defer(boolean ephemeral) {
         this.deferredMessage = new MockEditableMessage();
-        this.deferredEphemeral = false;
+        this.deferredEphemeral = ephemeral;
         return deferredMessage;
     }
 

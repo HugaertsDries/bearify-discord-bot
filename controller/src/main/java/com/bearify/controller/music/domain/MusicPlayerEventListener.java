@@ -8,6 +8,6 @@ public interface MusicPlayerEventListener {
     default void onTrackLoadFailed(String reason) {}
     default void onPaused() {}
     default void onResumed() {}
+    default void onNothingToAdvance() {}
     default void onNothingToGoBack() {}
-    default void onQueueEmpty() {}
 }

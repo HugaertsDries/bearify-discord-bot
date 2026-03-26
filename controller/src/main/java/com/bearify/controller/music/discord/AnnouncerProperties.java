@@ -3,11 +3,14 @@ package com.bearify.controller.music.discord;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+import java.time.Duration;
+
 @ConfigurationProperties("bearify.music.announcer")
 public record AnnouncerProperties(
         @DefaultValue("#FFA500") String colorNowPlaying,
         @DefaultValue("#FF4444") String colorError,
-        @DefaultValue("Bearify \uD83D\uDC3B \u2022 Powered by Bearable Software") String footerMain
+        @DefaultValue("\uD83D\uDC3B Bearify \u2022 Powered by Bearable Software") String footer,
+        @DefaultValue("15s") Duration actionTimeout
 ) {
     public AnnouncerProperties {
         Integer.decode(colorNowPlaying);

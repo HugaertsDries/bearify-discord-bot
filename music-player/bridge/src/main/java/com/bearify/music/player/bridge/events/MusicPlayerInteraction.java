@@ -1,5 +1,6 @@
 package com.bearify.music.player.bridge.events;
 
+import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -31,14 +32,26 @@ public sealed interface MusicPlayerInteraction permits
     String requestId();
 
     record Play(String playerId, String requestId, String guildId, TrackRequest trackRequest) implements MusicPlayerInteraction {}
-    record TogglePause(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
-    record Next(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
-    record Previous(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
+    record TogglePause(String playerId, Request request, String guildId) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
+    record Next(String playerId, Request request, String guildId) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
+    record Previous(String playerId, Request request, String guildId) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
     /** seekMs of 0 means use the player's configured default. */
-    record Rewind(String playerId, String requestId, String guildId, long seekMs) implements MusicPlayerInteraction {}
+    record Rewind(String playerId, Request request, String guildId, long seekMs) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
     /** seekMs of 0 means use the player's configured default. */
-    record Forward(String playerId, String requestId, String guildId, long seekMs) implements MusicPlayerInteraction {}
+    record Forward(String playerId, Request request, String guildId, long seekMs) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
     record Stop(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
     record Connect(String playerId, String requestId, String voiceChannelId, String guildId) implements MusicPlayerInteraction {}
-    record Clear(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
+    record Clear(String playerId, Request request, String guildId) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
 }

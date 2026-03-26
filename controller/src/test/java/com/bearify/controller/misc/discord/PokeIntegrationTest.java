@@ -21,7 +21,7 @@ class PokeIntegrationTest extends AbstractControllerIntegrationTest {
 
         registry.handle(interaction);
 
-        assertThat(interaction.isDeferredEphemeral()).isFalse();
+        assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                 .contains("pokes survived");
     }

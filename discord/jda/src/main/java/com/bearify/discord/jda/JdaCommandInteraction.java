@@ -25,9 +25,9 @@ class JdaCommandInteraction implements CommandInteraction {
     }
 
     @Override
-    public EditableMessage defer() {
+    public EditableMessage defer(boolean ephemeral) {
         Instant createdAt = Instant.now();
-        InteractionHook hook = event.deferReply(false).complete();
+        InteractionHook hook = event.deferReply(ephemeral).complete();
         return new JdaEditableMessage(hook, createdAt);
     }
 

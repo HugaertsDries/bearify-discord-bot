@@ -8,6 +8,7 @@ import com.bearify.controller.music.discord.TextChannelMusicPlayerTrackAnnouncer
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.slf4j.Logger;
@@ -93,23 +94,26 @@ class RedisMusicPlayer implements MusicPlayer {
     @Override
     public void play(TrackRequest request, MusicPlayerEventListener handler) { state.play(request, handler); }
 
+    // TODO AI maybe this is overkill for now, but I don't know if it's a good idea to just pass a requesterTAG.
+    //  let's say in a future impl. we build a webapp UI to control the bot, will we have access to a tag? or maybe just a name.
+    //  So should we encapulate this in somekind of object/concept? what do you think?
     @Override
-    public void togglePause(MusicPlayerEventListener handler) { state.togglePause(handler); }
+    public void togglePause(String requesterTag, MusicPlayerEventListener handler) { state.togglePause(requesterTag, handler); }
 
     @Override
-    public void next(MusicPlayerEventListener handler) { state.next(handler); }
+    public void next(String requesterTag, MusicPlayerEventListener handler) { state.next(requesterTag, handler); }
 
     @Override
-    public void previous(MusicPlayerEventListener handler) { state.previous(handler); }
+    public void previous(String requesterTag, MusicPlayerEventListener handler) { state.previous(requesterTag, handler); }
 
     @Override
-    public void rewind(Duration seek) { state.rewind(seek); }
+    public void rewind(Duration seek, String requesterTag) { state.rewind(seek, requesterTag); }
 
     @Override
-    public void forward(Duration seek, MusicPlayerEventListener handler) { state.forward(seek, handler); }
+    public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) { state.forward(seek, requesterTag, handler); }
 
     @Override
-    public void clear() { state.clear(); }
+    public void clear(String requesterTag) { state.clear(requesterTag); }
 
     private String serialize(Object value) {
         try {
@@ -158,32 +162,32 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void togglePause(MusicPlayerEventListener handler) {
+        public void togglePause(String requesterTag, MusicPlayerEventListener handler) {
             LOG.warn("togglePause() called on player in Pending state for guild '{}' — ignoring", guildId);
         }
 
         @Override
-        public void next(MusicPlayerEventListener handler) {
+        public void next(String requesterTag, MusicPlayerEventListener handler) {
             LOG.warn("next() called on player in Pending state for guild '{}' — ignoring", guildId);
         }
 
         @Override
-        public void previous(MusicPlayerEventListener handler) {
+        public void previous(String requesterTag, MusicPlayerEventListener handler) {
             LOG.warn("previous() called on player in Pending state for guild '{}' — ignoring", guildId);
         }
 
         @Override
-        public void rewind(Duration seek) {
+        public void rewind(Duration seek, String requesterTag) {
             LOG.warn("rewind() called on player in Pending state for guild '{}' — ignoring", guildId);
         }
 
         @Override
-        public void forward(Duration seek, MusicPlayerEventListener handler) {
+        public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
             LOG.warn("forward() called on player in Pending state for guild '{}' — ignoring", guildId);
         }
 
         @Override
-        public void clear() {
+        public void clear(String requesterTag) {
             LOG.warn("clear() called on player in Pending state for guild '{}' — ignoring", guildId);
         }
     }
@@ -243,11 +247,11 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void togglePause(MusicPlayerEventListener handler) {
+        public void togglePause(String requesterTag, MusicPlayerEventListener handler) {
             MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.TogglePause(playerId, p.requestId(), guildId)));
+                    serialize(new MusicPlayerInteraction.TogglePause(playerId, new Request(p.requestId(), requesterTag), guildId)));
             p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
                 if (ex != null) return;
                 switch (event) {
@@ -260,15 +264,15 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void next(MusicPlayerEventListener handler) {
+        public void next(String requesterTag, MusicPlayerEventListener handler) {
             MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Next(playerId, p.requestId(), guildId)));
+                    serialize(new MusicPlayerInteraction.Next(playerId, new Request(p.requestId(), requesterTag), guildId)));
             p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
                 if (ex != null) return;
                 switch (event) {
-                    case MusicPlayerEvent.QueueEmpty ignored -> handler.onQueueEmpty();
+                    case MusicPlayerEvent.NothingToAdvance ignored -> handler.onNothingToAdvance();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for next request", event.getClass().getSimpleName());
                 }
@@ -276,11 +280,11 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void previous(MusicPlayerEventListener handler) {
+        public void previous(String requesterTag, MusicPlayerEventListener handler) {
             MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Previous(playerId, p.requestId(), guildId)));
+                    serialize(new MusicPlayerInteraction.Previous(playerId, new Request(p.requestId(), requesterTag), guildId)));
             p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
                 if (ex != null) return;
                 switch (event) {
@@ -292,22 +296,22 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void rewind(Duration seek) {
+        public void rewind(Duration seek, String requesterTag) {
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Rewind(playerId, UUID.randomUUID().toString(), guildId, seek.toMillis())));
+                    serialize(new MusicPlayerInteraction.Rewind(playerId, new Request(UUID.randomUUID().toString(), requesterTag), guildId, seek.toMillis())));
         }
 
         @Override
-        public void forward(Duration seek, MusicPlayerEventListener handler) {
+        public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
             MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Forward(playerId, p.requestId(), guildId, seek.toMillis())));
+                    serialize(new MusicPlayerInteraction.Forward(playerId, new Request(p.requestId(), requesterTag), guildId, seek.toMillis())));
             p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
                 if (ex != null) return;
                 switch (event) {
-                    case MusicPlayerEvent.QueueEmpty ignored -> handler.onQueueEmpty();
+                    case MusicPlayerEvent.NothingToAdvance ignored -> handler.onNothingToAdvance();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for forward request", event.getClass().getSimpleName());
                 }
@@ -315,10 +319,10 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void clear() {
+        public void clear(String requesterTag) {
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Clear(playerId, UUID.randomUUID().toString(), guildId)));
+                    serialize(new MusicPlayerInteraction.Clear(playerId, new Request(UUID.randomUUID().toString(), requesterTag), guildId)));
         }
     }
 
