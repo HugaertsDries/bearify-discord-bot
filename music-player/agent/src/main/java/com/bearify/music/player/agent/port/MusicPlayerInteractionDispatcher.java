@@ -3,12 +3,13 @@ package com.bearify.music.player.agent.port;
 import com.bearify.music.player.agent.domain.*;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+
+import java.time.Duration;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.time.Duration;
 
 @Component
 public class MusicPlayerInteractionDispatcher {
@@ -75,8 +76,8 @@ public class MusicPlayerInteractionDispatcher {
             }
 
             @Override
-            public void playlistLoaded(Track firstTrack) {
-                player.play(firstTrack);
+            public void playlistLoaded(List<Track> tracks) {
+                player.play(tracks);
             }
 
             @Override

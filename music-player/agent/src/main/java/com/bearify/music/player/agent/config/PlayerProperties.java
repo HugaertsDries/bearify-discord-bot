@@ -1,6 +1,7 @@
 package com.bearify.music.player.agent.config;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -14,6 +15,7 @@ public record PlayerProperties(
         @DefaultValue("30s") Duration seekLongDefault,
         @DefaultValue("5m")  Duration seekTrackLengthThreshold,
         @DefaultValue("5s")  Duration errorSkipDelay,
+        @DefaultValue("200") @Positive int playlistMaxTracks,
         @DefaultValue Assignment assignment,
         @DefaultValue VoiceSession voiceSession,
         @DefaultValue Engine engine) {

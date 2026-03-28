@@ -84,6 +84,18 @@ public class AudioPlayer implements AudioProvider {
         }
     }
 
+    public synchronized void play(List<Track> tracks) {
+        if (tracks.isEmpty()) return;
+        for (Track track : tracks) {
+            queue.addLast(track);
+        }
+        if (engine.getPlayingTrack() == null) {
+            engine.play(queue.pollFirst());
+        }
+        List<TrackMetadata> upNext = queue.stream().limit(3).map(this::toTrackMetadata).toList();
+        eventDispatcher.dispatch(new MusicPlayerEvent.QueueUpdated(playerId, randomId(), guildId, upNext));
+    }
+
     public void togglePause(Request request) {
         boolean nowPaused = !engine.isPaused();
         engine.setPaused(nowPaused);
@@ -163,7 +175,7 @@ public class AudioPlayer implements AudioProvider {
 
     public synchronized void clear(Request request) {
         queue.clear();
-        eventDispatcher.dispatch(new MusicPlayerEvent.Cleared(playerId, request, guildId));
+        eventDispatcher.dispatch(new MusicPlayerEvent.Cleared(playerId, request, guildId, List.of()));
     }
 
     public synchronized void close() {

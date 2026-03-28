@@ -41,8 +41,8 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
     }
 
     /** Returns a loader backed by this engine's player manager. */
-    public LavaAudioTrackLoader getLoader() {
-        return new LavaAudioTrackLoader(playerManager);
+    public LavaAudioTrackLoader getLoader(int maxTracks) {
+        return new LavaAudioTrackLoader(playerManager, maxTracks);
     }
 
     // --- AudioEngine ---

@@ -52,7 +52,7 @@ public class AudioPlayerPool {
     private GuildEntry getOrCreateEntry(String guildId) {
         return entries.computeIfAbsent(guildId, id -> {
             LavaAudioEngine engine = new LavaAudioEngine(properties.engine().youtube().refreshToken());
-            AudioTrackLoader loader = engine.getLoader();
+            AudioTrackLoader loader = engine.getLoader(properties.playlistMaxTracks());
             // TODO can't we use a inner-builder pattern here. It's getting a bit to much.
             AudioPlayer player = new AudioPlayer(
                     engine, engine, eventDispatcher, properties, scheduler, playerId, id,

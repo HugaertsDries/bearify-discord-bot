@@ -13,7 +13,7 @@ player:
 
 discord:
   token: ${DISCORD_PLAYER_TOKEN}
-  guild-id: ${DISCORD_GUILD_ID}
+  guild-id: ${DISCORD_GUILD_ID:}
   activity:
     type: LISTENING
     text: "Listening to certified bangers 🐻🎧"
@@ -23,6 +23,8 @@ music-player:
   seek-short-default: 10s
   seek-long-default: 30s
   seek-track-length-threshold: 5m
+  error-skip-delay: 5s
+  playlist-max-tracks: 200
   engine:
     youtube:
       refresh-token: ${YOUTUBE_REFRESH_TOKEN:}

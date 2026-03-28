@@ -28,7 +28,7 @@ import java.util.List;
         @JsonSubTypes.Type(value = MusicPlayerEvent.Ready.class, name = "player_ready"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Stopped.class, name = "player_stopped"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.ConnectFailed.class, name = "connect_failed"),
-        @JsonSubTypes.Type(value = MusicPlayerEvent.PlayerNotFound.class, name = "player_not_found")
+        @JsonSubTypes.Type(value = MusicPlayerEvent.PlayerNotFound.class, name = "player_not_found"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -87,7 +87,10 @@ public sealed interface MusicPlayerEvent permits
     record Forwarded(String playerId, Request request, String guildId, long seekMs) implements MusicPlayerEvent {
         @Override public String requestId() { return request.id(); }
     }
-    record Cleared(String playerId, Request request, String guildId) implements MusicPlayerEvent {
+    record Cleared(String playerId, Request request, String guildId, List<TrackMetadata> upNext) implements MusicPlayerEvent {
+        public Cleared {
+            upNext = upNext != null ? List.copyOf(upNext) : List.of();
+        }
         @Override public String requestId() { return request.id(); }
     }
     record NothingToAdvance(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}

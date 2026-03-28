@@ -23,6 +23,7 @@ class AudioPlayerTest {
     private static final PlayerProperties PROPS = new PlayerProperties(
             Duration.ofSeconds(3), Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofMinutes(5),
             Duration.ofSeconds(5),
+            200,
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
             new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null)));
@@ -272,7 +273,7 @@ class AudioPlayerTest {
         player.clear(new Request("req-1", "@user"));
 
         assertThat(eventDispatcher.getLastEvent())
-                .isEqualTo(new MusicPlayerEvent.Cleared(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID));
+                .isEqualTo(new MusicPlayerEvent.Cleared(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, List.of()));
     }
 
     @Test
@@ -405,6 +406,85 @@ class AudioPlayerTest {
         assertThat(trackStarts.getLast().upNext()).hasSize(3);
     }
 
+    @Test
+    void playStartsFirstTrackImmediatelyWhenIdle() {
+        InMemoryTrack trackA = track("Song A", 120_000, "@alice");
+        InMemoryTrack trackB = track("Song B", 180_000, "@alice");
+        InMemoryTrack trackC = track("Song C", 200_000, "@alice");
+
+        player.play(List.of(trackA, trackB, trackC));
+
+        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+    }
+
+    @Test
+    void playQueuesRemainingTracksWhenIdle() {
+        InMemoryTrack trackA = track("Song A", 120_000, "@alice");
+        InMemoryTrack trackB = track("Song B", 180_000, "@alice");
+        InMemoryTrack trackC = track("Song C", 200_000, "@alice");
+
+        player.play(List.of(trackA, trackB, trackC));
+
+        player.next(new Request("req-2", "@alice"));
+        assertThat(engine.getPlayingTrack()).isSameAs(trackB);
+        player.next(new Request("req-3", "@alice"));
+        assertThat(engine.getPlayingTrack()).isSameAs(trackC);
+    }
+
+    @Test
+    void playQueuesAllTracksWhenAlreadyPlaying() {
+        InMemoryTrack playing = track("Playing", 120_000, "@alice");
+        engine.play(playing);
+
+        InMemoryTrack trackA = track("Song A", 120_000, "@alice");
+        InMemoryTrack trackB = track("Song B", 180_000, "@alice");
+
+        player.play(List.of(trackA, trackB));
+
+        assertThat(engine.getPlayingTrack()).isSameAs(playing);
+        player.next(new Request("req-2", "@alice"));
+        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+    }
+
+    @Test
+    void playPlaylistEmitsSingleQueuedEvent() {
+        InMemoryTrack trackA = track("Song A", 120_000, "@alice");
+        InMemoryTrack trackB = track("Song B", 180_000, "@alice");
+        InMemoryTrack trackC = track("Song C", 200_000, "@alice");
+        engine.play(track("Playing", 120_000, "@alice"));
+
+        player.play(List.of(trackA, trackB, trackC));
+
+        long playlistQueuedCount = eventDispatcher.getEvents().stream()
+                .filter(e -> e instanceof MusicPlayerEvent.QueueUpdated)
+                .count();
+        assertThat(playlistQueuedCount).isEqualTo(1);
+
+        MusicPlayerEvent.QueueUpdated event = eventDispatcher.getEvents().stream()
+                .filter(e -> e instanceof MusicPlayerEvent.QueueUpdated)
+                .map(e -> (MusicPlayerEvent.QueueUpdated) e)
+                .findFirst().orElseThrow();
+        assertThat(event.requestId()).isNotEmpty();
+        assertThat(event.upNext()).hasSize(3);
+        assertThat(event.upNext().get(0).title()).isEqualTo("Song A");
+        assertThat(event.upNext().get(1).title()).isEqualTo("Song B");
+        assertThat(event.upNext().get(2).title()).isEqualTo("Song C");
+    }
+
+    @Test
+    void playWithSingleTrackStartsImmediatelyAndEmitsEmptyUpNext() {
+        InMemoryTrack trackA = track("Solo", 120_000, "@alice");
+
+        player.play(List.of(trackA));
+
+        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+        MusicPlayerEvent.QueueUpdated event = eventDispatcher.getEvents().stream()
+                .filter(e -> e instanceof MusicPlayerEvent.QueueUpdated)
+                .map(e -> (MusicPlayerEvent.QueueUpdated) e)
+                .findFirst().orElseThrow();
+        assertThat(event.upNext()).isEmpty();
+    }
+
     private static InMemoryTrack track(String title, long duration) {
         return new InMemoryTrack(title, duration, null);
     }
@@ -445,11 +525,22 @@ class AudioPlayerTest {
         @Override
         public void play(Track track) {
             if (listener != null && playingTrack != null) {
-                listener.onTrackEnd(playingTrack, true);
+                // Pass false to prevent re-entrancy: if playPlaylist calls engine.play() while
+                // tracks are already in the queue, firing onTrackEnd(true) would auto-advance
+                // and consume tracks. Tests that need to simulate natural track ending should
+                // use triggerOnTrackEnd() instead.
+                listener.onTrackEnd(playingTrack, false);
             }
             playingTrack = track;
             if (listener != null) {
                 listener.onTrackStart(track);
+            }
+        }
+
+        /** Simulates a track ending naturally and triggers auto-advance logic. */
+        void triggerOnTrackEnd(Track track) {
+            if (listener != null) {
+                listener.onTrackEnd(track, true);
             }
         }
 

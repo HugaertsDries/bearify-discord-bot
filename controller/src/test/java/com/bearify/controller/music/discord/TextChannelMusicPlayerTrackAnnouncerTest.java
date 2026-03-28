@@ -108,7 +108,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
-        announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-3", "@other"), "guild-1"));
+        announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-3", "@other"), "guild-1", List.of()));
 
         assertThat(updated.get()).isNotNull();
         assertThat(updated.get().description()).hasValue("*Cleared by @other*");

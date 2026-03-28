@@ -18,6 +18,7 @@ class AudioPlayerPoolTest {
             Duration.ofSeconds(30),
             Duration.ofMinutes(5),
             Duration.ofSeconds(5),
+            200,
             new PlayerProperties.Assignment(
                     Duration.ofSeconds(30),
                     Duration.ofSeconds(10)),

@@ -33,6 +33,7 @@ class MusicPlayerInteractionDispatcherTest {
     private static final PlayerProperties PROPS = new PlayerProperties(
             Duration.ofSeconds(3), Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofMinutes(5),
             Duration.ofSeconds(5),
+            200,
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
             new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null)));
@@ -134,6 +135,20 @@ class MusicPlayerInteractionDispatcherTest {
         assertThat(pool.forwardCalls).containsExactly("30000|" + GUILD_ID + "|@user");
     }
 
+    @Test
+    void routesPlaylistToPlayPlaylist() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.useLoader((query, requesterTag, cb) -> cb.playlistLoaded(List.of(
+                track("Song A"), track("Song B"), track("Song C"))));
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID,
+                new TrackRequest("https://youtube.com/playlist?list=PLxyz", TEXT_CHANNEL_ID, null)));
+
+        assertThat(pool.playPlaylistCalls).containsExactly(GUILD_ID  + "|3");
+    }
+
     // --- STUB ---
 
     private final class StubAudioPlayerPool extends AudioPlayerPool {
@@ -144,8 +159,10 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> previousCalls = new ArrayList<>();
         final List<String> rewindCalls = new ArrayList<>();
         final List<String> forwardCalls = new ArrayList<>();
+        final List<String> playPlaylistCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
+        private AudioTrackLoader stubLoader = null;
 
         StubAudioPlayerPool() {
             super(null, null, null, "test");
@@ -153,6 +170,10 @@ class MusicPlayerInteractionDispatcherTest {
 
         void primeGuild(String guildId) {
             primedGuilds.add(guildId);
+        }
+
+        void useLoader(AudioTrackLoader loader) {
+            this.stubLoader = loader;
         }
 
         @Override
@@ -163,6 +184,7 @@ class MusicPlayerInteractionDispatcherTest {
 
         @Override
         public AudioTrackLoader getLoader(String guildId) {
+            if (stubLoader != null) return stubLoader;
             return (query, requesterTag, cb) -> loaderCalls.add(query);
         }
 
@@ -211,6 +233,11 @@ class MusicPlayerInteractionDispatcherTest {
             @Override
             public void clear(Request request) {
             }
+
+            @Override
+            public void play(List<Track> tracks) {
+                playPlaylistCalls.add(guildId + "|" + tracks.size());
+            }
         }
 
         private static final class NoOpEngine implements AudioEngine {
@@ -226,5 +253,18 @@ class MusicPlayerInteractionDispatcherTest {
             @Override public byte[] provide20MsAudio() { return new byte[0]; }
             @Override public boolean isOpus() { return false; }
         }
+    }
+
+    private static Track track(String title) {
+        return new Track() {
+            @Override public String title() { return title; }
+            @Override public String author() { return "Author"; }
+            @Override public String uri() { return "https://example.com/" + title; }
+            @Override public String requesterTag() { return null; }
+            @Override public long duration() { return 120_000; }
+            @Override public long position() { return 0; }
+            @Override public void setPosition(long positionMs) {}
+            @Override public Track clone() { return this; }
+        };
     }
 }
