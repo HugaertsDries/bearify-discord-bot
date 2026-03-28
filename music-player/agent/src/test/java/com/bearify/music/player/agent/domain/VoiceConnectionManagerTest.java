@@ -1,5 +1,6 @@
 package com.bearify.music.player.agent.domain;
 
+import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
 import com.bearify.discord.api.gateway.EmbedMessage;
@@ -408,6 +409,11 @@ class VoiceConnectionManagerTest {
 
         @Override
         public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler) {
+            return client;
+        }
+
+        @Override
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler, Activity activity) {
             return client;
         }
     }

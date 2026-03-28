@@ -1,15 +1,15 @@
 package com.bearify.music.player.agent;
 
-import com.bearify.discord.api.gateway.DiscordClient;
-import com.bearify.discord.api.gateway.DiscordClientFactory;
-import com.bearify.discord.api.gateway.EmbedMessage;
-import com.bearify.discord.api.gateway.Guild;
-import com.bearify.discord.api.gateway.SentMessage;
-import com.bearify.discord.api.gateway.TextChannel;
+import com.bearify.discord.api.gateway.*;
+import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
+
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -43,7 +43,17 @@ public abstract class AbstractAgentIntegrationTest {
     static class AgentTestConfig {
         @Bean
         DiscordClientFactory discordClientFactory() {
-            return (commands, handler) -> new NoOpDiscordClient();
+            return new DiscordClientFactory() {
+                @Override
+                public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler) {
+                    return new NoOpDiscordClient();
+                }
+
+                @Override
+                public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler, Activity activity) {
+                    return new NoOpDiscordClient();
+                }
+            };
         }
     }
 

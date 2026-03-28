@@ -1,6 +1,7 @@
 package com.bearify.discord.jda;
 
 import club.minnced.discord.jdave.interop.JDaveSessionFactory;
+import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.TextChannel;
@@ -8,9 +9,9 @@ import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.audio.AudioModuleConfig;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -34,12 +35,16 @@ public class JdaDiscordClient implements DiscordClient {
     private final List<CommandDefinition> commands;
     private final ExecutorService interactionExecutor;
     private final Consumer<CommandInteraction> interactionHandler;
+    private final Activity activity;
 
     public JDA jda;
 
-    JdaDiscordClient(List<CommandDefinition> commands, Consumer<CommandInteraction> interactionHandler) {
+    JdaDiscordClient(List<CommandDefinition> commands,
+                     Consumer<CommandInteraction> interactionHandler,
+                     Activity activity) {
         this.commands = commands;
         this.interactionHandler = interactionHandler;
+        this.activity = activity;
         this.interactionExecutor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
@@ -99,15 +104,31 @@ public class JdaDiscordClient implements DiscordClient {
         try {
             var audio = new AudioModuleConfig();
             audio = audio.withDaveSessionFactory(new JDaveSessionFactory());
-            jda = JDABuilder.createDefault(token)
+            JDABuilder builder = JDABuilder.createDefault(token)
                     .addEventListeners(new JdaEventListener(interactionExecutor, interactionHandler))
-                    .setAudioModuleConfig(audio)
-                    .build();
+                    .setAudioModuleConfig(audio);
+            net.dv8tion.jda.api.entities.Activity startupActivity = toActivity(activity);
+            if (startupActivity != null) {
+                builder = builder.setActivity(startupActivity);
+            }
+            jda = builder.build();
             jda.awaitReady();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting for JDA to be ready", e);
         }
+    }
+
+    static net.dv8tion.jda.api.entities.Activity toActivity(Activity activity) {
+        if (activity == null) {
+            return null;
+        }
+        return switch (activity.type()) {
+            case PLAYING -> net.dv8tion.jda.api.entities.Activity.playing(activity.text());
+            case LISTENING -> net.dv8tion.jda.api.entities.Activity.listening(activity.text());
+            case WATCHING -> net.dv8tion.jda.api.entities.Activity.watching(activity.text());
+            case COMPETING -> net.dv8tion.jda.api.entities.Activity.competing(activity.text());
+        };
     }
 
     private List<CommandData> toCommandData() {

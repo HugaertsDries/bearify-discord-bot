@@ -1,5 +1,6 @@
 package com.bearify.discord.spring;
 
+import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
@@ -128,6 +129,33 @@ class DiscordAutoConfigurationTest {
     }
 
     @Test
+    void forwardsConfiguredActivityToDiscordClientFactory() {
+        contextRunner
+                .withPropertyValues(
+                        "discord.token=my-token",
+                        "discord.activity.type=PLAYING",
+                        "discord.activity.text=with slash commands"
+                )
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> {
+                    MockDiscordClient.Factory factory = ctx.getBean(MockDiscordClient.Factory.class);
+                    assertThat(factory.getLastCreatedActivity())
+                            .contains(new Activity(Activity.Type.PLAYING, "with slash commands"));
+                });
+    }
+
+    @Test
+    void leavesActivityEmptyWhenNotConfigured() {
+        contextRunner
+                .withPropertyValues("discord.token=my-token")
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> {
+                    MockDiscordClient.Factory factory = ctx.getBean(MockDiscordClient.Factory.class);
+                    assertThat(factory.getLastCreatedActivity()).isEmpty();
+                });
+    }
+
+    @Test
     void routesDispatchedInteractionThroughRegistryToHandler() {
         contextRunner
                 .withPropertyValues("discord.token=test-token")
@@ -202,5 +230,28 @@ class DiscordAutoConfigurationTest {
                     MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
                     assertThat(client.getStartedWithGuildId()).contains("12345");
                 });
+    }
+
+    @Test
+    void failsWhenActivityTextIsBlank() {
+        contextRunner
+                .withPropertyValues(
+                        "discord.token=my-token",
+                        "discord.activity.type=PLAYING",
+                        "discord.activity.text=   "
+                )
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> assertThat(ctx).hasFailed());
+    }
+
+    @Test
+    void failsWhenActivityTypeIsMissing() {
+        contextRunner
+                .withPropertyValues(
+                        "discord.token=my-token",
+                        "discord.activity.text=with slash commands"
+                )
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> assertThat(ctx).hasFailed());
     }
 }

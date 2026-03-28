@@ -14,6 +14,9 @@ player:
 discord:
   token: ${DISCORD_PLAYER_TOKEN}
   guild-id: ${DISCORD_GUILD_ID}
+  activity:
+    type: LISTENING
+    text: "certified bear bangers 🐻🎧"
 
 music-player:
   previous-restart-threshold: 3s

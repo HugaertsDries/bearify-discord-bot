@@ -1,11 +1,7 @@
 package com.bearify.discord.testing;
 
-import com.bearify.discord.api.gateway.DiscordClient;
-import com.bearify.discord.api.gateway.DiscordClientFactory;
-import com.bearify.discord.api.gateway.EmbedMessage;
-import com.bearify.discord.api.gateway.Guild;
-import com.bearify.discord.api.gateway.SentMessage;
-import com.bearify.discord.api.gateway.TextChannel;
+import com.bearify.discord.api.gateway.*;
+import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
@@ -120,9 +116,21 @@ public class MockDiscordClient implements DiscordClient {
     public static class Factory implements DiscordClientFactory {
 
         private MockDiscordClient lastCreated;
+        private Optional<Activity> lastCreatedActivity = Optional.empty();
 
         @Override
-        public MockDiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler) {
+        public MockDiscordClient create(List<CommandDefinition> commands,
+                                        Consumer<CommandInteraction> handler) {
+            lastCreatedActivity = Optional.empty();
+            lastCreated = new MockDiscordClient(commands, handler);
+            return lastCreated;
+        }
+
+        @Override
+        public MockDiscordClient create(List<CommandDefinition> commands,
+                                        Consumer<CommandInteraction> handler,
+                                        Activity activity) {
+            lastCreatedActivity = Optional.of(activity);
             lastCreated = new MockDiscordClient(commands, handler);
             return lastCreated;
         }
@@ -130,5 +138,10 @@ public class MockDiscordClient implements DiscordClient {
         public Optional<MockDiscordClient> getLastCreated() {
             return Optional.ofNullable(lastCreated);
         }
+
+        public Optional<Activity> getLastCreatedActivity() {
+            return lastCreatedActivity;
+        }
+
     }
 }

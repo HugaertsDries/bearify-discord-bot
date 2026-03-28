@@ -1,6 +1,9 @@
 package com.bearify.discord.spring;
 
+import com.bearify.discord.api.gateway.Activity;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -22,10 +25,13 @@ public final class DiscordProperties {
     @NotBlank
     private final String token;
     private final String guildId;
+    @Valid
+    private final Activity activity;
 
-    public DiscordProperties(String token, String guildId) {
+    public DiscordProperties(String token, String guildId, Activity activity) {
         this.token = token;
         this.guildId = guildId;
+        this.activity = activity;
     }
 
     public String token() {
@@ -39,5 +45,31 @@ public final class DiscordProperties {
      */
     public Optional<String> guildId() {
         return Optional.ofNullable(guildId);
+    }
+
+    public Optional<com.bearify.discord.api.gateway.Activity> activity() {
+        return Optional.ofNullable(activity)
+                .map(value -> new com.bearify.discord.api.gateway.Activity(value.type(), value.text()));
+    }
+
+    public static final class Activity {
+
+        @NotNull
+        private final com.bearify.discord.api.gateway.Activity.Type type;
+        @NotBlank
+        private final String text;
+
+        public Activity(com.bearify.discord.api.gateway.Activity.Type type, String text) {
+            this.type = type;
+            this.text = text;
+        }
+
+        public com.bearify.discord.api.gateway.Activity.Type type() {
+            return type;
+        }
+
+        public String text() {
+            return text;
+        }
     }
 }

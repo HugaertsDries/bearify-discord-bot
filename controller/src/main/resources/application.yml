@@ -11,3 +11,6 @@ spring:
 discord:
   token: ${DISCORD_CONTROLLER_TOKEN}
   guild-id: ${DISCORD_GUILD_ID:}  # leave blank for global commands in production
+  activity:
+    type: PLAYING
+    text: "with Honey"

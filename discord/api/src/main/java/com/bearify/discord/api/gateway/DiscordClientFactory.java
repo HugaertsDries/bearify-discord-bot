@@ -13,5 +13,10 @@ import java.util.function.Consumer;
  */
 public interface DiscordClientFactory {
 
-    DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler);
+    DiscordClient create(List<CommandDefinition> commands,
+                         Consumer<CommandInteraction> handler);
+
+    DiscordClient create(List<CommandDefinition> commands,
+                         Consumer<CommandInteraction> handler,
+                         Activity activity);
 }
