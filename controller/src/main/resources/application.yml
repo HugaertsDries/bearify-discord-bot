@@ -13,4 +13,4 @@ discord:
   guild-id: ${DISCORD_GUILD_ID:}  # leave blank for global commands in production
   activity:
     type: PLAYING
-    text: "with Honey"
+    text: "Playing with Honey"
