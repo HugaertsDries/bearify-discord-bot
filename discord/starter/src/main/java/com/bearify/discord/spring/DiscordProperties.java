@@ -44,7 +44,10 @@ public final class DiscordProperties {
      * When absent, commands are registered globally (up to 1 hour propagation delay).
      */
     public Optional<String> guildId() {
-        return Optional.ofNullable(guildId);
+        return Optional
+                .ofNullable(guildId)
+                .map(String::trim)
+                .filter(value -> !value.isBlank());
     }
 
     public Optional<com.bearify.discord.api.gateway.Activity> activity() {
