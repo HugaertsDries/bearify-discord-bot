@@ -212,6 +212,18 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     }
 
     @Test
+    void clearedEventRemovesUpNextFieldWhenQueueBecomesEmpty() {
+        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(trackStartWithUpNext("player-1"));
+        announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-2", "@user"), "guild-1", List.of()));
+
+        assertThat(updated.get()).isNotNull();
+        assertThat(updated.get().fields()).noneMatch(field -> field.name().equals("Up Next"));
+    }
+
+    @Test
     void truncatesLongTrackTitleAt30Characters() {
         AtomicReference<EmbedMessage> sent = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));

@@ -76,7 +76,7 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
             case MusicPlayerEvent.WentBack wentBack -> notify("Jumped back by " + wentBack.request().requesterTag());
             case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
             case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
-            case MusicPlayerEvent.Cleared cleared -> notify("Cleared by " + cleared.request().requesterTag());
+            case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
             case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
             case MusicPlayerEvent.QueueEmpty ignored -> deleteEmbed();
             case MusicPlayerEvent.Stopped ignored -> deleteEmbed();
@@ -116,6 +116,11 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
     private void onQueueUpdated(MusicPlayerEvent.QueueUpdated event) {
         currentUpNext = event.upNext();
         refreshNowPlayingEmbed();
+    }
+
+    private void onCleared(MusicPlayerEvent.Cleared event) {
+        currentUpNext = event.upNext();
+        notify("Cleared by " + event.request().requesterTag());
     }
 
     private void updatePlaybackState(PlaybackState state) {
