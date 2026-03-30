@@ -3,10 +3,16 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.MusicPlayerTrackAnnouncer;
 import com.bearify.discord.api.gateway.DiscordClient;
-import com.bearify.discord.api.gateway.EmbedMessage;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.gateway.TextChannel;
+import com.bearify.discord.api.message.ActionRow;
+import com.bearify.discord.api.message.ComponentMessage;
+import com.bearify.discord.api.message.Container;
+import com.bearify.discord.api.message.ContainerChild;
+import com.bearify.discord.api.message.InteractiveButton;
+import com.bearify.discord.api.message.Section;
+import com.bearify.discord.api.message.TextBlock;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
@@ -16,56 +22,74 @@ import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.bearify.controller.music.discord.PlaybackAnnouncer.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TextChannelMusicPlayerTrackAnnouncerTest {
 
-    private static final String PLAYING_AUTHOR_TEXT = BearifyEmoji.RED + " ON THE AIR";
-    private static final String PAUSED_AUTHOR_TEXT  = "\u26AA ON THE AIR";
 
     @Test
     void defaultFooterStartsWithBearEmoji() {
-        AnnouncerProperties props = new AnnouncerProperties("#FFA500", "#FF4444",
+        AnnouncerProperties props = new AnnouncerProperties(
+                "#FFA500",
+                "#FF4444",
                 "\uD83D\uDC3B Bearify \u2022 Powered by Bearable Software",
-                Duration.ofSeconds(15));
+                Duration.ofSeconds(15)
+        );
+
         assertThat(props.footer()).startsWith(BearifyEmoji.BEAR + " Bearify");
     }
 
     @Test
-    void acceptPostsEmbedWhenTrackStartsAndNoMessageExists() {
-        AtomicReference<EmbedMessage> sent = new AtomicReference<>();
+    void acceptPostsComponentMessageWhenTrackStartsAndNoMessageExists() {
+        AtomicReference<ComponentMessage> sent = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
 
         assertThat(sent.get()).isNotNull();
-        assertThat(sent.get().authorText()).hasValue(PLAYING_AUTHOR_TEXT);
-        assertThat(sent.get().description()).isEmpty();
-        assertThat(sent.get().imageFilename()).hasValue("vibing.gif");
+        assertThat(sent.get().label()).isEqualTo("playback-announcer");
+        assertThat(sent.get().containers()).hasSize(2);
+        assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("Song"));
+        assertThat(buttonLabels(sent.get())).containsExactly(
+                PLAYER_PREVIOUS_LABEL,
+                PLAYER_REWIND_LABEL,
+                PLAYER_PAUSE_LABEL,
+                PLAYER_FORWARD_LABEL,
+                PLAYER_NEXT_LABEL
+        );
     }
 
     @Test
     void acceptShowsPausedStateAfterPausedEvent() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Paused("player-1", new Request("req-2", "@user"), "guild-1"));
 
         assertThat(updated.get()).isNotNull();
-        assertThat(updated.get().authorText()).hasValue(PAUSED_AUTHOR_TEXT);
-        assertThat(updated.get().imageFilename()).hasValue("spacer.png");
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("ON THE AIR"));
+        assertThat(buttonLabels(updated.get())).containsExactly(
+                PLAYER_PREVIOUS_LABEL,
+                PLAYER_REWIND_LABEL,
+                PLAYER_PLAY_LABEL,
+                PLAYER_FORWARD_LABEL,
+                PLAYER_NEXT_LABEL
+        );
     }
 
     @Test
     void acceptRestoresPlayingCopyAfterResume() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
@@ -73,50 +97,54 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.Resumed("player-1", new Request("req-3", "@user"), "guild-1"));
 
         assertThat(updated.get()).isNotNull();
-        assertThat(updated.get().authorText()).hasValue(PLAYING_AUTHOR_TEXT);
-        assertThat(updated.get().imageFilename()).hasValue("vibing.gif");
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("ON THE AIR"));
+        assertThat(buttonLabels(updated.get())).containsExactly(
+                PLAYER_PREVIOUS_LABEL,
+                PLAYER_REWIND_LABEL,
+                PLAYER_PAUSE_LABEL,
+                PLAYER_FORWARD_LABEL,
+                PLAYER_NEXT_LABEL
+        );
     }
 
     @Test
     void acceptShowsTemporarySkippedAction() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
 
-        assertThat(updated.get()).isNotNull();
-        assertThat(updated.get().description()).hasValue("*Last track skipped by @user*");
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Last track skipped by @user"));
     }
 
     @Test
     void acceptShowsTemporaryWentBackAction() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.WentBack("player-1", new Request("req-2", "@user"), "guild-1"));
 
-        assertThat(updated.get()).isNotNull();
-        assertThat(updated.get().description()).hasValue("*Jumped back by @user*");
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Jumped back by @user"));
     }
 
     @Test
     void acceptReplacesOlderTemporaryActionWithNewerOne() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
         announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-3", "@other"), "guild-1", List.of()));
 
-        assertThat(updated.get()).isNotNull();
-        assertThat(updated.get().description()).hasValue("*Cleared by @other*");
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Cleared by @other"));
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Last track skipped"));
     }
 
     @Test
     void acceptClearsTemporaryActionAfterTimeout() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofMillis(50));
 
         announcer.accept(trackStart("player-1"));
@@ -125,12 +153,12 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
         Awaitility.await().atMost(Duration.ofSeconds(1)).untilAsserted(() ->
                 assertThat(updated.get()).isNotNull());
         Awaitility.await().atMost(Duration.ofSeconds(1)).untilAsserted(() ->
-                assertThat(updated.get().description()).isEmpty());
+                assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Forwarded by @user")));
     }
 
     @Test
     void acceptUpdatesExistingMessageWhenTrackErrorArrives() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicInteger sends = new AtomicInteger();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, Duration.ofSeconds(15));
 
@@ -138,12 +166,13 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
         announcer.accept(trackError("player-1"));
 
         assertThat(sends.get()).isEqualTo(1);
-        assertThat(updated.get()).isNotNull();
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Something went wrong loading this track"));
+        assertThat(updated.get().containers().getFirst().accentColor()).isEqualTo(0xFF4444);
     }
 
     @Test
     void acceptDeletesExistingMessageOnStopped() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicInteger sends = new AtomicInteger();
         AtomicInteger deletes = new AtomicInteger();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, deletes, Duration.ofSeconds(15));
@@ -156,8 +185,8 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     }
 
     @Test
-    void acceptDoesNotDeleteEmbedForUnrelatedNonTerminalEvent() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+    void acceptDoesNotDeleteMessageForUnrelatedNonTerminalEvent() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicInteger sends = new AtomicInteger();
         AtomicInteger deletes = new AtomicInteger();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, deletes, Duration.ofSeconds(15));
@@ -170,101 +199,111 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     }
 
     @Test
-    void embedIncludesUpNextFieldWithTracksFromTrackStart() {
-        AtomicReference<EmbedMessage> sent = new AtomicReference<>();
+    void includesUpNextFromTrackStart() {
+        AtomicReference<ComponentMessage> sent = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStartWithUpNext("player-1"));
 
-        assertThat(sent.get()).isNotNull();
-        assertThat(sent.get().fields()).anySatisfy(field -> {
-            assertThat(field.name()).isEqualTo("Up Next");
-            assertThat(field.value()).contains("1. Hotel California");
-            assertThat(field.value()).contains("2. Stairway to Heaven");
-        });
+        assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("## Up Next"));
+        assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("Hotel California"));
+        assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("Stairway to Heaven"));
     }
 
     @Test
-    void embedOmitsUpNextFieldWhenQueueIsEmpty() {
-        AtomicReference<EmbedMessage> sent = new AtomicReference<>();
+    void omitsUpNextWhenQueueIsEmpty() {
+        AtomicReference<ComponentMessage> sent = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
 
-        assertThat(sent.get()).isNotNull();
-        assertThat(sent.get().fields()).noneMatch(field -> field.name().equals("Up Next"));
+        assertThat(allTexts(sent.get())).noneMatch(text -> text.contains("**Up Next**"));
     }
 
     @Test
     void upNextUpdatesWhenQueueUpdatedEventArrives() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1",
                 List.of(new TrackMetadata("New Song", "New Artist", "https://example.com/new", 120_000))));
 
-        assertThat(updated.get()).isNotNull();
-        assertThat(updated.get().fields()).anySatisfy(field -> {
-            assertThat(field.name()).isEqualTo("Up Next");
-            assertThat(field.value()).contains("New Song");
-        });
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("New Song"));
     }
 
     @Test
-    void clearedEventRemovesUpNextFieldWhenQueueBecomesEmpty() {
-        AtomicReference<EmbedMessage> updated = new AtomicReference<>();
+    void clearedEventRemovesUpNextWhenQueueBecomesEmpty() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStartWithUpNext("player-1"));
         announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-2", "@user"), "guild-1", List.of()));
 
-        assertThat(updated.get()).isNotNull();
-        assertThat(updated.get().fields()).noneMatch(field -> field.name().equals("Up Next"));
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("**Up Next**"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Cleared by @user"));
     }
 
     @Test
-    void truncatesLongTrackTitleAt30Characters() {
-        AtomicReference<EmbedMessage> sent = new AtomicReference<>();
+    void truncatesLongTrackTitleAt45Characters() {
+        AtomicReference<ComponentMessage> sent = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         String longTitle = "A".repeat(100);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
                 new TrackMetadata(longTitle, "Artist", "https://example.com", 60_000), List.of()));
 
-        assertThat(sent.get()).isNotNull();
-        assertThat(sent.get().title()).hasSizeLessThanOrEqualTo(30);
-        assertThat(sent.get().title()).endsWith("…");
+        assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("A".repeat(44)));
     }
 
     @Test
     void truncatesLongAuthorAt40Characters() {
-        AtomicReference<EmbedMessage> sent = new AtomicReference<>();
+        AtomicReference<ComponentMessage> sent = new AtomicReference<>();
         MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         String longAuthor = "B".repeat(60);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
                 new TrackMetadata("Song", longAuthor, "https://example.com", 60_000), List.of()));
 
-        assertThat(sent.get()).isNotNull();
-        assertThat(sent.get().fields())
-                .filteredOn(field -> field.name().equals("Author"))
-                .singleElement()
-                .satisfies(field -> {
-                    assertThat(field.value()).hasSizeLessThanOrEqualTo(40);
-                    assertThat(field.value()).endsWith("…");
-                });
+        assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("B".repeat(39)));
     }
 
-    private static MusicPlayerTrackAnnouncer announcer(AtomicReference<EmbedMessage> sent,
-                                                       AtomicReference<EmbedMessage> updated,
+    @Test
+    void usesTrackArtworkUrlBeforeYoutubeFallback() {
+        TrackMetadata track = new TrackMetadata(
+                "Song",
+                "Artist",
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                60_000,
+                "https://cdn.example/art.png"
+        );
+
+        assertThat(new YoutubeThumbnailResolver().resolve(track)).contains(URI.create("https://cdn.example/art.png"));
+    }
+
+    @Test
+    void derivesYoutubeArtworkWhenMetadataArtworkIsMissing() {
+        TrackMetadata track = new TrackMetadata(
+                "Song",
+                "Artist",
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                60_000,
+                null
+        );
+
+        assertThat(new YoutubeThumbnailResolver().resolve(track))
+                .contains(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"));
+    }
+
+    private static MusicPlayerTrackAnnouncer announcer(AtomicReference<ComponentMessage> sent,
+                                                       AtomicReference<ComponentMessage> updated,
                                                        AtomicInteger sends,
                                                        Duration timeout) {
         return announcer(sent, updated, sends, new AtomicInteger(), timeout);
     }
 
-    private static MusicPlayerTrackAnnouncer announcer(AtomicReference<EmbedMessage> sent,
-                                                       AtomicReference<EmbedMessage> updated,
+    private static MusicPlayerTrackAnnouncer announcer(AtomicReference<ComponentMessage> sent,
+                                                       AtomicReference<ComponentMessage> updated,
                                                        AtomicInteger sends,
                                                        AtomicInteger deletes,
                                                        Duration timeout) {
@@ -293,9 +332,9 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
                 new TrackMetadata("Song", "Artist", "https://example.com", 60_000));
     }
 
-    private static DiscordClient discordClient(AtomicReference<EmbedMessage> sent,
+    private static DiscordClient discordClient(AtomicReference<ComponentMessage> sent,
                                                AtomicInteger sends,
-                                               AtomicReference<EmbedMessage> updated,
+                                               AtomicReference<ComponentMessage> updated,
                                                AtomicInteger deletes) {
         return new DiscordClient() {
             @Override
@@ -328,8 +367,8 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
                     }
 
                     @Override
-                    public SentMessage send(EmbedMessage embed) {
-                        sent.set(embed);
+                    public SentMessage send(ComponentMessage message) {
+                        sent.set(message);
                         sends.incrementAndGet();
                         return new SentMessage() {
                             @Override
@@ -338,8 +377,8 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
                             }
 
                             @Override
-                            public void update(EmbedMessage newEmbed) {
-                                updated.set(newEmbed);
+                            public void update(ComponentMessage updatedMessage) {
+                                updated.set(updatedMessage);
                             }
                         };
                     }
@@ -350,5 +389,31 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
             public void shutdown() {
             }
         };
+    }
+
+    private static List<String> allTexts(ComponentMessage message) {
+        List<String> texts = new ArrayList<>();
+        for (Container container : message.containers()) {
+            for (ContainerChild child : container.children()) {
+                switch (child) {
+                    case TextBlock textBlock -> texts.add(textBlock.text());
+                    case Section section -> texts.addAll(section.texts());
+                    default -> {
+                    }
+                }
+            }
+        }
+        return texts;
+    }
+
+    private static List<String> buttonLabels(ComponentMessage message) {
+        for (Container container : message.containers()) {
+            for (ContainerChild child : container.children()) {
+                if (child instanceof ActionRow row) {
+                    return row.buttons().stream().map(InteractiveButton::label).toList();
+                }
+            }
+        }
+        return List.of();
     }
 }

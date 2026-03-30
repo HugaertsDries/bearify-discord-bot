@@ -3,11 +3,12 @@ package com.bearify.music.player.agent.domain;
 import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
-import com.bearify.discord.api.gateway.EmbedMessage;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.Interaction;
+import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
@@ -307,12 +308,12 @@ class VoiceSessionHeartbeatTest {
         }
 
         @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler) {
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler) {
             return client;
         }
 
         @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler, Activity activity) {
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Activity activity) {
             return client;
         }
     }
@@ -342,16 +343,8 @@ class VoiceSessionHeartbeatTest {
                 }
 
                 @Override
-                public SentMessage send(EmbedMessage embed) {
-                    return new SentMessage() {
-                        @Override
-                        public void delete() {
-                        }
-
-                        @Override
-                        public void update(EmbedMessage updated) {
-                        }
-                    };
+                public SentMessage send(ComponentMessage message) {
+                    return null;
                 }
             };
         }

@@ -2,10 +2,12 @@ package com.bearify.discord.spring;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
-import com.bearify.discord.spring.annotation.Command;
+import com.bearify.discord.api.interaction.ButtonInteraction;
+import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.Interaction;
 import com.bearify.discord.spring.annotation.CommandAdvice;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.HandleException;
-import com.bearify.discord.spring.annotation.Interaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -35,18 +37,37 @@ public class DiscordAutoConfiguration {
     public CommandRegistry commandRegistry(ApplicationContext context, CommandExceptionHandlerRegistry exceptionHandlerRegistry) {
         CommandRegistry registry = new CommandRegistry(context, exceptionHandlerRegistry);
         long start = System.currentTimeMillis();
-        scanner.scan(context, Command.class, Interaction.class, registry::register);
+        scanner.scan(context, DiscordController.class, com.bearify.discord.spring.annotation.Interaction.class, registry::register);
         LOG.info("Finished scanning for commands: {} registered in {} ms", registry.getDefinitions().size(), System.currentTimeMillis() - start);
+        return registry;
+    }
+
+    @Bean
+    public ButtonRegistry buttonRegistry(ApplicationContext context) {
+        ButtonRegistry registry = new ButtonRegistry(context);
+        scanner.scan(context, DiscordController.class, com.bearify.discord.spring.annotation.Interaction.class, registry::register);
         return registry;
     }
 
     @Bean
     public DiscordClient discordClient(DiscordClientFactory factory,
                                        CommandRegistry registry,
+                                       ButtonRegistry buttonRegistry,
                                        DiscordProperties properties) {
+        java.util.function.Consumer<Interaction> interactionHandler = interaction -> {
+            if (interaction instanceof CommandInteraction commandInteraction) {
+                registry.handle(commandInteraction);
+                return;
+            }
+            if (interaction instanceof ButtonInteraction buttonInteraction) {
+                buttonRegistry.handle(buttonInteraction);
+                return;
+            }
+            throw new IllegalStateException("Unsupported interaction type: " + interaction.getClass().getName());
+        };
         return properties.activity()
-                .map(activity -> factory.create(registry.getDefinitions(), registry::handle, activity))
-                .orElseGet(() -> factory.create(registry.getDefinitions(), registry::handle));
+                .map(activity -> factory.create(registry.getDefinitions(), interactionHandler, activity))
+                .orElseGet(() -> factory.create(registry.getDefinitions(), interactionHandler));
     }
 
     @Bean

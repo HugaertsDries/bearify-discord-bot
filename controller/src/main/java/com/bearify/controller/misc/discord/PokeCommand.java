@@ -4,7 +4,7 @@ import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.discord.api.format.CodeBlockBuilder;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;
-import com.bearify.discord.spring.annotation.Command;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.Option;
 
@@ -13,7 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LongSummaryStatistics;
 
-@Command
+@DiscordController
 public class PokeCommand {
 
     private static final long THRESHOLD_GREEN = 300;

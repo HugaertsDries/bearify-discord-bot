@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = "music-player.pool.connect-request-ttl=200ms")
-class MusicPlayerCommandPlayTest extends AbstractControllerIntegrationTest {
+class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegrationTest {
 
     private static final String VOICE_CHANNEL_ID = "vc-123";
     private static final String GUILD_ID = "guild-456";

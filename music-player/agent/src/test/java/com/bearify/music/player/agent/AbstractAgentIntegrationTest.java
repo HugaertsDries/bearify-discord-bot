@@ -2,6 +2,8 @@ package com.bearify.music.player.agent;
 
 import com.bearify.discord.api.gateway.*;
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.Interaction;
+import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSessionListener;
@@ -45,12 +47,12 @@ public abstract class AbstractAgentIntegrationTest {
         DiscordClientFactory discordClientFactory() {
             return new DiscordClientFactory() {
                 @Override
-                public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler) {
+                public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler) {
                     return new NoOpDiscordClient();
                 }
 
                 @Override
-                public DiscordClient create(List<CommandDefinition> commands, Consumer<CommandInteraction> handler, Activity activity) {
+                public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Activity activity) {
                     return new NoOpDiscordClient();
                 }
             };
@@ -85,11 +87,10 @@ public abstract class AbstractAgentIntegrationTest {
         public TextChannel textChannel(String channelId) {
             return new TextChannel() {
                 @Override public void send(String message) {}
-                @Override public SentMessage send(EmbedMessage embed) {
-                    return new SentMessage() {
-                        @Override public void delete() {}
-                        @Override public void update(EmbedMessage updated) {}
-                    };
+
+                @Override
+                public SentMessage send(ComponentMessage message) {
+                    return null;
                 }
             };
         }

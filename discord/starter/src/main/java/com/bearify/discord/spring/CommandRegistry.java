@@ -1,16 +1,17 @@
 package com.bearify.discord.spring;
 
+import com.bearify.discord.api.interaction.InteractionType;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
 import com.bearify.discord.api.model.OptionDefinition.OptionType;
 import com.bearify.discord.api.model.SubcommandDefinition;
-import com.bearify.discord.spring.annotation.Command;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
+import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.spring.annotation.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
 
@@ -53,21 +54,26 @@ public class CommandRegistry {
     }
 
     void register(String name, Interaction interaction, Method method) {
+        if (interaction.type() != InteractionType.COMMAND) {
+            return;
+        }
         if (context == null) {
             throw new IllegalStateException("Lazy command registration requires an ApplicationContext");
         }
-        Command command = AnnotationUtils.findAnnotation(method.getDeclaringClass(), Command.class);
-        register(command, interaction, method, new CommandHandler(context, name, method));
+        DiscordController controller = AnnotationUtils.findAnnotation(method.getDeclaringClass(), DiscordController.class);
+        if (controller == null) {
+            throw new IllegalStateException("Interaction " + interaction + " has no @DiscordController annotation");
+        }
+        InteractionGroup interactionGroup = AnnotationUtils.findAnnotation(method.getDeclaringClass(), InteractionGroup.class);
+        String groupName = interactionGroup == null ? "" : interactionGroup.value();
+        String groupDescription = interactionGroup == null ? "" : interactionGroup.description();
+        register(groupName, groupDescription, interaction, method, new CommandHandler(context, name, method));
     }
 
-    private void register(Command command, Interaction interaction, Method method, CommandHandler handler) {
-        if (command == null) {
-            throw new IllegalStateException("Interaction " + interaction + " has no @Command annotation");
-        }
-
-        boolean isGrouped = !command.value().isBlank();
+    private void register(String commandName, String commandDescription, Interaction interaction, Method method, CommandHandler handler) {
+        boolean isGrouped = !commandName.isBlank();
         String name = interaction.value();
-        String key = isGrouped ? command.value() + "/" + name : name;
+        String key = isGrouped ? commandName + "/" + name : name;
 
         if (handlers.containsKey(key)) {
             throw new IllegalStateException("Duplicate interaction '" + key + "' - already registered by: " + handlers.get(key));
@@ -77,8 +83,8 @@ public class CommandRegistry {
 
         List<OptionDefinition> options = introspectOptions(method);
         if (isGrouped) {
-            definitions.computeIfAbsent(command.value(), group -> new CommandDefinition(group, command.description()));
-            definitions.computeIfPresent(command.value(), (group, def) -> {
+            definitions.computeIfAbsent(commandName, group -> new CommandDefinition(group, commandDescription));
+            definitions.computeIfPresent(commandName, (group, def) -> {
                 SubcommandDefinition subcommand = new SubcommandDefinition(name, interaction.description(), options);
                 var subcommands = new ArrayList<>(def.subcommands());
                 subcommands.add(subcommand);

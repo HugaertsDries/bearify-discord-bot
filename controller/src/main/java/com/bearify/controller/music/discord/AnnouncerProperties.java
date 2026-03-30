@@ -7,21 +7,21 @@ import java.time.Duration;
 
 @ConfigurationProperties("bearify.music.announcer")
 public record AnnouncerProperties(
-        @DefaultValue("#FFA500") String colorNowPlaying,
-        @DefaultValue("#FF4444") String colorError,
-        @DefaultValue("\uD83D\uDC3B Bearify \u2022 Powered by Bearable Software") String footer,
+        @DefaultValue("#FFA500") String primaryColor,
+        @DefaultValue("#FF4444") String errorColor,
+        @DefaultValue("Bearify \u2022 Powered by Bearable Software") String footer,
         @DefaultValue("15s") Duration actionTimeout
 ) {
     public AnnouncerProperties {
-        Integer.decode(colorNowPlaying);
-        Integer.decode(colorError);
+        Integer.decode(primaryColor);
+        Integer.decode(errorColor);
     }
 
     public int colorNowPlayingInt() {
-        return Integer.decode(colorNowPlaying);
+        return Integer.decode(primaryColor);
     }
 
     public int colorErrorInt() {
-        return Integer.decode(colorError);
+        return Integer.decode(errorColor);
     }
 }

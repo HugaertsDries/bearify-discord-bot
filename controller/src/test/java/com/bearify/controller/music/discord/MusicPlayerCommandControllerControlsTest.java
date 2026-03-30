@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MusicPlayerCommandControlsTest extends AbstractControllerIntegrationTest {
+class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegrationTest {
 
     private static final String VOICE_CHANNEL_ID = "vc-123";
     private static final String GUILD_ID = "guild-456";

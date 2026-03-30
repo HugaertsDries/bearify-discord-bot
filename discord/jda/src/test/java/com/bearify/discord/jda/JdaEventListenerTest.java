@@ -1,6 +1,8 @@
 package com.bearify.discord.jda;
 
+import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import org.junit.jupiter.api.Test;
 
@@ -22,21 +24,34 @@ class JdaEventListenerTest {
     void submitsHandlerInvocationToExecutorInsteadOfCallingItInline() {
         List<Runnable> captured = new ArrayList<>();
         AtomicInteger handlerCalls = new AtomicInteger(0);
+        AtomicInteger buttonCalls = new AtomicInteger(0);
 
         JdaEventListener listener = new JdaEventListener(
                 captured::add,
-                interaction -> handlerCalls.incrementAndGet(),
-                event -> mock(CommandInteraction.class)
+                interaction -> {
+                    if (interaction instanceof CommandInteraction) {
+                        handlerCalls.incrementAndGet();
+                    }
+                    if (interaction instanceof ButtonInteraction) {
+                        buttonCalls.incrementAndGet();
+                    }
+                },
+                event -> mock(CommandInteraction.class),
+                event -> mock(ButtonInteraction.class)
         );
 
         listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
+        listener.onButtonInteraction(mock(ButtonInteractionEvent.class));
 
         assertThat(handlerCalls.get()).isZero();
-        assertThat(captured).hasSize(1);
+        assertThat(buttonCalls.get()).isZero();
+        assertThat(captured).hasSize(2);
 
         captured.getFirst().run();
+        captured.getLast().run();
 
         assertThat(handlerCalls.get()).isEqualTo(1);
+        assertThat(buttonCalls.get()).isEqualTo(1);
     }
 
     @Test
@@ -46,13 +61,15 @@ class JdaEventListenerTest {
         JdaEventListener listener = new JdaEventListener(
                 captured::add,
                 interaction -> {},
-                event -> mock(CommandInteraction.class)
+                event -> mock(CommandInteraction.class),
+                event -> mock(ButtonInteraction.class)
         );
 
         listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
         listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
+        listener.onButtonInteraction(mock(ButtonInteractionEvent.class));
 
-        assertThat(captured).hasSize(2);
+        assertThat(captured).hasSize(3);
     }
 
     // --- CONCURRENCY ---
@@ -74,11 +91,12 @@ class JdaEventListenerTest {
                     }
                     bothFinished.countDown();
                 },
-                event -> mock(CommandInteraction.class)
+                event -> mock(CommandInteraction.class),
+                event -> mock(ButtonInteraction.class)
         );
 
         listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
-        listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
+        listener.onButtonInteraction(mock(ButtonInteractionEvent.class));
 
         boolean bothStartedBeforeRelease = bothStarted.await(5, TimeUnit.SECONDS);
         assertThat(bothStartedBeforeRelease)

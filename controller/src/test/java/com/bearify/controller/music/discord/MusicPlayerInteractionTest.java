@@ -30,7 +30,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(pool).join(interaction);
+        new MusicPlayerCommandController(pool).join(interaction);
 
         assertThat(pool.acquireGuildId).isEqualTo(GUILD_ID);
         assertThat(pool.acquireVoiceChannelId).isEqualTo(VOICE_CHANNEL_ID);
@@ -49,7 +49,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).join(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).join(interaction);
         musicPlayer.fireReady();
 
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
@@ -65,7 +65,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).join(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).join(interaction);
         musicPlayer.fireFailed("timed out");
 
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
@@ -81,7 +81,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(new RecordingMusicPlayer()))).join(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(new RecordingMusicPlayer()))).join(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
@@ -95,7 +95,7 @@ class MusicPlayerInteractionTest {
                 .voiceChannelId(VOICE_CHANNEL_ID)
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(new RecordingMusicPlayer()))).join(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(new RecordingMusicPlayer()))).join(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
@@ -114,7 +114,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(pool).leave(interaction);
+        new MusicPlayerCommandController(pool).leave(interaction);
 
         assertThat(pool.findGuildId).isEqualTo(GUILD_ID);
         assertThat(pool.findVoiceChannelId).isEqualTo(VOICE_CHANNEL_ID);
@@ -133,7 +133,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(pool).leave(interaction);
+        new MusicPlayerCommandController(pool).leave(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
@@ -149,7 +149,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(pool).leave(interaction);
+        new MusicPlayerCommandController(pool).leave(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
@@ -170,7 +170,7 @@ class MusicPlayerInteractionTest {
                 .option("search", "missing")
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, "missing");
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, "missing");
         musicPlayer.fireTrackNotFound("missing");
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -189,7 +189,7 @@ class MusicPlayerInteractionTest {
                 .option("search", "blocked")
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, "blocked");
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, "blocked");
         musicPlayer.fireTrackLoadFailed("region blocked");
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -204,7 +204,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("pause");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).pause(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).pause(interaction);
         musicPlayer.firePaused();
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -217,7 +217,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("pause");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).pause(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).pause(interaction);
         musicPlayer.fireResumed();
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -232,7 +232,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("previous");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).previous(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).previous(interaction);
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
@@ -244,7 +244,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("previous");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).previous(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).previous(interaction);
         musicPlayer.fireNothingToGoBack();
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -259,7 +259,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("next");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).next(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).next(interaction);
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
@@ -271,7 +271,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("next");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).next(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).next(interaction);
         musicPlayer.fireNextNothingToAdvance();
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -286,7 +286,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("rewind");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, 0);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, 0);
 
         assertThat(musicPlayer.rewindSeek).isEqualTo(Duration.ZERO);
         assertThat(interaction.getReplies()).hasSize(1);
@@ -300,7 +300,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("rewind");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, 30);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, 30);
 
         assertThat(musicPlayer.rewindSeek).isEqualTo(Duration.ofSeconds(30));
         assertThat(interaction.getReplies()).hasSize(1);
@@ -316,7 +316,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("forward");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 0);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 0);
 
         assertThat(musicPlayer.forwardSeek).isEqualTo(Duration.ZERO);
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -329,7 +329,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("forward");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 30);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 30);
 
         assertThat(musicPlayer.forwardSeek).isEqualTo(Duration.ofSeconds(30));
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -342,7 +342,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("forward");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 5);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 5);
         musicPlayer.fireForwardNothingToAdvance();
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
@@ -357,7 +357,7 @@ class MusicPlayerInteractionTest {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("clear");
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).clear(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).clear(interaction);
 
         assertThat(musicPlayer.cleared).isTrue();
         assertThat(interaction.getReplies()).hasSize(1);
@@ -374,7 +374,7 @@ class MusicPlayerInteractionTest {
                 .guildId(GUILD_ID)
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.empty())).leave(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.empty())).leave(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
@@ -388,7 +388,7 @@ class MusicPlayerInteractionTest {
                 .voiceChannelId(VOICE_CHANNEL_ID)
                 .build();
 
-        new MusicPlayerCommand(new RecordingMusicPlayerPool(Optional.empty())).leave(interaction);
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.empty())).leave(interaction);
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();

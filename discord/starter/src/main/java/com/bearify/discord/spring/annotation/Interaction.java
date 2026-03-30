@@ -1,5 +1,7 @@
 package com.bearify.discord.spring.annotation;
 
+import com.bearify.discord.api.interaction.InteractionType;
+
 import java.lang.annotation.*;
 
 /**
@@ -19,6 +21,7 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface Interaction {
+    InteractionType type() default InteractionType.COMMAND;
     /** The interaction name (e.g. "play"). Must be lowercase, no spaces. */
     String value();
     String description() default "";

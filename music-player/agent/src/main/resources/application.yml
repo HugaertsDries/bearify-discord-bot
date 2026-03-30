@@ -15,8 +15,8 @@ discord:
   token: ${DISCORD_PLAYER_TOKEN}
   guild-id: ${DISCORD_GUILD_ID:}
   activity:
-    type: LISTENING
-    text: "Listening to certified bangers 🐻🎧"
+    type: ${PLAYER_ACTIVITY_TYPE:LISTENING}
+    text: ${PLAYER_ACTIVITY_TEXT:"Listening to certified bangers 🐻🎧"}
 
 music-player:
   previous-restart-threshold: 3s
