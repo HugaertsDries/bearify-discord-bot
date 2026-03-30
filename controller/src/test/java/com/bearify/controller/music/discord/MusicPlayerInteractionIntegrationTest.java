@@ -2,8 +2,14 @@ package com.bearify.controller.music.discord;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.discord.testing.MockDiscordClient;
+import com.bearify.discord.testing.MockButtonInteraction;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.discord.api.message.ComponentMessage;
+import com.bearify.discord.api.message.Container;
+import com.bearify.discord.api.message.ContainerChild;
+import com.bearify.discord.api.message.Section;
+import com.bearify.discord.api.message.TextBlock;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
@@ -243,8 +249,8 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
 
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
-            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
-            assertThat(discord.sentEmbeds("text-2")).hasSize(1);
+            assertThat(discord.sentComponents("text-1")).hasSize(1);
+            assertThat(discord.sentComponents("text-2")).hasSize(1);
         });
     }
 
@@ -270,15 +276,15 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of())));
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
-            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
+            assertThat(discord.sentComponents("text-1")).hasSize(1);
         });
         redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
                 new MusicPlayerEvent.Paused(PLAYER_ID, new Request("event-2", "@user"), GUILD_ID)));
 
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
-            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
-            assertThat(discord.sentEmbeds("text-1").getFirst().authorText()).hasValue("\u26AA ON THE AIR");
+            assertThat(discord.sentComponents("text-1")).hasSize(1);
+            assertThat(allTexts(discord.sentComponents("text-1").getFirst())).anyMatch(text -> text.contains("\u26AA ON THE AIR"));
         });
     }
 
@@ -304,16 +310,63 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of())));
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
-            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
+            assertThat(discord.sentComponents("text-1")).hasSize(1);
         });
         redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
                 new MusicPlayerEvent.Skipped(PLAYER_ID, new Request("event-2", "@user"), GUILD_ID)));
 
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
-            assertThat(discord.sentEmbeds("text-1")).hasSize(1);
-            assertThat(discord.sentEmbeds("text-1").getFirst().description()).hasValue("*Last track skipped by @user*");
+            assertThat(discord.sentComponents("text-1")).hasSize(1);
+            assertThat(allTexts(discord.sentComponents("text-1").getFirst())).anyMatch(text -> text.contains("Last track skipped by @user"));
         });
+    }
+
+    @Test
+    void buttonInteractionPublishesNextCommandForAssignedPlayer() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockButtonInteraction interaction = MockButtonInteraction.forButton("player:next")
+                    .guildId(GUILD_ID)
+                    .voiceChannelId(VOICE_CHANNEL_ID)
+                    .userMention("@button-user")
+                    .build();
+
+            MockDiscordClient client = discordClientFactory.getLastCreated().orElseThrow();
+            client.dispatchButton(interaction);
+
+            String json = received.poll(2, TimeUnit.SECONDS);
+            assertThat(json).isNotNull();
+
+            MusicPlayerInteraction playerInteraction = objectMapper.readValue(json, MusicPlayerInteraction.class);
+            assertThat(playerInteraction).isInstanceOf(MusicPlayerInteraction.Next.class);
+            MusicPlayerInteraction.Next next = (MusicPlayerInteraction.Next) playerInteraction;
+            assertThat(next.guildId()).isEqualTo(GUILD_ID);
+            assertThat(next.request().requesterTag()).isEqualTo("@button-user");
+            assertThat(interaction.isAcknowledged()).isTrue();
+            assertThat(interaction.getDeferredMessage()).isEmpty();
+            assertThat(interaction.getReplies()).isEmpty();
+        } finally {
+            container.stop();
+        }
+    }
+
+    private static List<String> allTexts(ComponentMessage message) {
+        List<String> texts = new java.util.ArrayList<>();
+        for (Container container : message.containers()) {
+            for (ContainerChild child : container.children()) {
+                switch (child) {
+                    case TextBlock textBlock -> texts.add(textBlock.text());
+                    case Section section -> texts.addAll(section.texts());
+                    default -> {
+                    }
+                }
+            }
+        }
+        return texts;
     }
 
 }

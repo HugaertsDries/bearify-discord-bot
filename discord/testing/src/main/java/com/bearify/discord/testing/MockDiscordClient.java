@@ -1,8 +1,15 @@
 package com.bearify.discord.testing;
 
-import com.bearify.discord.api.gateway.*;
 import com.bearify.discord.api.gateway.Activity;
+import com.bearify.discord.api.gateway.DiscordClient;
+import com.bearify.discord.api.gateway.DiscordClientFactory;
+import com.bearify.discord.api.gateway.Guild;
+import com.bearify.discord.api.gateway.SentMessage;
+import com.bearify.discord.api.gateway.TextChannel;
+import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.Interaction;
+import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
@@ -17,13 +24,14 @@ import java.util.function.Consumer;
 
 public class MockDiscordClient implements DiscordClient {
 
-    private final Consumer<CommandInteraction> handler;
+    private final Consumer<Interaction> handler;
     private boolean started = false;
     private String startedWithToken;
     private String startedWithGuildId;
-    private final Map<String, List<EmbedMessage>> sentEmbedsByChannel = new ConcurrentHashMap<>();
+    private final Map<String, List<ComponentMessage>> sentComponentsByChannel = new ConcurrentHashMap<>();
 
-    private MockDiscordClient(List<CommandDefinition> commands, Consumer<CommandInteraction> handler) {
+    private MockDiscordClient(List<CommandDefinition> commands,
+                              Consumer<Interaction> handler) {
         this.handler = handler;
     }
 
@@ -59,6 +67,10 @@ public class MockDiscordClient implements DiscordClient {
         handler.accept(interaction);
     }
 
+    public void dispatchButton(ButtonInteraction interaction) {
+        handler.accept(interaction);
+    }
+
     public boolean isStarted() {
         return started;
     }
@@ -71,8 +83,8 @@ public class MockDiscordClient implements DiscordClient {
         return Optional.ofNullable(startedWithGuildId);
     }
 
-    public List<EmbedMessage> sentEmbeds(String channelId) {
-        return List.copyOf(sentEmbedsByChannel.getOrDefault(channelId, List.of()));
+    public List<ComponentMessage> sentComponents(String channelId) {
+        return List.copyOf(sentComponentsByChannel.getOrDefault(channelId, List.of()));
     }
 
     private static final class MockGuild implements Guild {
@@ -100,14 +112,15 @@ public class MockDiscordClient implements DiscordClient {
         }
 
         @Override
-        public SentMessage send(EmbedMessage embed) {
-            sentEmbedsByChannel.computeIfAbsent(channelId, ignored -> new ArrayList<>()).add(embed);
+        public SentMessage send(ComponentMessage message) {
+            sentComponentsByChannel.computeIfAbsent(channelId, ignored -> new ArrayList<>()).add(message);
             return new SentMessage() {
                 @Override public void delete() {}
+
                 @Override
-                public void update(EmbedMessage updated) {
-                    List<EmbedMessage> embeds = sentEmbedsByChannel.get(channelId);
-                    embeds.set(embeds.size() - 1, updated);
+                public void update(ComponentMessage updated) {
+                    List<ComponentMessage> messages = sentComponentsByChannel.get(channelId);
+                    messages.set(messages.size() - 1, updated);
                 }
             };
         }
@@ -120,7 +133,7 @@ public class MockDiscordClient implements DiscordClient {
 
         @Override
         public MockDiscordClient create(List<CommandDefinition> commands,
-                                        Consumer<CommandInteraction> handler) {
+                                        Consumer<Interaction> handler) {
             lastCreatedActivity = Optional.empty();
             lastCreated = new MockDiscordClient(commands, handler);
             return lastCreated;
@@ -128,7 +141,7 @@ public class MockDiscordClient implements DiscordClient {
 
         @Override
         public MockDiscordClient create(List<CommandDefinition> commands,
-                                        Consumer<CommandInteraction> handler,
+                                        Consumer<Interaction> handler,
                                         Activity activity) {
             lastCreatedActivity = Optional.of(activity);
             lastCreated = new MockDiscordClient(commands, handler);

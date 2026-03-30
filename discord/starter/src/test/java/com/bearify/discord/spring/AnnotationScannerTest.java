@@ -1,7 +1,7 @@
 package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
-import com.bearify.discord.spring.annotation.Command;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AnnotationScannerTest {
 
-    @Command
+    @DiscordController
     static class SomeCommand {
         @Interaction("ping")
         void ping(CommandInteraction interaction) {}
@@ -25,7 +25,7 @@ class AnnotationScannerTest {
         void notAHandler() {}
     }
 
-    @Command
+    @DiscordController
     static class AnotherCommand {
         @Interaction("foo")
         void foo(CommandInteraction interaction) {}
@@ -45,7 +45,7 @@ class AnnotationScannerTest {
             ctx.refresh();
 
             List<String> names = new ArrayList<>();
-            new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
+            new AnnotationScanner().scan(ctx, DiscordController.class, Interaction.class,
                     (_, ann, _) -> names.add(ann.value()));
 
             assertThat(names).containsExactlyInAnyOrder("ping", "pong", "foo");
@@ -60,7 +60,7 @@ class AnnotationScannerTest {
 
             List<String> beanNames = new ArrayList<>();
             List<Method> methods = new ArrayList<>();
-            new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
+            new AnnotationScanner().scan(ctx, DiscordController.class, Interaction.class,
                     (beanName, _, method) -> { beanNames.add(beanName); methods.add(method); });
 
             assertThat(beanNames).containsOnly("annotationScannerTest.SomeCommand");
@@ -72,13 +72,13 @@ class AnnotationScannerTest {
     // --- EDGE CASES ---
 
     @Test
-    void ignoresBeansNotAnnotatedWithCommand() {
+    void ignoresBeansNotAnnotatedWithDiscordController() {
         try (var ctx = new AnnotationConfigApplicationContext()) {
             ctx.register(NotACommand.class);
             ctx.refresh();
 
             List<String> names = new ArrayList<>();
-            new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
+            new AnnotationScanner().scan(ctx, DiscordController.class, Interaction.class,
                     (_, ann, _) -> names.add(ann.value()));
 
             assertThat(names).isEmpty();
@@ -92,7 +92,7 @@ class AnnotationScannerTest {
             ctx.refresh();
 
             List<Method> methods = new ArrayList<>();
-            new AnnotationScanner().scan(ctx, Command.class, Interaction.class,
+            new AnnotationScanner().scan(ctx, DiscordController.class, Interaction.class,
                     (_, __, method) -> methods.add(method));
 
             assertThat(methods).hasSize(2);

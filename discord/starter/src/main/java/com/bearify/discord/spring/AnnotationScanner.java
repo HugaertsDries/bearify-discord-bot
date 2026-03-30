@@ -31,6 +31,15 @@ class AnnotationScanner {
         });
     }
 
+    <A extends Annotation> void scan(ApplicationContext context,
+                                     Class<? extends Annotation> firstClassAnnotation,
+                                     Class<? extends Annotation> secondClassAnnotation,
+                                     Class<A> methodAnnotation,
+                                     Handler<A> handler) {
+        scan(context, firstClassAnnotation, methodAnnotation, handler);
+        scan(context, secondClassAnnotation, methodAnnotation, handler);
+    }
+
     private record BeanDefinition(String name, Class<?> type) {
         boolean isDetermined() {
             return type != null;

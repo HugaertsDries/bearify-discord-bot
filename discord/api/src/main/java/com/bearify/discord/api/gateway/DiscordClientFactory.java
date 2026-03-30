@@ -1,6 +1,6 @@
 package com.bearify.discord.api.gateway;
 
-import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.Interaction;
 import com.bearify.discord.api.model.CommandDefinition;
 
 import java.util.List;
@@ -14,9 +14,9 @@ import java.util.function.Consumer;
 public interface DiscordClientFactory {
 
     DiscordClient create(List<CommandDefinition> commands,
-                         Consumer<CommandInteraction> handler);
+                         Consumer<Interaction> handler);
 
     DiscordClient create(List<CommandDefinition> commands,
-                         Consumer<CommandInteraction> handler,
+                         Consumer<Interaction> handler,
                          Activity activity);
 }

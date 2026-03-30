@@ -1,21 +1,18 @@
 package com.bearify.controller.music.discord;
 
-import com.bearify.controller.music.discord.images.DiskGIF;
-import com.bearify.controller.music.discord.images.SpacerPng;
-import com.bearify.controller.music.discord.images.VibingGIF;
 import com.bearify.controller.music.domain.MusicPlayerTrackAnnouncer;
 import com.bearify.discord.api.gateway.DiscordClient;
-import com.bearify.discord.api.gateway.EmbedMessage;
 import com.bearify.discord.api.gateway.SentMessage;
+import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -24,38 +21,22 @@ import java.util.concurrent.TimeUnit;
 
 public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnnouncer {
 
-    private enum PlaybackState {
-        PLAYING("\uD83D\uDD34 ON THE AIR", "vibing.gif"),
-        PAUSED("\u26AA ON THE AIR", "spacer.png");
-
-        private final String authorText;
-        private final String imageFilename;
-
-        PlaybackState(String authorText, String imageFilename) {
-            this.authorText = authorText;
-            this.imageFilename = imageFilename;
-        }
-    }
-
     private static final Logger LOG = LoggerFactory.getLogger(TextChannelMusicPlayerTrackAnnouncer.class);
     private final ScheduledExecutorService actionTimeouts =
             Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
 
-    private static final String DISK_FILENAME  = "disk.gif";
-    private static final byte[] SPACER_BYTES   = new SpacerPng().toBytes();
-
     private final DiscordClient discord;
     private final AnnouncerProperties properties;
+    private final PlaybackAnnouncer playbackAnnouncer = new PlaybackAnnouncer();
+    private final YoutubeThumbnailResolver artworkUrlResolver = new YoutubeThumbnailResolver();
     private final String textChannelId;
-    private volatile SentMessage activeEmbed;
-    private volatile PlaybackState playbackState = PlaybackState.PLAYING;
+    private volatile SentMessage activeMessage;
+    private volatile PlaybackAnnouncerState.PlaybackState playbackState = PlaybackAnnouncerState.PlaybackState.PLAYING;
     private volatile String temporaryAction;
     private volatile ScheduledFuture<?> clearActionTask;
     private volatile TrackMetadata currentTrack;
     private volatile List<TrackMetadata> currentUpNext = List.of();
     private volatile String currentRequesterTag;
-    private volatile byte[] diskBytes;
-    private volatile byte[] vibingBytes;
 
     public TextChannelMusicPlayerTrackAnnouncer(DiscordClient discord,
                                                 AnnouncerProperties properties,
@@ -70,8 +51,8 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         switch (event) {
             case MusicPlayerEvent.TrackStart started -> onTrackStart(started);
             case MusicPlayerEvent.TrackError error -> onTrackError(error);
-            case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackState.PAUSED);
-            case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackState.PLAYING);
+            case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackAnnouncerState.PlaybackState.PAUSED);
+            case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackAnnouncerState.PlaybackState.PLAYING);
             case MusicPlayerEvent.Skipped skipped -> notify("Last track skipped by " + skipped.request().requesterTag());
             case MusicPlayerEvent.WentBack wentBack -> notify("Jumped back by " + wentBack.request().requesterTag());
             case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
@@ -92,12 +73,10 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
             currentTrack = event.track();
             currentUpNext = event.upNext();
             currentRequesterTag = event.request().requesterTag();
-            playbackState = PlaybackState.PLAYING;
-            diskBytes = new DiskGIF().toBytes();
-            vibingBytes = new VibingGIF().toBytes();
-            updateOrPost(nowPlayingEmbed());
+            playbackState = PlaybackAnnouncerState.PlaybackState.PLAYING;
+            updateOrPost(playbackAnnouncer.render(currentState()));
         } catch (Exception e) {
-            LOG.warn("Failed to post now-playing embed for channel {}", textChannelId, e);
+            LOG.warn("Failed to post now-playing component message for channel {}", textChannelId, e);
         }
     }
 
@@ -105,11 +84,11 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         currentTrack = event.track();
         currentRequesterTag = null;
         cancelClearTask();
-        temporaryAction = null;
+        temporaryAction = "Something went wrong loading this track. Skipping in 5 seconds…";
         try {
-            updateOrPost(errorEmbed(event.track()));
+            updateOrPost(playbackAnnouncer.render(currentState()));
         } catch (Exception e) {
-            LOG.warn("Failed to post error embed for channel {}", textChannelId, e);
+            LOG.warn("Failed to post error component message for channel {}", textChannelId, e);
         }
     }
 
@@ -123,7 +102,7 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         notify("Cleared by " + event.request().requesterTag());
     }
 
-    private void updatePlaybackState(PlaybackState state) {
+    private void updatePlaybackState(PlaybackAnnouncerState.PlaybackState state) {
         playbackState = state;
         refreshNowPlayingEmbed();
     }
@@ -145,28 +124,28 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
     }
 
     private void refreshNowPlayingEmbed() {
-        if (currentTrack == null || activeEmbed == null) {
+        if (currentTrack == null || activeMessage == null) {
             return;
         }
         try {
-            updateOrPost(nowPlayingEmbed());
+            updateOrPost(playbackAnnouncer.render(currentState()));
         } catch (Exception e) {
-            LOG.warn("Failed to refresh embed for channel {}", textChannelId, e);
+            LOG.warn("Failed to refresh component message for channel {}", textChannelId, e);
         }
     }
 
-    private void updateOrPost(EmbedMessage embed) {
-        SentMessage existing = activeEmbed;
+    private void updateOrPost(ComponentMessage message) {
+        SentMessage existing = activeMessage;
         if (existing != null) {
             try {
-                existing.update(embed);
+                existing.update(message);
                 return;
             } catch (Exception e) {
-                LOG.warn("Failed to update embed for channel {}, will post fresh", textChannelId, e);
-                activeEmbed = null;
+                LOG.warn("Failed to update component message for channel {}, will post fresh", textChannelId, e);
+                activeMessage = null;
             }
         }
-        activeEmbed = discord.textChannel(textChannelId).send(embed);
+        activeMessage = discord.textChannel(textChannelId).send(message);
     }
 
     private void deleteEmbed() {
@@ -175,13 +154,13 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         currentRequesterTag = null;
         currentUpNext = List.of();
         temporaryAction = null;
-        SentMessage existing = activeEmbed;
-        activeEmbed = null;
+        SentMessage existing = activeMessage;
+        activeMessage = null;
         if (existing != null) {
             try {
                 existing.delete();
             } catch (Exception e) {
-                LOG.warn("Failed to delete embed for channel {}", textChannelId, e);
+                LOG.warn("Failed to delete component message for channel {}", textChannelId, e);
             }
         }
     }
@@ -194,73 +173,17 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         }
     }
 
-    private EmbedMessage nowPlayingEmbed() {
-        String requestedBy = currentRequesterTag != null ? currentRequesterTag : "Unknown";
-        String description = temporaryAction != null && !temporaryAction.isBlank()
-                ? "*" + temporaryAction + "*"
-                : null;
-
-        List<EmbedMessage.Field> fields = new ArrayList<>();
-        fields.add(new EmbedMessage.Field("Author",       truncate(currentTrack.author(), 40), true));
-        fields.add(new EmbedMessage.Field("Length",       humanReadable(Duration.ofMillis(currentTrack.durationMs())), true));
-        fields.add(new EmbedMessage.Field("Requested by", requestedBy,                         true));
-        if (!currentUpNext.isEmpty()) {
-            fields.add(new EmbedMessage.Field("Up Next", formatUpNext(currentUpNext), false));
-        }
-
-        return EmbedMessage.builder()
-                .authorText(playbackState.authorText)
-                .title(truncate(currentTrack.title(), 30))
-                .titleUrl(currentTrack.uri())
-                .description(description)
-                .color(properties.colorNowPlayingInt())
-                .imageFilename(playbackState.imageFilename)
-                .thumbnailFilename(DISK_FILENAME)
+    private PlaybackAnnouncerState currentState() {
+        return PlaybackAnnouncerState.builder()
+                .playbackState(playbackState)
+                .notification(Optional.ofNullable(temporaryAction).filter(text -> !text.isBlank()).orElse(null))
+                .track(currentTrack)
+                .requesterTag(currentRequesterTag != null ? currentRequesterTag : "Unknown")
+                .upNext(currentUpNext)
+                .artworkUri(artworkUrlResolver.resolve(currentTrack).orElse(null))
                 .footer(properties.footer())
-                .fields(fields)
-                .attachments(attachments())
+                .paused(playbackState == PlaybackAnnouncerState.PlaybackState.PAUSED)
                 .build();
-    }
-
-    private EmbedMessage errorEmbed(TrackMetadata track) {
-        return EmbedMessage.builder()
-                .title(track.title())
-                .titleUrl(track.uri())
-                .description("Something went wrong loading this track. Skipping in 5 seconds\u2026")
-                .color(properties.colorErrorInt())
-                .footer(properties.footer())
-                .build();
-    }
-
-    private List<EmbedMessage.Attachment> attachments() {
-        byte[] stateImageBytes = playbackState == PlaybackState.PLAYING ? vibingBytes : SPACER_BYTES;
-        return List.of(
-                new EmbedMessage.Attachment(DISK_FILENAME, diskBytes),
-                new EmbedMessage.Attachment(playbackState.imageFilename, stateImageBytes)
-        );
-    }
-
-    private static String formatUpNext(List<TrackMetadata> tracks) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < tracks.size(); i++) {
-            TrackMetadata t = tracks.get(i);
-            if (i > 0) sb.append('\n');
-            sb.append(i + 1).append(". ")
-              .append(truncate(t.title(), 35));
-        }
-        return sb.toString();
-    }
-
-    private static String truncate(String text, int limit) {
-        if (text == null) return "";
-        return text.length() <= limit ? text : text.substring(0, limit - 1) + "\u2026";
-    }
-
-    private static String humanReadable(Duration duration) {
-        return duration.toString()
-                .substring(2)
-                .replaceAll("(\\d[HMS])(?!$)", "$1 ")
-                .toLowerCase();
     }
 
     @Override

@@ -6,7 +6,7 @@ import java.util.Optional;
  * Abstraction over a Discord command interaction.
  * Implementations wrap the underlying library's interaction object (e.g. JDA, Discord4J).
  */
-public interface CommandInteraction {
+public interface CommandInteraction extends Interaction {
 
     default EditableMessage defer() {
         return defer(false);
@@ -21,15 +21,5 @@ public interface CommandInteraction {
     String getName();
 
     Optional<String> getSubcommandName();
-
-    Optional<String> getGuildId();
-
-    Optional<String> getVoiceChannelId();
-
-    Optional<String> getTextChannelId();
-
-    default String getUserMention() {
-        return "Someone";
-    }
 
 }

@@ -5,7 +5,7 @@ import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.TextChannel;
-import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.Interaction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
 import net.dv8tion.jda.api.JDA;
@@ -34,13 +34,13 @@ public class JdaDiscordClient implements DiscordClient {
 
     private final List<CommandDefinition> commands;
     private final ExecutorService interactionExecutor;
-    private final Consumer<CommandInteraction> interactionHandler;
+    private final Consumer<Interaction> interactionHandler;
     private final Activity activity;
 
     public JDA jda;
 
     JdaDiscordClient(List<CommandDefinition> commands,
-                     Consumer<CommandInteraction> interactionHandler,
+                     Consumer<Interaction> interactionHandler,
                      Activity activity) {
         this.commands = commands;
         this.interactionHandler = interactionHandler;

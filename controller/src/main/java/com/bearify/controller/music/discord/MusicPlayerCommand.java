@@ -5,8 +5,9 @@ import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;
-import com.bearify.discord.spring.annotation.Command;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
+import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.spring.annotation.Option;
 import com.bearify.music.player.bridge.model.TrackRequest;
 
@@ -15,7 +16,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
-@Command(value = "player", description = "Player commands")
+@DiscordController
+@InteractionGroup(value = "player", description = "Player commands")
 public class MusicPlayerCommand {
 
     private static final String NOT_IN_VOICE_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | Looks like you're not in a voice channel! Jump in one and try again.";

@@ -2,13 +2,17 @@ package com.bearify.discord.spring;
 
 import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.gateway.DiscordClient;
+import com.bearify.discord.api.interaction.ButtonInteraction;
+import com.bearify.discord.api.interaction.InteractionType;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
-import com.bearify.discord.spring.annotation.Command;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.CommandAdvice;
 import com.bearify.discord.spring.annotation.HandleException;
 import com.bearify.discord.spring.annotation.Interaction;
+import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.discord.testing.MockButtonInteraction;
 import com.bearify.discord.testing.MockDiscordClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -34,7 +38,7 @@ class DiscordAutoConfigurationTest {
         }
     }
 
-    @Command
+    @DiscordController
     static class HelloCommand {
         @Interaction(value = "hello", description = "Say hello")
         void hello(CommandInteraction interaction) {
@@ -50,7 +54,7 @@ class DiscordAutoConfigurationTest {
         }
     }
 
-    @Command
+    @DiscordController
     @Lazy
     static class LazyInitCommand {
         static final AtomicInteger instantiations = new AtomicInteger();
@@ -65,7 +69,7 @@ class DiscordAutoConfigurationTest {
         }
     }
 
-    @Command
+    @DiscordController
     static class DiscordDependentCommand {
         DiscordDependentCommand(DiscordClient client) {
         }
@@ -87,6 +91,31 @@ class DiscordAutoConfigurationTest {
         }
     }
 
+    @DiscordController
+    static class ButtonController {
+        @Interaction(type = InteractionType.BUTTON, value = "player:pause-play")
+        void pausePlay(ButtonInteraction interaction) {
+            interaction.reply("ok").ephemeral().send();
+        }
+    }
+
+    @DiscordController
+    @InteractionGroup(value = "music", description = "Music commands")
+    static class GroupedCommand {
+        @Interaction(value = "play", description = "Play a song")
+        void play(CommandInteraction interaction) {
+            interaction.reply("playing").send();
+        }
+    }
+
+    @DiscordController
+    static class FailingCommand {
+        @Interaction(value = "boom", description = "Always throws")
+        void boom(CommandInteraction interaction) {
+            throw new IllegalStateException("boom");
+        }
+    }
+
     // --- HAPPY PATH ---
 
     @Test
@@ -98,6 +127,17 @@ class DiscordAutoConfigurationTest {
                     CommandRegistry registry = ctx.getBean(CommandRegistry.class);
                     assertThat(registry.getDefinitions()).hasSize(1);
                     assertThat(registry.getDefinitions().getFirst().name()).isEqualTo("hello");
+                });
+    }
+
+    @Test
+    void registersGroupedCommandsThroughInteractionGroup() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, GroupedCommand.class)
+                .run(ctx -> {
+                    CommandRegistry registry = ctx.getBean(CommandRegistry.class);
+                    assertThat(registry.getDefinitions()).extracting(CommandDefinition::name).contains("music");
                 });
     }
 
@@ -168,6 +208,41 @@ class DiscordAutoConfigurationTest {
                     assertThat(interaction.getReplies()).hasSize(1);
                     assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo("Hello!");
                     assertThat(interaction.getReplies().getFirst().isSent()).isTrue();
+                });
+    }
+
+    @Test
+    void routesDispatchedButtonThroughRegistryToHandler() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, ButtonController.class)
+                .run(ctx -> {
+                    MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
+                    MockButtonInteraction interaction = MockButtonInteraction.forButton("player:pause-play").build();
+
+                    client.dispatchButton(interaction);
+
+                    assertThat(interaction.getReplies()).hasSize(1);
+                    assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo("ok");
+                    assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+                });
+    }
+
+    @Test
+    void usesFallbackReplyWhenNoExceptionHandlerMatches() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, FailingCommand.class)
+                .run(ctx -> {
+                    MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
+                    MockCommandInteraction interaction = MockCommandInteraction.forCommand("boom").build();
+
+                    client.dispatch(interaction);
+
+                    assertThat(interaction.getReplies()).singleElement().satisfies(reply -> {
+                        assertThat(reply.getContent()).isEqualTo("Something went wrong. Please try again later.");
+                        assertThat(reply.isEphemeral()).isTrue();
+                    });
                 });
     }
 

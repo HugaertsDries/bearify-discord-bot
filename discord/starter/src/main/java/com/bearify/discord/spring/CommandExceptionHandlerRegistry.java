@@ -2,9 +2,11 @@ package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.spring.annotation.HandleException;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,15 +32,24 @@ public class CommandExceptionHandlerRegistry {
     }
 
     public void handle(CommandInteraction interaction, Throwable exception) {
-        Class<?> type = exception.getClass();
+        CommandExceptionHandler handler = findHandler(exception.getClass());
+        if (handler != null) {
+            handler.handle(interaction, exception);
+            return;
+        }
+        LoggerFactory.getLogger(CommandExceptionHandlerRegistry.class).warn("Unhandled command exception", exception);
+        interaction.reply("Something went wrong. Please try again later.").ephemeral().send();
+    }
+
+    private CommandExceptionHandler findHandler(Class<?> exceptionType) {
+        Class<?> type = exceptionType;
         while (type != null && type != Object.class) {
             CommandExceptionHandler handler = handlers.get(type);
             if (handler != null) {
-                handler.handle(interaction, exception);
-                return;
+                return handler;
             }
             type = type.getSuperclass();
         }
-        interaction.reply("Something went wrong. Please try again later.").ephemeral().send();
+        return null;
     }
 }

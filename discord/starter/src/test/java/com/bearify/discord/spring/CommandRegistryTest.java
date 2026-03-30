@@ -1,11 +1,14 @@
 package com.bearify.discord.spring;
 
+import com.bearify.discord.api.interaction.ButtonInteraction;
+import com.bearify.discord.api.interaction.InteractionType;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
 import com.bearify.discord.api.model.SubcommandDefinition;
-import com.bearify.discord.spring.annotation.Command;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
+import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.spring.annotation.Option;
 import com.bearify.discord.testing.MockCommandInteraction;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommandRegistryTest {
 
-    @Command
+    @DiscordController
     static class TestController {
         final List<String> invocations = new ArrayList<>();
 
@@ -44,7 +47,8 @@ class CommandRegistryTest {
         }
     }
 
-    @Command(value = "music", description = "Music commands")
+    @DiscordController
+    @InteractionGroup(value = "music", description = "Music commands")
     static class MusicController {
         @Interaction(value = "play", description = "Play a song")
         void play(CommandInteraction interaction) {
@@ -57,6 +61,14 @@ class CommandRegistryTest {
         }
     }
 
+    @DiscordController
+    static class ButtonController {
+        @Interaction(type = InteractionType.BUTTON, value = "player:pause-play")
+        void pausePlay(ButtonInteraction interaction) {
+            interaction.reply("noop").send();
+        }
+    }
+
     private AnnotationConfigApplicationContext context;
     private CommandRegistry registry;
 
@@ -65,6 +77,7 @@ class CommandRegistryTest {
        context = new AnnotationConfigApplicationContext();
        context.registerBean("testController", TestController.class, TestController::new);
        context.registerBean("musicController", MusicController.class, MusicController::new);
+       context.registerBean("buttonController", ButtonController.class, ButtonController::new);
        context.refresh();
 
        registry = new CommandRegistry(context, new CommandExceptionHandlerRegistry(context));
@@ -212,5 +225,14 @@ class CommandRegistryTest {
         assertThatThrownBy(() -> registry.register("testController", annotation, method))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("music/play");
+    }
+
+    @Test
+    void ignoresButtonTypedInteractionsWhenBuildingCommandDefinitions() throws NoSuchMethodException {
+        Method method = ButtonController.class.getDeclaredMethod("pausePlay", ButtonInteraction.class);
+
+        registry.register("buttonController", method.getAnnotation(Interaction.class), method);
+
+        assertThat(registry.getDefinitions()).isEmpty();
     }
 }
