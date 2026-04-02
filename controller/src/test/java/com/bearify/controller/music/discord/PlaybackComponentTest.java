@@ -1,8 +1,6 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.discord.api.message.ComponentMessage;
-import com.bearify.discord.api.message.Container;
-import com.bearify.discord.api.message.ContainerChild;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
@@ -12,11 +10,11 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class PlaybackAnnouncerTest {
+class PlaybackComponentTest {
 
     @Test
     void renderUsesConfiguredPrimaryColorForDefaultNotification() {
-        PlaybackAnnouncer announcer = new PlaybackAnnouncer(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
 
         ComponentMessage message = announcer.render(baseState().notification("Skipped by @user").build());
 
@@ -27,11 +25,11 @@ class PlaybackAnnouncerTest {
 
     @Test
     void renderUsesConfiguredErrorColorForErrorNotification() {
-        PlaybackAnnouncer announcer = new PlaybackAnnouncer(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
 
         ComponentMessage message = announcer.render(baseState()
-                .notification(new PlaybackAnnouncerState.Notification(
-                        PlaybackAnnouncerState.NotificationStyle.ERROR,
+                .notification(new PlaybackComponentState.Notification(
+                        PlaybackComponentState.NotificationStyle.ERROR,
                         "Something went wrong"))
                 .build());
 
@@ -40,9 +38,9 @@ class PlaybackAnnouncerTest {
         assertThat(texts(message)).anyMatch(text -> text.contains("Something went wrong"));
     }
 
-    private static PlaybackAnnouncerState.Builder baseState() {
-        return PlaybackAnnouncerState.builder()
-                .playbackState(PlaybackAnnouncerState.PlaybackState.PLAYING)
+    private static PlaybackComponentState.Builder baseState() {
+        return PlaybackComponentState.builder()
+                .playbackState(PlaybackComponentState.PlaybackState.PLAYING)
                 .track(new TrackMetadata("Song", "Artist", "https://example.com", 60_000))
                 .requesterTag("@user")
                 .upNext(List.of(new TrackMetadata("Next", "Artist 2", "https://example.com/next", 120_000)))

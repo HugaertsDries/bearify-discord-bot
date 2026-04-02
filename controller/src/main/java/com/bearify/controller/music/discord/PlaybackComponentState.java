@@ -6,7 +6,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
-public final class PlaybackAnnouncerState {
+public final class PlaybackComponentState {
 
     private static final String DEFAULT_FOOTER = "Bearify \u2022 Powered by Bearable Software";
 
@@ -45,7 +45,7 @@ public final class PlaybackAnnouncerState {
     private final String footer;
     private final boolean paused;
 
-    private PlaybackAnnouncerState(Builder builder) {
+    private PlaybackComponentState(Builder builder) {
         this.playbackState = builder.playbackState;
         this.notification = builder.notification;
         this.track = builder.track;
@@ -150,8 +150,8 @@ public final class PlaybackAnnouncerState {
             return this;
         }
 
-        public PlaybackAnnouncerState build() {
-            return new PlaybackAnnouncerState(this);
+        public PlaybackComponentState build() {
+            return new PlaybackComponentState(this);
         }
     }
 }

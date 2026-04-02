@@ -1,6 +1,6 @@
 package com.bearify.controller.music.discord;
 
-import com.bearify.controller.music.domain.MusicPlayerTrackAnnouncer;
+import com.bearify.controller.music.domain.PlaybackAnnouncer;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.message.ComponentMessage;
@@ -9,7 +9,6 @@ import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,31 +18,31 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnnouncer {
+public class DiscordPlaybackAnnouncer implements PlaybackAnnouncer {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TextChannelMusicPlayerTrackAnnouncer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DiscordPlaybackAnnouncer.class);
     private final ScheduledExecutorService actionTimeouts =
             Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
 
     private final DiscordClient discord;
     private final AnnouncerProperties properties;
-    private final PlaybackAnnouncer playbackAnnouncer;
+    private final PlaybackComponent playbackComponent;
     private final YoutubeThumbnailResolver artworkUrlResolver = new YoutubeThumbnailResolver();
     private final String textChannelId;
     private volatile SentMessage activeMessage;
-    private volatile PlaybackAnnouncerState.PlaybackState playbackState = PlaybackAnnouncerState.PlaybackState.PLAYING;
+    private volatile PlaybackComponentState.PlaybackState playbackState = PlaybackComponentState.PlaybackState.PLAYING;
     private volatile String temporaryAction;
     private volatile ScheduledFuture<?> clearActionTask;
     private volatile TrackMetadata currentTrack;
     private volatile List<TrackMetadata> currentUpNext = List.of();
     private volatile String currentRequesterTag;
 
-    public TextChannelMusicPlayerTrackAnnouncer(DiscordClient discord,
-                                                AnnouncerProperties properties,
-                                                String textChannelId) {
+    public DiscordPlaybackAnnouncer(DiscordClient discord,
+                                    AnnouncerProperties properties,
+                                    String textChannelId) {
         this.discord = discord;
         this.properties = properties;
-        this.playbackAnnouncer = new PlaybackAnnouncer(properties);
+        this.playbackComponent = new PlaybackComponent(properties);
         this.textChannelId = textChannelId;
     }
 
@@ -52,8 +51,8 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         switch (event) {
             case MusicPlayerEvent.TrackStart started -> onTrackStart(started);
             case MusicPlayerEvent.TrackError error -> onTrackError(error);
-            case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackAnnouncerState.PlaybackState.PAUSED);
-            case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackAnnouncerState.PlaybackState.PLAYING);
+            case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackComponentState.PlaybackState.PAUSED);
+            case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackComponentState.PlaybackState.PLAYING);
             case MusicPlayerEvent.Skipped skipped -> notify("Last track skipped by " + skipped.request().requesterTag());
             case MusicPlayerEvent.WentBack wentBack -> notify("Jumped back by " + wentBack.request().requesterTag());
             case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
@@ -74,8 +73,8 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
             currentTrack = event.track();
             currentUpNext = event.upNext();
             currentRequesterTag = event.request().requesterTag();
-            playbackState = PlaybackAnnouncerState.PlaybackState.PLAYING;
-            updateOrPost(playbackAnnouncer.render(currentState()));
+            playbackState = PlaybackComponentState.PlaybackState.PLAYING;
+            updateOrPost(playbackComponent.render(currentState()));
         } catch (Exception e) {
             LOG.warn("Failed to post now-playing component message for channel {}", textChannelId, e);
         }
@@ -87,7 +86,7 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         cancelClearTask();
         temporaryAction = "Something went wrong loading this track. Skipping in 5 seconds…";
         try {
-            updateOrPost(playbackAnnouncer.render(currentState()));
+            updateOrPost(playbackComponent.render(currentState()));
         } catch (Exception e) {
             LOG.warn("Failed to post error component message for channel {}", textChannelId, e);
         }
@@ -103,7 +102,7 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         notify("Cleared by " + event.request().requesterTag());
     }
 
-    private void updatePlaybackState(PlaybackAnnouncerState.PlaybackState state) {
+    private void updatePlaybackState(PlaybackComponentState.PlaybackState state) {
         playbackState = state;
         refreshNowPlayingEmbed();
     }
@@ -129,7 +128,7 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
             return;
         }
         try {
-            updateOrPost(playbackAnnouncer.render(currentState()));
+            updateOrPost(playbackComponent.render(currentState()));
         } catch (Exception e) {
             LOG.warn("Failed to refresh component message for channel {}", textChannelId, e);
         }
@@ -174,8 +173,8 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
         }
     }
 
-    private PlaybackAnnouncerState currentState() {
-        return PlaybackAnnouncerState.builder()
+    private PlaybackComponentState currentState() {
+        return PlaybackComponentState.builder()
                 .playbackState(playbackState)
                 .notification(currentNotification().orElse(null))
                 .track(currentTrack)
@@ -183,26 +182,26 @@ public class TextChannelMusicPlayerTrackAnnouncer implements MusicPlayerTrackAnn
                 .upNext(currentUpNext)
                 .artworkUri(artworkUrlResolver.resolve(currentTrack).orElse(null))
                 .footer(properties.footer())
-                .paused(playbackState == PlaybackAnnouncerState.PlaybackState.PAUSED)
+                .paused(playbackState == PlaybackComponentState.PlaybackState.PAUSED)
                 .build();
     }
 
-    private Optional<PlaybackAnnouncerState.Notification> currentNotification() {
+    private Optional<PlaybackComponentState.Notification> currentNotification() {
         return Optional.ofNullable(temporaryAction)
                 .filter(text -> !text.isBlank())
-                .map(text -> new PlaybackAnnouncerState.Notification(notificationStyleFor(text), text));
+                .map(text -> new PlaybackComponentState.Notification(notificationStyleFor(text), text));
     }
 
-    private PlaybackAnnouncerState.NotificationStyle notificationStyleFor(String text) {
+    private PlaybackComponentState.NotificationStyle notificationStyleFor(String text) {
         return text.startsWith("Something went wrong")
-                ? PlaybackAnnouncerState.NotificationStyle.ERROR
-                : PlaybackAnnouncerState.NotificationStyle.INFO;
+                ? PlaybackComponentState.NotificationStyle.ERROR
+                : PlaybackComponentState.NotificationStyle.INFO;
     }
 
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;
-        if (!(other instanceof TextChannelMusicPlayerTrackAnnouncer that)) return false;
+        if (!(other instanceof DiscordPlaybackAnnouncer that)) return false;
         return Objects.equals(textChannelId, that.textChannelId);
     }
 

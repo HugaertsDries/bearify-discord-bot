@@ -4,7 +4,7 @@ import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
 import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
 import com.bearify.controller.music.domain.MusicPlayerPool;
-import com.bearify.controller.music.discord.TextChannelMusicPlayerTrackAnnouncerFactory;
+import com.bearify.controller.music.discord.DiscordPlaybackAnnouncerFactory;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -17,14 +17,14 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
     private final ObjectMapper objectMapper;
     private final MusicPlayerPendingInteractions pendingInteractions;
     private final MusicPlayerAnnouncementRegistry announcementRegistry;
-    private final TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
+    private final DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
     private final MusicPlayerPoolProperties properties;
 
     RedisMusicPlayerPool(StringRedisTemplate redis,
                          ObjectMapper objectMapper,
                          MusicPlayerPendingInteractions pendingInteractions,
                          MusicPlayerAnnouncementRegistry announcementRegistry,
-                         TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory,
+                         DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
                          MusicPlayerPoolProperties properties) {
         this.redis = redis;
         this.objectMapper = objectMapper;

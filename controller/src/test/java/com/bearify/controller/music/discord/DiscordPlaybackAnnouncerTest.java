@@ -1,7 +1,7 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.format.BearifyEmoji;
-import com.bearify.controller.music.domain.MusicPlayerTrackAnnouncer;
+import com.bearify.controller.music.domain.PlaybackAnnouncer;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.SentMessage;
@@ -30,10 +30,10 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.bearify.controller.music.discord.PlaybackAnnouncer.*;
+import static com.bearify.controller.music.discord.PlaybackComponent.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class TextChannelMusicPlayerTrackAnnouncerTest {
+class DiscordPlaybackAnnouncerTest {
 
 
     @Test
@@ -51,7 +51,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void acceptPostsComponentMessageWhenTrackStartsAndNoMessageExists() {
         AtomicReference<ComponentMessage> sent = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
 
@@ -71,7 +71,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void acceptShowsPausedStateAfterPausedEvent() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Paused("player-1", new Request("req-2", "@user"), "guild-1"));
@@ -90,7 +90,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void acceptRestoresPlayingCopyAfterResume() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Paused("player-1", new Request("req-2", "@user"), "guild-1"));
@@ -110,7 +110,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void acceptShowsTemporarySkippedAction() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
@@ -121,7 +121,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void acceptShowsTemporaryWentBackAction() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.WentBack("player-1", new Request("req-2", "@user"), "guild-1"));
@@ -132,7 +132,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void acceptReplacesOlderTemporaryActionWithNewerOne() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
@@ -145,7 +145,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void acceptClearsTemporaryActionAfterTimeout() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofMillis(50));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofMillis(50));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Forwarded("player-1", new Request("req-2", "@user"), "guild-1", 30_000));
@@ -160,7 +160,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     void acceptUpdatesExistingMessageWhenTrackErrorArrives() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicInteger sends = new AtomicInteger();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(trackError("player-1"));
@@ -175,7 +175,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicInteger sends = new AtomicInteger();
         AtomicInteger deletes = new AtomicInteger();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, deletes, Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, deletes, Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-2", "guild-1"));
@@ -189,7 +189,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicInteger sends = new AtomicInteger();
         AtomicInteger deletes = new AtomicInteger();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, deletes, Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, sends, deletes, Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.NothingToGoBack("player-1", "req-2", "guild-1"));
@@ -201,7 +201,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void includesUpNextFromTrackStart() {
         AtomicReference<ComponentMessage> sent = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStartWithUpNext("player-1"));
 
@@ -213,7 +213,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void omitsUpNextWhenQueueIsEmpty() {
         AtomicReference<ComponentMessage> sent = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
 
@@ -223,7 +223,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void upNextUpdatesWhenQueueUpdatedEventArrives() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1",
@@ -235,7 +235,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void clearedEventRemovesUpNextWhenQueueBecomesEmpty() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStartWithUpNext("player-1"));
         announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-2", "@user"), "guild-1", List.of()));
@@ -247,7 +247,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void truncatesLongTrackTitleAt45Characters() {
         AtomicReference<ComponentMessage> sent = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         String longTitle = "A".repeat(100);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
@@ -259,7 +259,7 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
     @Test
     void truncatesLongAuthorAt40Characters() {
         AtomicReference<ComponentMessage> sent = new AtomicReference<>();
-        MusicPlayerTrackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
+        PlaybackAnnouncer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         String longAuthor = "B".repeat(60);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
@@ -295,19 +295,19 @@ class TextChannelMusicPlayerTrackAnnouncerTest {
                 .contains(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"));
     }
 
-    private static MusicPlayerTrackAnnouncer announcer(AtomicReference<ComponentMessage> sent,
-                                                       AtomicReference<ComponentMessage> updated,
-                                                       AtomicInteger sends,
-                                                       Duration timeout) {
+    private static PlaybackAnnouncer announcer(AtomicReference<ComponentMessage> sent,
+                                               AtomicReference<ComponentMessage> updated,
+                                               AtomicInteger sends,
+                                               Duration timeout) {
         return announcer(sent, updated, sends, new AtomicInteger(), timeout);
     }
 
-    private static MusicPlayerTrackAnnouncer announcer(AtomicReference<ComponentMessage> sent,
-                                                       AtomicReference<ComponentMessage> updated,
-                                                       AtomicInteger sends,
-                                                       AtomicInteger deletes,
-                                                       Duration timeout) {
-        return new TextChannelMusicPlayerTrackAnnouncer(
+    private static PlaybackAnnouncer announcer(AtomicReference<ComponentMessage> sent,
+                                               AtomicReference<ComponentMessage> updated,
+                                               AtomicInteger sends,
+                                               AtomicInteger deletes,
+                                               Duration timeout) {
+        return new DiscordPlaybackAnnouncer(
                 discordClient(sent, sends, updated, deletes),
                 new AnnouncerProperties("#FFA500", "#FF4444", "Bearify", timeout),
                 "text-1");

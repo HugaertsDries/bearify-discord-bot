@@ -16,7 +16,7 @@ public class MusicPlayerAnnouncementConsumer implements MusicPlayerEventConsumer
 
     @Override
     public void accept(MusicPlayerEvent event) {
-        for (MusicPlayerTrackAnnouncer announcer : registry.findAll(event.playerId())) {
+        for (PlaybackAnnouncer announcer : registry.findAll(event.playerId())) {
             try {
                 announcer.accept(event);
             } catch (Exception e) {

@@ -10,7 +10,7 @@ import java.time.Duration;
 
 import static com.bearify.discord.api.message.ButtonStyle.SECONDARY;
 
-public class PlaybackAnnouncer {
+public class PlaybackComponent {
 
     private static final AnnouncerProperties DEFAULT_PROPERTIES = new AnnouncerProperties(
             "#FDB529",
@@ -27,15 +27,15 @@ public class PlaybackAnnouncer {
 
     private final AnnouncerProperties properties;
 
-    public PlaybackAnnouncer() {
+    public PlaybackComponent() {
         this(DEFAULT_PROPERTIES);
     }
 
-    public PlaybackAnnouncer(AnnouncerProperties properties) {
+    public PlaybackComponent(AnnouncerProperties properties) {
         this.properties = properties;
     }
 
-    public ComponentMessage render(PlaybackAnnouncerState state) {
+    public ComponentMessage render(PlaybackComponentState state) {
         ComponentMessageBuilder builder = ComponentMessage.builder("playback-announcer");
         appendNotification(builder, state);
         appendHero(builder, state);
@@ -45,13 +45,13 @@ public class PlaybackAnnouncer {
         return builder.build();
     }
 
-    private void appendNotification(ComponentMessageBuilder builder, PlaybackAnnouncerState state) {
+    private void appendNotification(ComponentMessageBuilder builder, PlaybackComponentState state) {
         state.notification().ifPresent(notification -> builder.container(container -> container
                 .accentColor(toDiscordColor(colorFor(notification.style())))
                 .text("\uD83D\uDD14 " + notification.text())));
     }
 
-    private static void appendHero(ComponentMessageBuilder builder, PlaybackAnnouncerState state) {
+    private static void appendHero(ComponentMessageBuilder builder, PlaybackComponentState state) {
         builder.container(container -> {
             container.text("-# **" + state.playbackState().header() + "**");
             state.artworkUri().ifPresent(uri -> container.image(uri.toString(), "Track artwork"));
@@ -65,7 +65,7 @@ public class PlaybackAnnouncer {
         });
     }
 
-    private static void appendActionRow(ComponentMessageBuilder builder, PlaybackAnnouncerState state) {
+    private static void appendActionRow(ComponentMessageBuilder builder, PlaybackComponentState state) {
         builder.container(container -> container.ActionRow(row -> {
             row.secondary("player:previous", PLAYER_PREVIOUS_LABEL);
             row.secondary("player:rewind", PLAYER_REWIND_LABEL);
@@ -75,7 +75,7 @@ public class PlaybackAnnouncer {
         }));
     }
 
-    private static void appendQueue(ComponentMessageBuilder builder, PlaybackAnnouncerState state) {
+    private static void appendQueue(ComponentMessageBuilder builder, PlaybackComponentState state) {
         if (state.upNext().isEmpty()) {
             return;
         }
@@ -112,7 +112,7 @@ public class PlaybackAnnouncer {
         });
     }
 
-    private Color colorFor(PlaybackAnnouncerState.NotificationStyle style) {
+    private Color colorFor(PlaybackComponentState.NotificationStyle style) {
         return switch (style) {
             case ERROR -> new Color(properties.colorErrorInt());
             case INFO -> new Color(properties.colorNowPlayingInt());

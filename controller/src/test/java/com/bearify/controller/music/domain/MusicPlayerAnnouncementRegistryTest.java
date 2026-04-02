@@ -9,7 +9,7 @@ class MusicPlayerAnnouncementRegistryTest {
     @Test
     void subscribeStoresAnnouncerPerPlayer() {
         MusicPlayerAnnouncementRegistry registry = new MusicPlayerAnnouncementRegistry();
-        MusicPlayerTrackAnnouncer announcer = event -> {};
+        PlaybackAnnouncer announcer = event -> {};
 
         registry.subscribe("player-1", announcer);
 
@@ -19,7 +19,7 @@ class MusicPlayerAnnouncementRegistryTest {
     @Test
     void subscribeIsIdempotentForSameAnnouncer() {
         MusicPlayerAnnouncementRegistry registry = new MusicPlayerAnnouncementRegistry();
-        MusicPlayerTrackAnnouncer announcer = event -> {};
+        PlaybackAnnouncer announcer = event -> {};
 
         registry.subscribe("player-1", announcer);
         registry.subscribe("player-1", announcer);
@@ -30,7 +30,7 @@ class MusicPlayerAnnouncementRegistryTest {
     @Test
     void subscriptionsAreIsolatedPerPlayer() {
         MusicPlayerAnnouncementRegistry registry = new MusicPlayerAnnouncementRegistry();
-        MusicPlayerTrackAnnouncer announcer = event -> {};
+        PlaybackAnnouncer announcer = event -> {};
 
         registry.subscribe("player-1", announcer);
 

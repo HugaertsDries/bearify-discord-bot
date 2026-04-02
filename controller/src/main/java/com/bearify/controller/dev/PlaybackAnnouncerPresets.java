@@ -1,6 +1,6 @@
 package com.bearify.controller.dev;
 
-import com.bearify.controller.music.discord.PlaybackAnnouncerState;
+import com.bearify.controller.music.discord.PlaybackComponentState;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.net.URI;
@@ -9,10 +9,10 @@ import java.util.Map;
 
 public class PlaybackAnnouncerPresets {
 
-    private static final Map<PlaybackAnnouncerPreset, PlaybackAnnouncerState> PRESETS = Map.of(
+    private static final Map<PlaybackAnnouncerPreset, PlaybackComponentState> PRESETS = Map.of(
             PlaybackAnnouncerPreset.BROADCAST,
-            PlaybackAnnouncerState.builder()
-                    .playbackState(PlaybackAnnouncerState.PlaybackState.PAUSED)
+            PlaybackComponentState.builder()
+                    .playbackState(PlaybackComponentState.PlaybackState.PAUSED)
                     .notification("Last track skipped by @Bearable")
                     .track(new TrackMetadata("Hans Zimmer: F1, The Movie Theme", "Gilles Nuytens", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", 634_000))
                     .requesterTag("@The Neighbours Kid")
@@ -25,8 +25,8 @@ public class PlaybackAnnouncerPresets {
                     .paused(true)
                     .build(),
             PlaybackAnnouncerPreset.JUST_SKIPPED,
-            PlaybackAnnouncerState.builder()
-                    .playbackState(PlaybackAnnouncerState.PlaybackState.PLAYING)
+            PlaybackComponentState.builder()
+                    .playbackState(PlaybackComponentState.PlaybackState.PLAYING)
                     .notification("Last track skipped by @Bearable")
                     .track(new TrackMetadata("Daft Punk - Voyager", "Daft Punk", "https://example.com/voyager", 227_000))
                     .requesterTag("@Bearable")
@@ -35,8 +35,8 @@ public class PlaybackAnnouncerPresets {
                     .paused(false)
                     .build(),
             PlaybackAnnouncerPreset.HEAVY_QUEUE,
-            PlaybackAnnouncerState.builder()
-                    .playbackState(PlaybackAnnouncerState.PlaybackState.PLAYING)
+            PlaybackComponentState.builder()
+                    .playbackState(PlaybackComponentState.PlaybackState.PLAYING)
                     .track(new TrackMetadata("Live Forever", "Oasis", "https://example.com/live-forever", 276_000))
                     .requesterTag("@Queue Master")
                     .upNext(List.of(
@@ -50,7 +50,7 @@ public class PlaybackAnnouncerPresets {
                     .build()
     );
 
-    public PlaybackAnnouncerState get(PlaybackAnnouncerPreset preset) {
+    public PlaybackComponentState get(PlaybackAnnouncerPreset preset) {
         return PRESETS.getOrDefault(preset, PRESETS.get(PlaybackAnnouncerPreset.BROADCAST));
     }
 }

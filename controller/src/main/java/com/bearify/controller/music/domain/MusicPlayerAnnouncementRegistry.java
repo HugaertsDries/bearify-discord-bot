@@ -6,20 +6,20 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class MusicPlayerAnnouncementRegistry {
 
-    private final ConcurrentHashMap<String, Set<MusicPlayerTrackAnnouncer>> subscriptions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Set<PlaybackAnnouncer>> subscriptions = new ConcurrentHashMap<>();
 
-    public void subscribe(String playerId, MusicPlayerTrackAnnouncer announcer) {
+    public void subscribe(String playerId, PlaybackAnnouncer announcer) {
         subscriptions.computeIfAbsent(playerId, ignored -> ConcurrentHashMap.newKeySet()).add(announcer);
     }
 
-    public void unsubscribe(String playerId, MusicPlayerTrackAnnouncer announcer) {
+    public void unsubscribe(String playerId, PlaybackAnnouncer announcer) {
         subscriptions.computeIfPresent(playerId, (ignored, announcers) -> {
             announcers.remove(announcer);
             return announcers.isEmpty() ? null : announcers;
         });
     }
 
-    public Collection<MusicPlayerTrackAnnouncer> findAll(String playerId) {
+    public Collection<PlaybackAnnouncer> findAll(String playerId) {
         return subscriptions.getOrDefault(playerId, Set.of());
     }
 

@@ -4,7 +4,7 @@ import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
-import com.bearify.controller.music.discord.TextChannelMusicPlayerTrackAnnouncerFactory;
+import com.bearify.controller.music.discord.DiscordPlaybackAnnouncerFactory;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
@@ -35,7 +35,7 @@ class RedisMusicPlayer implements MusicPlayer {
     private final ObjectMapper objectMapper;
     private final MusicPlayerPendingInteractions pendingInteractions;
     private final MusicPlayerAnnouncementRegistry announcementRegistry;
-    private final TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
+    private final DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
     private final MusicPlayerPoolProperties properties;
 
     static PendingBuilder pending() {
@@ -52,7 +52,7 @@ class RedisMusicPlayer implements MusicPlayer {
                              ObjectMapper objectMapper,
                              MusicPlayerPendingInteractions pendingInteractions,
                              MusicPlayerAnnouncementRegistry announcementRegistry,
-                             TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory,
+                             DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
                              MusicPlayerPoolProperties properties) {
         this.state = new Pending();
         this.guildId = guildId;
@@ -72,7 +72,7 @@ class RedisMusicPlayer implements MusicPlayer {
                              ObjectMapper objectMapper,
                              MusicPlayerPendingInteractions pendingInteractions,
                              MusicPlayerAnnouncementRegistry announcementRegistry,
-                             TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory,
+                             DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
                              MusicPlayerPoolProperties properties) {
         this.state = new Connected(playerId);
         this.guildId = guildId;
@@ -333,7 +333,7 @@ class RedisMusicPlayer implements MusicPlayer {
         private ObjectMapper objectMapper;
         private MusicPlayerPendingInteractions pendingInteractions;
         private MusicPlayerAnnouncementRegistry announcementRegistry;
-        private TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
+        private DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
         private MusicPlayerPoolProperties properties;
 
         PendingBuilder withGuildId(String guildId) { this.guildId = guildId; return this; }
@@ -342,7 +342,7 @@ class RedisMusicPlayer implements MusicPlayer {
         PendingBuilder withObjectMapper(ObjectMapper objectMapper) { this.objectMapper = objectMapper; return this; }
         PendingBuilder withPendingInteractions(MusicPlayerPendingInteractions pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
         PendingBuilder withAnnouncementRegistry(MusicPlayerAnnouncementRegistry announcementRegistry) { this.announcementRegistry = announcementRegistry; return this; }
-        PendingBuilder withTrackAnnouncerFactory(TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
+        PendingBuilder withTrackAnnouncerFactory(DiscordPlaybackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
         PendingBuilder withProperties(MusicPlayerPoolProperties properties) { this.properties = properties; return this; }
 
         RedisMusicPlayer build() {
@@ -358,7 +358,7 @@ class RedisMusicPlayer implements MusicPlayer {
         private ObjectMapper objectMapper;
         private MusicPlayerPendingInteractions pendingInteractions;
         private MusicPlayerAnnouncementRegistry announcementRegistry;
-        private TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory;
+        private DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
         private MusicPlayerPoolProperties properties;
 
         ConnectedBuilder withPlayerId(String playerId) { this.playerId = playerId; return this; }
@@ -368,7 +368,7 @@ class RedisMusicPlayer implements MusicPlayer {
         ConnectedBuilder withObjectMapper(ObjectMapper objectMapper) { this.objectMapper = objectMapper; return this; }
         ConnectedBuilder withPendingInteractions(MusicPlayerPendingInteractions pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
         ConnectedBuilder withAnnouncementRegistry(MusicPlayerAnnouncementRegistry announcementRegistry) { this.announcementRegistry = announcementRegistry; return this; }
-        ConnectedBuilder withTrackAnnouncerFactory(TextChannelMusicPlayerTrackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
+        ConnectedBuilder withTrackAnnouncerFactory(DiscordPlaybackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
         ConnectedBuilder withProperties(MusicPlayerPoolProperties properties) { this.properties = properties; return this; }
 
         RedisMusicPlayer build() {
