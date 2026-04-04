@@ -71,7 +71,6 @@ public class MusicPlayerButtonController {
         });
     }
 
-    // TODO codex add a test for this, are make sure it is tested ...
     @SuppressWarnings("unused")
     @Interaction(type = InteractionType.BUTTON, value = "player:clear")
     public void clear(ButtonInteraction interaction) {

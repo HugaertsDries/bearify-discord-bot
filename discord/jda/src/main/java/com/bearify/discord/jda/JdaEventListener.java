@@ -1,9 +1,11 @@
 package com.bearify.discord.jda;
 
 import com.bearify.discord.api.interaction.ButtonInteraction;
+import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.Interaction;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
@@ -22,19 +24,29 @@ class JdaEventListener extends ListenerAdapter {
     private final Consumer<Interaction> interactionHandler;
     private final Function<SlashCommandInteractionEvent, CommandInteraction> commandInteractionFactory;
     private final Function<ButtonInteractionEvent, ButtonInteraction> buttonInteractionFactory;
+    private final Function<CommandAutoCompleteInteractionEvent, AutocompleteInteraction> autocompleteInteractionFactory;
 
     JdaEventListener(Executor executor, Consumer<Interaction> interactionHandler) {
-        this(executor, interactionHandler, JdaCommandInteraction::new, JdaButtonInteraction::new);
+        this(executor, interactionHandler, JdaCommandInteraction::new, JdaButtonInteraction::new, JdaAutocompleteInteraction::new);
     }
 
     JdaEventListener(Executor executor,
                      Consumer<Interaction> interactionHandler,
                      Function<SlashCommandInteractionEvent, CommandInteraction> commandInteractionFactory,
                      Function<ButtonInteractionEvent, ButtonInteraction> buttonInteractionFactory) {
+        this(executor, interactionHandler, commandInteractionFactory, buttonInteractionFactory, JdaAutocompleteInteraction::new);
+    }
+
+    JdaEventListener(Executor executor,
+                     Consumer<Interaction> interactionHandler,
+                     Function<SlashCommandInteractionEvent, CommandInteraction> commandInteractionFactory,
+                     Function<ButtonInteractionEvent, ButtonInteraction> buttonInteractionFactory,
+                     Function<CommandAutoCompleteInteractionEvent, AutocompleteInteraction> autocompleteInteractionFactory) {
         this.executor = executor;
         this.interactionHandler = interactionHandler;
         this.commandInteractionFactory = commandInteractionFactory;
         this.buttonInteractionFactory = buttonInteractionFactory;
+        this.autocompleteInteractionFactory = autocompleteInteractionFactory;
     }
 
     @Override
@@ -46,6 +58,12 @@ class JdaEventListener extends ListenerAdapter {
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
         ButtonInteraction interaction = buttonInteractionFactory.apply(event);
+        executor.execute(() -> interactionHandler.accept(interaction));
+    }
+
+    @Override
+    public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
+        AutocompleteInteraction interaction = autocompleteInteractionFactory.apply(event);
         executor.execute(() -> interactionHandler.accept(interaction));
     }
 }

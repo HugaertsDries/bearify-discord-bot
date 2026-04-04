@@ -154,6 +154,7 @@ public class JdaDiscordClient implements DiscordClient {
     private OptionData toOptionData(OptionDefinition option) {
         OptionType jdaType = OptionType.valueOf(option.type().name());
         String description = option.description().isBlank() ? NO_DESCRIPTION : option.description();
-        return new OptionData(jdaType, option.name(), description, option.required());
+        return new OptionData(jdaType, option.name(), description, option.required())
+                .setAutoComplete(option.autocomplete());
     }
 }

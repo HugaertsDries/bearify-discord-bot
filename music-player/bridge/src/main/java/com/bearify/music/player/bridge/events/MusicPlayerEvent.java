@@ -25,6 +25,7 @@ import java.util.List;
         @JsonSubTypes.Type(value = MusicPlayerEvent.NothingToGoBack.class, name = "nothing_to_go_back"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackNotFound.class, name = "track_not_found"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackLoadFailed.class, name = "track_load_failed"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.SearchResults.class, name = "search_results"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Ready.class, name = "player_ready"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Stopped.class, name = "player_stopped"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.ConnectFailed.class, name = "connect_failed"),
@@ -47,6 +48,7 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.NothingToGoBack,
         MusicPlayerEvent.TrackNotFound,
         MusicPlayerEvent.TrackLoadFailed,
+        MusicPlayerEvent.SearchResults,
         MusicPlayerEvent.Ready,
         MusicPlayerEvent.Stopped,
         MusicPlayerEvent.ConnectFailed,
@@ -97,6 +99,11 @@ public sealed interface MusicPlayerEvent permits
     record NothingToGoBack(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record TrackNotFound(String playerId, String requestId, String guildId, String query) implements MusicPlayerEvent {}
     record TrackLoadFailed(String playerId, String requestId, String guildId, String reason) implements MusicPlayerEvent {}
+    record SearchResults(String playerId, String requestId, String guildId, List<TrackMetadata> tracks) implements MusicPlayerEvent {
+        public SearchResults {
+            tracks = tracks != null ? List.copyOf(tracks) : List.of();
+        }
+    }
     record Ready(String playerId, String requestId) implements MusicPlayerEvent {}
     record Stopped(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record ConnectFailed(String playerId, String requestId, String reason) implements MusicPlayerEvent {}

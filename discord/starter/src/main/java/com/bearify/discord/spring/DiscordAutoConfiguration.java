@@ -2,6 +2,7 @@ package com.bearify.discord.spring;
 
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
+import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.Interaction;
@@ -50,13 +51,25 @@ public class DiscordAutoConfiguration {
     }
 
     @Bean
+    public AutocompleteRegistry autocompleteRegistry(ApplicationContext context) {
+        AutocompleteRegistry registry = new AutocompleteRegistry(context);
+        scanner.scan(context, DiscordController.class, com.bearify.discord.spring.annotation.Interaction.class, registry::register);
+        return registry;
+    }
+
+    @Bean
     public DiscordClient discordClient(DiscordClientFactory factory,
                                        CommandRegistry registry,
                                        ButtonRegistry buttonRegistry,
+                                       AutocompleteRegistry autocompleteRegistry,
                                        DiscordProperties properties) {
         java.util.function.Consumer<Interaction> interactionHandler = interaction -> {
             if (interaction instanceof CommandInteraction commandInteraction) {
                 registry.handle(commandInteraction);
+                return;
+            }
+            if (interaction instanceof AutocompleteInteraction autocompleteInteraction) {
+                autocompleteRegistry.handle(autocompleteInteraction);
                 return;
             }
             if (interaction instanceof ButtonInteraction buttonInteraction) {

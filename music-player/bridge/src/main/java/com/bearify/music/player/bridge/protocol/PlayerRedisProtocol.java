@@ -25,6 +25,7 @@ public final class PlayerRedisProtocol {
 
         public static final String EVENTS = "players:events";
         public static final String REQUESTS = "players:requests";
+        public static final String SEARCH = "players:search";
 
         public static String interactions(String playerId) {
             return "players:interactions:" + playerId;

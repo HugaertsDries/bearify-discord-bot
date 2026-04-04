@@ -79,6 +79,31 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
     }
 
     @Test
+    void playsSelectedAutocompleteUriWithoutYtsearchPrefix() throws Exception {
+        String uri = "https://youtube.com/watch?v=dQw4w9WgXcQ";
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                    .subcommand("play")
+                    .voiceChannelId(VOICE_CHANNEL_ID)
+                    .guildId(GUILD_ID)
+                    .textChannelId(TEXT_CHANNEL_ID)
+                    .option("search", uri)
+                    .build();
+
+            commandRegistry.handle(interaction);
+
+            MusicPlayerInteraction.Play play = (MusicPlayerInteraction.Play) objectMapper.readValue(received.poll(2, TimeUnit.SECONDS), MusicPlayerInteraction.class);
+            assertThat(play.trackRequest().query()).isEqualTo(uri);
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
     void autoJoinsAndThenPlaysWhenNoPlayerAssigned() throws Exception {
         BlockingQueue<String> requestsQueue = new LinkedBlockingQueue<>();
         BlockingQueue<String> interactionQueue = new LinkedBlockingQueue<>();

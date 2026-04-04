@@ -4,7 +4,8 @@ public record OptionDefinition(
         String name,
         String description,
         OptionType type,
-        boolean required
+        boolean required,
+        boolean autocomplete
 ) {
     public enum OptionType {
         STRING,

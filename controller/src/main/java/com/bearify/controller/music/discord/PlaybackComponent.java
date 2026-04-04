@@ -134,10 +134,13 @@ public class PlaybackComponent {
         return text.length() <= limit ? text : text.substring(0, limit - 1) + "\u2026";
     }
 
-    private static String humanReadable(Duration duration) {
-        return duration.toString()
-                .substring(2)
-                .replaceAll("(\\d[HMS])(?!$)", "$1 ")
-                .toLowerCase();
+    static String humanReadable(Duration duration) {
+        long totalSeconds = duration.toSeconds();
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        if (minutes > 0) {
+            return "%dm %02ds".formatted(minutes, seconds);
+        }
+        return "%ds".formatted(seconds);
     }
 }

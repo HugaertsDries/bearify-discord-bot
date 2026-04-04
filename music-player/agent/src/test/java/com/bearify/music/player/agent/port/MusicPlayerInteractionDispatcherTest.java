@@ -9,10 +9,13 @@ import com.bearify.music.player.agent.domain.AudioPlayer;
 import com.bearify.music.player.agent.domain.AudioPlayerPool;
 import com.bearify.music.player.agent.domain.AudioTrackLoader;
 import com.bearify.music.player.agent.domain.Track;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
+import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -138,8 +141,17 @@ class MusicPlayerInteractionDispatcherTest {
     @Test
     void routesPlaylistToPlayPlaylist() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        pool.useLoader((query, requesterTag, cb) -> cb.playlistLoaded(List.of(
-                track("Song A"), track("Song B"), track("Song C"))));
+        pool.useLoader(new AudioTrackLoader() {
+            @Override
+            public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+                callback.playlistLoaded(List.of(track("Song A"), track("Song B"), track("Song C")));
+            }
+
+            @Override
+            public void search(String query, int limit, AudioTrackSearchCallback callback) {
+                throw new AssertionError("Search should not be used");
+            }
+        });
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
 
@@ -147,6 +159,73 @@ class MusicPlayerInteractionDispatcherTest {
                 new TrackRequest("https://youtube.com/playlist?list=PLxyz", TEXT_CHANNEL_ID, null)));
 
         assertThat(pool.playPlaylistCalls).containsExactly(GUILD_ID  + "|3");
+    }
+
+    @Test
+    void dispatchesSearchInteractionToLoaderAndPublishesSearchResults() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.useLoader(new AudioTrackLoader() {
+            @Override
+            public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+                throw new AssertionError("Search should not use load()");
+            }
+
+            @Override
+            public void search(String query, int limit, AudioTrackSearchCallback callback) {
+                pool.searchCalls.add(query + "|" + limit);
+                callback.searchResults(List.of(metadata("One More Time"), metadata("Digital Love")));
+            }
+        });
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, eventDispatcher, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
+
+        assertThat(pool.searchCalls).containsExactly("ytsearch:daft punk|5");
+        assertThat(eventDispatcher.events).hasSize(1);
+        assertThat(eventDispatcher.events.getFirst()).isInstanceOf(MusicPlayerEvent.SearchResults.class);
+        MusicPlayerEvent.SearchResults results = (MusicPlayerEvent.SearchResults) eventDispatcher.events.getFirst();
+        assertThat(results.tracks()).extracting(TrackMetadata::title)
+                .containsExactly("One More Time", "Digital Love");
+    }
+
+    @Test
+    void searchResultsDefensivelyCopyIncomingTracks() {
+        List<TrackMetadata> tracks = new ArrayList<>();
+        tracks.add(metadata("One More Time"));
+
+        MusicPlayerEvent.SearchResults results = new MusicPlayerEvent.SearchResults(PLAYER_ID, REQUEST_ID, GUILD_ID, tracks);
+        tracks.add(metadata("Digital Love"));
+
+        assertThat(results.tracks()).extracting(TrackMetadata::title)
+                .containsExactly("One More Time");
+    }
+
+    @Test
+    void dispatchesEmptySearchResultsWhenSearchReturnsNoMatches() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.useLoader(new AudioTrackLoader() {
+            @Override
+            public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+                throw new AssertionError("Search should not use load()");
+            }
+
+            @Override
+            public void search(String query, int limit, AudioTrackSearchCallback callback) {
+                pool.searchCalls.add(query + "|" + limit);
+                callback.noMatches();
+            }
+        });
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, eventDispatcher, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
+
+        assertThat(eventDispatcher.events).hasSize(1);
+        assertThat(eventDispatcher.events.getFirst()).isInstanceOf(MusicPlayerEvent.SearchResults.class);
+        assertThat(((MusicPlayerEvent.SearchResults) eventDispatcher.events.getFirst()).tracks()).isEmpty();
     }
 
     // --- STUB ---
@@ -160,6 +239,7 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> rewindCalls = new ArrayList<>();
         final List<String> forwardCalls = new ArrayList<>();
         final List<String> playPlaylistCalls = new ArrayList<>();
+        final List<String> searchCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
         private AudioTrackLoader stubLoader = null;
@@ -185,7 +265,17 @@ class MusicPlayerInteractionDispatcherTest {
         @Override
         public AudioTrackLoader getLoader(String guildId) {
             if (stubLoader != null) return stubLoader;
-            return (query, requesterTag, cb) -> loaderCalls.add(query);
+            return new AudioTrackLoader() {
+                @Override
+                public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+                    loaderCalls.add(query);
+                }
+
+                @Override
+                public void search(String query, int limit, AudioTrackSearchCallback callback) {
+                    searchCalls.add(query + "|" + limit);
+                }
+            };
         }
 
         @Override
@@ -255,6 +345,16 @@ class MusicPlayerInteractionDispatcherTest {
         }
     }
 
+    private static final class RecordingEventDispatcher implements MusicPlayerEventDispatcher {
+
+        private final List<MusicPlayerEvent> events = new ArrayList<>();
+
+        @Override
+        public void dispatch(MusicPlayerEvent event) {
+            events.add(event);
+        }
+    }
+
     private static Track track(String title) {
         return new Track() {
             @Override public String title() { return title; }
@@ -266,5 +366,9 @@ class MusicPlayerInteractionDispatcherTest {
             @Override public void setPosition(long positionMs) {}
             @Override public Track clone() { return this; }
         };
+    }
+
+    private static TrackMetadata metadata(String title) {
+        return new TrackMetadata(title, "Author", "https://example.com/" + title, 120_000);
     }
 }

@@ -1,18 +1,21 @@
 package com.bearify.discord.spring;
 
-import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.gateway.DiscordClient;
+import com.bearify.discord.api.interaction.Option;
+import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.api.interaction.ButtonInteraction;
-import com.bearify.discord.api.interaction.InteractionType;
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.InteractionType;
+import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.model.CommandDefinition;
-import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.CommandAdvice;
+import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.HandleException;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.InteractionGroup;
-import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.discord.testing.MockAutocompleteInteraction;
 import com.bearify.discord.testing.MockButtonInteraction;
+import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.discord.testing.MockDiscordClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -21,7 +24,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,11 +43,71 @@ class DiscordAutoConfigurationTest {
         }
     }
 
+    @Configuration
+    static class CapturingClientConfig {
+        @Bean
+        CapturingDiscordClientFactory discordClientFactory() {
+            return new CapturingDiscordClientFactory();
+        }
+    }
+
+    static class CapturingDiscordClientFactory implements com.bearify.discord.api.gateway.DiscordClientFactory {
+        private Consumer<com.bearify.discord.api.interaction.Interaction> handler;
+
+        @Override
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<com.bearify.discord.api.interaction.Interaction> handler) {
+            this.handler = handler;
+            return new NoopDiscordClient();
+        }
+
+        @Override
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<com.bearify.discord.api.interaction.Interaction> handler, Activity activity) {
+            this.handler = handler;
+            return new NoopDiscordClient();
+        }
+
+        void dispatch(com.bearify.discord.api.interaction.Interaction interaction) {
+            handler.accept(interaction);
+        }
+    }
+
+    static class NoopDiscordClient implements DiscordClient {
+        @Override
+        public void start(String token) {
+        }
+
+        @Override
+        public void start(String token, String guildId) {
+        }
+
+        @Override
+        public com.bearify.discord.api.gateway.Guild guild(String guildId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public com.bearify.discord.api.gateway.TextChannel textChannel(String channelId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void shutdown() {
+        }
+    }
+
     @DiscordController
     static class HelloCommand {
         @Interaction(value = "hello", description = "Say hello")
         void hello(CommandInteraction interaction) {
             interaction.reply("Hello!").send();
+        }
+    }
+
+    @DiscordController
+    static class SearchController {
+        @Interaction(type = InteractionType.AUTOCOMPLETE, value = "player:play:search")
+        void search(AutocompleteInteraction interaction) {
+            interaction.reply(java.util.List.of(new Option("lofi mix", "lofi-mix")));
         }
     }
 
@@ -116,7 +181,29 @@ class DiscordAutoConfigurationTest {
         }
     }
 
-    // --- HAPPY PATH ---
+    @Test
+    void registersAutocompleteRegistryBean() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, SearchController.class)
+                .run(ctx -> assertThat(ctx).hasSingleBean(AutocompleteRegistry.class));
+    }
+
+    @Test
+    void routesDispatchedAutocompleteInteractionThroughRegistryToHandler() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(CapturingClientConfig.class, SearchController.class)
+                .run(ctx -> {
+                    CapturingDiscordClientFactory factory = ctx.getBean(CapturingDiscordClientFactory.class);
+                    MockAutocompleteInteraction interaction = MockAutocompleteInteraction.forAutocomplete("player:play:search", "lofi").build();
+
+                    factory.dispatch(interaction);
+
+                    assertThat(interaction.getReplies()).singleElement().satisfies(choices ->
+                            assertThat(choices).containsExactly(new Option("lofi mix", "lofi-mix")));
+                });
+    }
 
     @Test
     void registersScannedCommandsInRegistry() {
@@ -285,8 +372,6 @@ class DiscordAutoConfigurationTest {
                     assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo("ok");
                 });
     }
-
-    // --- EDGE CASES ---
 
     @Test
     void doesNotActivateWithoutDiscordClientFactory() {

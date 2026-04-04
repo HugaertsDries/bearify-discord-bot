@@ -53,7 +53,7 @@ public class DiscordPlaybackAnnouncer implements PlaybackAnnouncer {
             case MusicPlayerEvent.TrackError error -> onTrackError(error);
             case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackComponentState.PlaybackState.PAUSED);
             case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackComponentState.PlaybackState.PLAYING);
-            case MusicPlayerEvent.Skipped skipped -> notify("Last track skipped by " + skipped.request().requesterTag());
+            case MusicPlayerEvent.Skipped skipped -> notify("Skipped by " + skipped.request().requesterTag());
             case MusicPlayerEvent.WentBack wentBack -> notify("Jumped back by " + wentBack.request().requesterTag());
             case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
             case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
@@ -99,7 +99,7 @@ public class DiscordPlaybackAnnouncer implements PlaybackAnnouncer {
 
     private void onCleared(MusicPlayerEvent.Cleared event) {
         currentUpNext = event.upNext();
-        notify("Cleared by " + event.request().requesterTag());
+        notify("Queue cleared by " + event.request().requesterTag());
     }
 
     private void updatePlaybackState(PlaybackComponentState.PlaybackState state) {

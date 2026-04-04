@@ -5,6 +5,7 @@ import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
 import com.bearify.controller.music.domain.MusicPlayerEventDispatcher;
 import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.domain.TrackCatalogue;
 import com.bearify.controller.music.discord.DiscordPlaybackAnnouncerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +45,14 @@ public class RedisConfig {
                          DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
                          MusicPlayerPoolProperties properties) {
         return new RedisMusicPlayerPool(redis, objectMapper, pendingInteractions, announcementRegistry, trackAnnouncerFactory, properties);
+    }
+
+    @Bean
+    TrackCatalogue trackCatalogue(StringRedisTemplate redis,
+                                  ObjectMapper objectMapper,
+                                  MusicPlayerPendingInteractions pendingInteractions,
+                                  MusicPlayerPoolProperties properties) {
+        return new RedisTrackCatalogue(redis, objectMapper, pendingInteractions, properties);
     }
 
     @Bean

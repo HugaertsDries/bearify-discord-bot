@@ -197,6 +197,24 @@ class MusicPlayerInteractionTest {
                 .contains("Something went wrong loading this track");
     }
 
+    @Test
+    void usesSelectedAutocompleteUriWithoutYtsearchPrefix() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        String uri = "https://youtube.com/watch?v=dQw4w9WgXcQ";
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("player")
+                .subcommand("play")
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .guildId(GUILD_ID)
+                .textChannelId(TEXT_CHANNEL_ID)
+                .option("search", uri)
+                .build();
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, uri);
+
+        assertThat(musicPlayer.playRequest).isNotNull();
+        assertThat(musicPlayer.playRequest.query()).isEqualTo(uri);
+    }
+
     // --- PAUSE ---
 
     @Test
@@ -453,6 +471,7 @@ class MusicPlayerInteractionTest {
         private MusicPlayerEventListener previousHandler;
         private MusicPlayerEventListener nextHandler;
         private MusicPlayerEventListener forwardHandler;
+        private TrackRequest playRequest;
 
         private void fireReady() {
             joinHandler.onReady();
@@ -503,6 +522,7 @@ class MusicPlayerInteractionTest {
 
         @Override
         public void play(TrackRequest request, MusicPlayerEventListener handler) {
+            playRequest = request;
             playHandler = handler;
         }
 

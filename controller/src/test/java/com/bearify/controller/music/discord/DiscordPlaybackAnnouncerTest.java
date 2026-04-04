@@ -115,7 +115,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Last track skipped by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Skipped by @user"));
     }
 
     @Test
@@ -138,8 +138,8 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
         announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-3", "@other"), "guild-1", List.of()));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Cleared by @other"));
-        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Last track skipped"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Queue cleared by @other"));
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Skipped by @user"));
     }
 
     @Test
@@ -241,7 +241,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-2", "@user"), "guild-1", List.of()));
 
         assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("**Up Next**"));
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Cleared by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Queue cleared by @user"));
     }
 
     @Test

@@ -15,7 +15,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Forward.class, name = "forward"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Stop.class, name = "stop"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Connect.class, name = "connect"),
-        @JsonSubTypes.Type(value = MusicPlayerInteraction.Clear.class, name = "clear")
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.Clear.class, name = "clear"),
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.Search.class, name = "search")
 })
 public sealed interface MusicPlayerInteraction permits
         MusicPlayerInteraction.Play,
@@ -26,7 +27,8 @@ public sealed interface MusicPlayerInteraction permits
         MusicPlayerInteraction.Forward,
         MusicPlayerInteraction.Stop,
         MusicPlayerInteraction.Connect,
-        MusicPlayerInteraction.Clear {
+        MusicPlayerInteraction.Clear,
+        MusicPlayerInteraction.Search {
 
     String playerId();
     String requestId();
@@ -53,5 +55,8 @@ public sealed interface MusicPlayerInteraction permits
     record Connect(String playerId, String requestId, String voiceChannelId, String guildId) implements MusicPlayerInteraction {}
     record Clear(String playerId, Request request, String guildId) implements MusicPlayerInteraction {
         @Override public String requestId() { return request.id(); }
+    }
+    record Search(String requestId, String guildId, String query, int limit) implements MusicPlayerInteraction {
+        @Override public String playerId() { return ""; }
     }
 }

@@ -3,6 +3,7 @@ package com.bearify.music.player.agent.port;
 import com.bearify.music.player.agent.domain.*;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.time.Duration;
 import java.util.List;
@@ -62,6 +63,8 @@ public class MusicPlayerInteractionDispatcher {
                             () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, f.requestId(), f.guildId())));
             case MusicPlayerInteraction.Clear c ->
                     pool.get(c.guildId()).ifPresent(player -> player.clear(c.request()));
+            case MusicPlayerInteraction.Search search ->
+                    search(search);
         }
     }
 
@@ -91,6 +94,30 @@ public class MusicPlayerInteractionDispatcher {
                 LOG.warn("Failed to load track '{}': {}", trackRequest.query(), message);
                 eventDispatcher.dispatch(new MusicPlayerEvent.TrackLoadFailed(
                         playerId, play.requestId(), play.guildId(), message));
+            }
+        });
+    }
+
+    private void search(MusicPlayerInteraction.Search search) {
+        AudioTrackLoader loader = pool.getLoader(search.guildId());
+        loader.search("ytsearch:" + search.query(), search.limit(), new AudioTrackLoader.AudioTrackSearchCallback() {
+            @Override
+            public void searchResults(List<TrackMetadata> tracks) {
+                eventDispatcher.dispatch(new MusicPlayerEvent.SearchResults(
+                        playerId, search.requestId(), search.guildId(), tracks));
+            }
+
+            @Override
+            public void noMatches() {
+                eventDispatcher.dispatch(new MusicPlayerEvent.SearchResults(
+                        playerId, search.requestId(), search.guildId(), List.of()));
+            }
+
+            @Override
+            public void loadFailed(String message) {
+                LOG.warn("Failed to search '{}': {}", search.query(), message);
+                eventDispatcher.dispatch(new MusicPlayerEvent.SearchResults(
+                        playerId, search.requestId(), search.guildId(), List.of()));
             }
         });
     }

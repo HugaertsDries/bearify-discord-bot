@@ -3,6 +3,8 @@ package com.bearify.music.player.agent.redis;
 import com.bearify.music.player.agent.AbstractAgentIntegrationTest;
 import com.bearify.music.player.agent.RecordingVoiceConnectionManager;
 import com.bearify.music.player.agent.domain.VoiceConnectionManager;
+import com.bearify.music.player.agent.port.RecordingMusicPlayerInteractionDispatcher;
+import com.bearify.music.player.agent.port.MusicPlayerInteractionDispatcher;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,10 +33,12 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
     @Autowired StringRedisTemplate redis;
     @Autowired ObjectMapper objectMapper;
     @Autowired RecordingVoiceConnectionManager recordingVoiceConnectionManager;
+    @Autowired RecordingMusicPlayerInteractionDispatcher dispatcher;
 
     @BeforeEach
     void resetStub() {
         recordingVoiceConnectionManager.reset();
+        dispatcher.reset();
     }
 
     // --- HAPPY PATH ---
@@ -62,6 +66,21 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
         assertThat(recordingVoiceConnectionManager.getDisconnectedGuilds()).containsExactly(GUILD_ID);
     }
 
+    @Test
+    void handlesSearchInteractionsPublishedOnSharedSearchChannel() throws Exception {
+        MusicPlayerInteraction interaction = new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5);
+        redis.convertAndSend(PlayerRedisProtocol.Channels.SEARCH, objectMapper.writeValueAsString(interaction));
+
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                assertThat(dispatcher.interactions()).anySatisfy(candidate -> {
+                    assertThat(candidate).isInstanceOf(MusicPlayerInteraction.Search.class);
+                    MusicPlayerInteraction.Search search = (MusicPlayerInteraction.Search) candidate;
+                    assertThat(search.requestId()).isEqualTo(REQUEST_ID);
+                    assertThat(search.query()).isEqualTo("daft punk");
+                    assertThat(search.limit()).isEqualTo(5);
+                }));
+    }
+
     @TestConfiguration
     static class TestConfig {
         @Bean
@@ -72,6 +91,12 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
         @Bean
         @Primary
         VoiceConnectionManager primaryVoiceConnectionManager(RecordingVoiceConnectionManager recording) {
+            return recording;
+        }
+
+        @Bean
+        @Primary
+        MusicPlayerInteractionDispatcher primaryMusicPlayerInteractionDispatcher(RecordingMusicPlayerInteractionDispatcher recording) {
             return recording;
         }
     }

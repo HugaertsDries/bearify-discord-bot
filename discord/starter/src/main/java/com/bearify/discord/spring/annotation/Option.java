@@ -21,5 +21,6 @@ public @interface Option {
     String name();
     String description() default "";
     boolean required() default false;
+    boolean autocomplete() default false;
     String defaultValue() default "";
 }

@@ -2,6 +2,7 @@ package com.bearify.music.player.agent.lava;
 
 import com.bearify.music.player.agent.domain.AudioTrackLoader;
 import com.bearify.music.player.agent.domain.Track;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
@@ -75,5 +76,42 @@ class LavaAudioTrackLoader implements AudioTrackLoader {
                 callback.loadFailed(exception.getMessage());
             }
         });
+    }
+
+    @Override
+    public void search(String query, int limit, AudioTrackSearchCallback callback) {
+        playerManager.loadItem(query, new AudioLoadResultHandler() {
+            @Override
+            public void trackLoaded(AudioTrack track) {
+                callback.searchResults(List.of(toTrackMetadata(track)));
+            }
+
+            @Override
+            public void playlistLoaded(AudioPlaylist playlist) {
+                List<TrackMetadata> tracks = playlist.getTracks().stream()
+                        .limit(limit)
+                        .map(LavaAudioTrackLoader::toTrackMetadata)
+                        .toList();
+                callback.searchResults(tracks);
+            }
+
+            @Override
+            public void noMatches() {
+                callback.noMatches();
+            }
+
+            @Override
+            public void loadFailed(FriendlyException exception) {
+                callback.loadFailed(exception.getMessage());
+            }
+        });
+    }
+
+    private static TrackMetadata toTrackMetadata(AudioTrack track) {
+        return new TrackMetadata(
+                track.getInfo().title,
+                track.getInfo().author,
+                track.getInfo().uri,
+                track.getDuration());
     }
 }

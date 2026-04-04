@@ -41,6 +41,10 @@ class CommandRegistryTest {
                   @Option(name = "times", description = "How many times", required = true) int times,
                   @Option(name = "message", description = "Optional message") String message) {}
 
+        @Interaction(value = "search", description = "Search the catalog")
+        void search(CommandInteraction interaction,
+                    @Option(name = "query", description = "Search query", autocomplete = true) String query) {}
+
         @Interaction(value = "crash", description = "Always throws")
         void crash(CommandInteraction interaction) {
             throw new RuntimeException("boom");
@@ -119,6 +123,15 @@ class CommandRegistryTest {
         assertThat(messageOpt.name()).isEqualTo("message");
         assertThat(messageOpt.type()).isEqualTo(OptionDefinition.OptionType.STRING);
         assertThat(messageOpt.required()).isFalse();
+    }
+
+    @Test
+    void includesAutocompleteFlagInCommandDefinition() throws NoSuchMethodException {
+        Method method = TestController.class.getDeclaredMethod("search", CommandInteraction.class, String.class);
+        registry.register("testController", method.getAnnotation(Interaction.class), method);
+
+        OptionDefinition option = registry.getDefinitions().getFirst().options().getFirst();
+        assertThat(option.autocomplete()).isTrue();
     }
 
     @Test

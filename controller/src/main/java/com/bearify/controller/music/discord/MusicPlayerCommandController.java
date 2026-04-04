@@ -94,7 +94,7 @@ public class MusicPlayerCommandController {
     @SuppressWarnings("unused")
     @Interaction(value = "play", description = "I'll gladly play you some tunes. I accept links: YouTube, Twitch, Soundcloud, etc.")
     public void play(CommandInteraction interaction,
-                     @Option(name = "search", description = "Search or link to a song or playlist.", required = true) String query) {
+                     @Option(name = "search", description = "Search or link to a song or playlist.", required = true, autocomplete = true) String query) {
         requireVoiceSession(interaction).ifPresent(ctx -> {
             String textChannelId = interaction.getTextChannelId()
                     .orElseThrow(() -> new IllegalStateException("No text channel ID on interaction"));

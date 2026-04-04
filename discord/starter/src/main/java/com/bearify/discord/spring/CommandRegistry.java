@@ -124,7 +124,8 @@ public class CommandRegistry {
                             option.name(),
                             option.description(),
                             inferType(param.getType(), method),
-                            option.required()
+                            option.required(),
+                            option.autocomplete()
                     );
                 })
                 .toList();
