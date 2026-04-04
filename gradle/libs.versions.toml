@@ -1,10 +1,9 @@
 [versions]
 spring-boot = "4.0.4"
 spring-dependency-management = "1.1.7"
-dotenv = "3.2.0"
-jda = "6.3.1"
-jdave = "0.1.7"
-lavaplayer = "2.2.2"
+jda = "6.4.1"
+jdave = "0.1.8"
+lavaplayer = "2.2.6"
 youtube-source = "1.18.0"
 
 [libraries]
@@ -21,7 +20,6 @@ slf4j-api = { module = "org.slf4j:slf4j-api" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api" }
 jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
-dotenv-java = { module = "io.github.cdimascio:dotenv-java", version.ref = "dotenv" }
 jda = { module = "net.dv8tion:JDA", version.ref = "jda" }
 jdave-api = {module = "club.minnced:jdave-api", version.ref = "jdave"}
 jdave-native-win-x86 = {module = "club.minnced:jdave-native-win-x86-64", version.ref = "jdave"}
