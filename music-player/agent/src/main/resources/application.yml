@@ -28,3 +28,5 @@ music-player:
   engine:
     youtube:
       refresh-token: ${YOUTUBE_REFRESH_TOKEN:}
+      remote-cipher-url: ${YOUTUBE_REMOTE_CIPHER_URL:https://cipher.kikkia.dev/}
+      remote-cipher-password: ${YOUTUBE_REMOTE_CIPHER_PASSWORD:}

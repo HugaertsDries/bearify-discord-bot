@@ -1,6 +1,7 @@
 package com.bearify.music.player.agent.lava;
 
 import com.bearify.discord.api.voice.AudioProvider;
+import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.domain.AudioEngine;
 import com.bearify.music.player.agent.domain.AudioEngineListener;
 import com.bearify.music.player.agent.domain.Track;
@@ -13,6 +14,7 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
 import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
 import dev.lavalink.youtube.YoutubeAudioSourceManager;
+import dev.lavalink.youtube.YoutubeSourceOptions;
 import dev.lavalink.youtube.clients.AndroidVr;
 import dev.lavalink.youtube.clients.Music;
 import dev.lavalink.youtube.clients.Tv;
@@ -20,7 +22,6 @@ import dev.lavalink.youtube.clients.Web;
 import dev.lavalink.youtube.clients.WebEmbedded;
 
 import java.nio.ByteBuffer;
-import java.util.Optional;
 
 /**
  * LavaPlayer-backed implementation of {@link AudioEngine} and {@link AudioProvider}.
@@ -34,11 +35,14 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
     private final ByteBuffer frameBuffer = ByteBuffer.allocate(4096);
     private byte[] audioData = new byte[0];
 
-    public LavaAudioEngine(Optional<String> youtubeRefreshToken) {
+    public LavaAudioEngine(PlayerProperties.Engine.Youtube youtube) {
         this.playerManager = new DefaultAudioPlayerManager();
+        // local signature deciphering breaks whenever YouTube changes its player script, a remote cipher server keeps up
+        var options = new YoutubeSourceOptions();
+        youtube.remoteCipherUrl().ifPresent(url -> options.setRemoteCipher(url, youtube.remoteCipherPassword().orElse(null), null));
         // Tv is the only OAuth-capable client; it's the fallback for videos that require login
-        var source = new YoutubeAudioSourceManager(true, new Music(), new AndroidVr(), new Web(), new WebEmbedded(), new Tv());
-        youtubeRefreshToken.ifPresentOrElse(
+        var source = new YoutubeAudioSourceManager(options, new Music(), new AndroidVr(), new Web(), new WebEmbedded(), new Tv());
+        youtube.refreshToken().ifPresentOrElse(
                 token -> source.useOauth2(token, true),
                 () -> source.useOauth2(null, false));
         playerManager.registerSourceManager(source);

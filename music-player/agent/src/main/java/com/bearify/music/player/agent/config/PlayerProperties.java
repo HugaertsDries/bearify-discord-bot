@@ -49,13 +49,25 @@ public record PlayerProperties(
 
         public static final class Youtube {
             private final Optional<String> refreshToken;
+            private final Optional<String> remoteCipherUrl;
+            private final Optional<String> remoteCipherPassword;
 
-            public Youtube(String refreshToken) {
+            public Youtube(String refreshToken, String remoteCipherUrl, String remoteCipherPassword) {
                 this.refreshToken = Optional.ofNullable(refreshToken);
+                this.remoteCipherUrl = Optional.ofNullable(remoteCipherUrl).filter(url -> !url.isBlank());
+                this.remoteCipherPassword = Optional.ofNullable(remoteCipherPassword).filter(password -> !password.isBlank());
             }
 
             public Optional<String> refreshToken() {
                 return refreshToken;
+            }
+
+            public Optional<String> remoteCipherUrl() {
+                return remoteCipherUrl;
+            }
+
+            public Optional<String> remoteCipherPassword() {
+                return remoteCipherPassword;
             }
         }
     }
