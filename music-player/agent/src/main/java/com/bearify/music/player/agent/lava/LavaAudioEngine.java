@@ -13,6 +13,11 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
 import com.sedmelluq.discord.lavaplayer.track.playback.MutableAudioFrame;
 import dev.lavalink.youtube.YoutubeAudioSourceManager;
+import dev.lavalink.youtube.clients.AndroidVr;
+import dev.lavalink.youtube.clients.Music;
+import dev.lavalink.youtube.clients.Tv;
+import dev.lavalink.youtube.clients.Web;
+import dev.lavalink.youtube.clients.WebEmbedded;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
@@ -31,7 +36,8 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
 
     public LavaAudioEngine(Optional<String> youtubeRefreshToken) {
         this.playerManager = new DefaultAudioPlayerManager();
-        var source = new YoutubeAudioSourceManager();
+        // Tv is the only OAuth-capable client; it's the fallback for videos that require login
+        var source = new YoutubeAudioSourceManager(true, new Music(), new AndroidVr(), new Web(), new WebEmbedded(), new Tv());
         youtubeRefreshToken.ifPresentOrElse(
                 token -> source.useOauth2(token, true),
                 () -> source.useOauth2(null, false));
