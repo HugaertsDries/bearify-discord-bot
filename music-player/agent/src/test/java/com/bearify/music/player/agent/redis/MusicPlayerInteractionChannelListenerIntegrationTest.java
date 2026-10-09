@@ -2,14 +2,16 @@ package com.bearify.music.player.agent.redis;
 
 import com.bearify.music.player.agent.AbstractAgentIntegrationTest;
 import com.bearify.music.player.agent.RecordingVoiceConnectionManager;
+import com.bearify.music.player.agent.domain.AudioPlayerPool;
 import com.bearify.music.player.agent.domain.VoiceConnectionManager;
+import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.agent.port.RecordingMusicPlayerInteractionDispatcher;
-import com.bearify.music.player.agent.port.MusicPlayerInteractionDispatcher;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -96,8 +98,11 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
 
         @Bean
         @Primary
-        MusicPlayerInteractionDispatcher primaryMusicPlayerInteractionDispatcher(RecordingMusicPlayerInteractionDispatcher recording) {
-            return recording;
+        RecordingMusicPlayerInteractionDispatcher recordingMusicPlayerInteractionDispatcher(VoiceConnectionManager manager,
+                                                                                            AudioPlayerPool pool,
+                                                                                            MusicPlayerEventDispatcher eventDispatcher,
+                                                                                            @Value("${player.id}") String playerId) {
+            return new RecordingMusicPlayerInteractionDispatcher(manager, pool, eventDispatcher, playerId);
         }
     }
 }
