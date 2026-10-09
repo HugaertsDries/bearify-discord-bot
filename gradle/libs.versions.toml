@@ -4,7 +4,7 @@ spring-dependency-management = "1.1.7"
 jda = "6.7.0"
 jdave = "0.1.8"
 lavaplayer = "2.2.7"
-youtube-source = "1.18.2"
+youtube-source = "2be8e542d3f6f178e048dca565892684c2e40177-SNAPSHOT"
 
 [libraries]
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
