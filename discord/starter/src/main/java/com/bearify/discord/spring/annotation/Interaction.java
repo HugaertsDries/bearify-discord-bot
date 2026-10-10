@@ -5,7 +5,7 @@ import com.bearify.discord.api.interaction.InteractionType;
 import java.lang.annotation.*;
 
 /**
- * Marks a method inside a {@link Command} as a handler for a Discord interaction.
+ * Marks a method inside a {@link DiscordController} as a handler for a Discord interaction.
  *
  * <p>The method must accept a single {@link com.bearify.discord.api.interaction.CommandInteraction}
  * parameter. Return values are ignored; use the interaction object to send replies.

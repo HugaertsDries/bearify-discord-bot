@@ -3,13 +3,13 @@
 Spring Boot auto-configuration that bridges `discord-api` with Spring. Provides annotations and wiring so application code can declare commands with zero boilerplate.
 
 ## Purpose
-Acts as the glue between the Discord abstraction and Spring Boot. Scans for `@Command` beans, builds a `CommandRegistry`, and manages the bot's lifecycle as a `SmartLifecycle` bean.
+Acts as the glue between the Discord abstraction and Spring Boot. Scans `@DiscordController` beans for `@Interaction` methods, builds the command, button and autocomplete registries, and manages the bot's lifecycle as a `SmartLifecycle` bean.
 
 ## Usage
 
 ```java
-@Command
-public class PingCommand {
+@DiscordController
+public class PingController {
 
     @Interaction(value = "ping", description = "Check if the bot is alive")
     public void ping(CommandInteraction interaction) {
@@ -18,7 +18,7 @@ public class PingCommand {
 }
 ```
 
-Declare typed options with `@Option`:
+Declare typed options with `@Option` (`String`, `int`/`Integer`, `long`/`Long`, `boolean`/`Boolean`):
 
 ```java
 @Interaction(value = "play", description = "Play a track or search YouTube.")
@@ -28,11 +28,12 @@ public void play(CommandInteraction interaction,
 }
 ```
 
-Group commands as subcommands by giving `@Command` a name:
+Group commands as subcommands with `@InteractionGroup` (this registers `/music play` and `/music skip`):
 
 ```java
-@Command("music")
-public class MusicCommand {
+@DiscordController
+@InteractionGroup(value = "music", description = "Music commands")
+public class MusicController {
 
     @Interaction(value = "play", description = "Play a song")
     public void play(CommandInteraction interaction) { ... }
@@ -42,18 +43,31 @@ public class MusicCommand {
 }
 ```
 
-## Global Exception Handling
+Handle button clicks with `type = BUTTON`; the value is the button's custom id:
 
 ```java
-@DiscordControllerAdvice
-public class GlobalExceptionHandler {
-
-    @HandleException(RuntimeException.class)
-    public void onRuntimeException(CommandInteraction interaction, RuntimeException e) {
-        interaction.reply("Something went wrong.").ephemeral().send();
-    }
+@Interaction(type = InteractionType.BUTTON, value = "player:pause-play")
+public void pausePlay(ButtonInteraction interaction) {
+    interaction.acknowledge();
 }
 ```
+
+Answer autocomplete for an `@Option(..., autocomplete = true)` with `type = AUTOCOMPLETE`; the value is `command:option`, or `command:subcommand:option` for grouped commands:
+
+```java
+@Interaction(type = InteractionType.AUTOCOMPLETE, value = "player:play:search")
+public void search(AutocompleteInteraction interaction) {
+    interaction.reply(List.of(new Option("lofi mix", "lofi-mix")));
+}
+```
+
+## Error Handling
+
+An exception thrown by any handler is logged through SLF4J and answered, so Discord never shows "This interaction failed":
+- commands and buttons get an ephemeral "Something went wrong. Please try again later." reply;
+- autocomplete gets an empty choice list.
+
+If that reply fails too (for example because the handler already replied), the failure is logged and swallowed.
 
 ## Configuration
 
@@ -61,13 +75,14 @@ public class GlobalExceptionHandler {
 |---|---|---|
 | `discord.token` | Yes | Bot token from the Discord Developer Portal |
 | `discord.guild-id` | No | Guild ID for instant command registration (dev only) |
+| `discord.activity.type` | No | Presence type: `PLAYING`, `LISTENING`, `WATCHING` or `COMPETING` (required when `text` is set) |
+| `discord.activity.text` | No | Presence text (required when `type` is set) |
 
 ## Contents
-- `@Command` — marks a class as a Discord command (optionally grouped)
-- `@Interaction` — marks a method as an interaction handler
-- `@DiscordControllerAdvice` — marks a class as a global exception handler
-- `@HandleException` — marks a method as handling a specific exception type
-- `CommandRegistry` — routes incoming interactions to the right handler
-- `CommandExceptionHandlerRegistry` — routes exceptions to the right handler
+- `@DiscordController` — marks a class as a Spring bean holding interaction handlers
+- `@InteractionGroup` — groups a controller's commands as subcommands of one command
+- `@Interaction` — marks a method as a command, button or autocomplete handler
+- `@Option` — binds a method parameter to a slash command option
+- `CommandRegistry`, `ButtonRegistry`, `AutocompleteRegistry` — route incoming interactions to the right handler
 - `DiscordAutoConfiguration` — Spring Boot auto-configuration
 - `DiscordProperties` — validated configuration properties
