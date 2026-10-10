@@ -157,6 +157,24 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void staleClearDoesNotRemoveNewerLabel() throws InterruptedException {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofMillis(500));
+
+        announcer.accept(trackStart("player-1"));
+        synchronized (announcer) {
+            announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
+            // Let the skip's clear fire and block on the announcer's lock
+            Thread.sleep(600);
+            announcer.accept(new MusicPlayerEvent.Forwarded("player-1", new Request("req-3", "@other"), "guild-1", 30_000));
+        }
+
+        // Give the stale clear time to run now that the lock is free
+        Thread.sleep(100);
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Forwarded by @other"));
+    }
+
+    @Test
     void clearsTemporaryActionOffTheSchedulerThread() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicReference<Thread> updatingThread = new AtomicReference<>();

@@ -34,6 +34,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private volatile PlaybackComponentState.PlaybackState playbackState = PlaybackComponentState.PlaybackState.PLAYING;
     private volatile String temporaryAction;
     private volatile ScheduledFuture<?> clearActionTask;
+    private long labelVersion;
     private volatile TrackMetadata currentTrack;
     private volatile List<TrackMetadata> currentUpNext = List.of();
     private volatile String currentRequesterTag;
@@ -111,14 +112,20 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private void notify(String action) {
         temporaryAction = action;
         cancelClearTask();
+        long version = labelVersion;
         // Hand the blocking Discord edit off so one slow guild can't delay every other guild's clear
-        clearActionTask = ACTION_TIMEOUTS.schedule(() -> Thread.startVirtualThread(this::clearTemporaryActionSafely),
+        clearActionTask = ACTION_TIMEOUTS.schedule(
+                () -> Thread.startVirtualThread(() -> clearTemporaryActionSafely(version)),
                 properties.actionTimeout().toMillis(), TimeUnit.MILLISECONDS);
         refreshNowPlayingEmbed();
     }
 
-    private void clearTemporaryActionSafely() {
+    private void clearTemporaryActionSafely(long version) {
         synchronized (this) {
+            // A clear only removes the label version it was scheduled for; a cancel can't stop one already waiting for this lock
+            if (version != labelVersion) {
+                return;
+            }
             clearActionTask = null;
             temporaryAction = null;
             refreshNowPlayingEmbed();
@@ -168,6 +175,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     }
 
     private void cancelClearTask() {
+        labelVersion++;
         ScheduledFuture<?> existingTask = clearActionTask;
         clearActionTask = null;
         if (existingTask != null) {
