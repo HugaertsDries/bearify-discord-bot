@@ -36,15 +36,13 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
 
     @Override
     public MusicPlayer acquire(String guildId, String voiceChannelId) {
-        return findAssignedTo(guildId, voiceChannelId)
-                .map(playerId -> connected(playerId, guildId, voiceChannelId))
-                .orElseGet(() -> pending(guildId, voiceChannelId));
+        return player(findAssignedTo(guildId, voiceChannelId), guildId, voiceChannelId);
     }
 
     @Override
     public Optional<MusicPlayer> find(String guildId, String voiceChannelId) {
         return findAssignedTo(guildId, voiceChannelId)
-                .map(playerId -> connected(playerId, guildId, voiceChannelId));
+                .map(playerId -> player(Optional.of(playerId), guildId, voiceChannelId));
     }
 
     @Override
@@ -57,30 +55,7 @@ class RedisMusicPlayerPool implements MusicPlayerPool {
         return Optional.ofNullable(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(guildId, voiceChannelId)));
     }
 
-    private MusicPlayer connected(String playerId, String guildId, String voiceChannelId) {
-        return RedisMusicPlayer.connected()
-                .withPlayerId(playerId)
-                .withGuildId(guildId)
-                .withVoiceChannelId(voiceChannelId)
-                .withRedis(redis)
-                .withObjectMapper(objectMapper)
-                .withPendingInteractions(pendingInteractions)
-                .withAnnouncementRegistry(announcementRegistry)
-                .withTrackAnnouncerFactory(trackAnnouncerFactory)
-                .withProperties(properties)
-                .build();
-    }
-
-    private MusicPlayer pending(String guildId, String voiceChannelId) {
-        return RedisMusicPlayer.pending()
-                .withGuildId(guildId)
-                .withVoiceChannelId(voiceChannelId)
-                .withRedis(redis)
-                .withObjectMapper(objectMapper)
-                .withPendingInteractions(pendingInteractions)
-                .withAnnouncementRegistry(announcementRegistry)
-                .withTrackAnnouncerFactory(trackAnnouncerFactory)
-                .withProperties(properties)
-                .build();
+    private MusicPlayer player(Optional<String> playerId, String guildId, String voiceChannelId) {
+        return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingInteractions, announcementRegistry, trackAnnouncerFactory, properties);
     }
 }

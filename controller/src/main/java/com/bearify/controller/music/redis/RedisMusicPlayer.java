@@ -18,6 +18,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -38,43 +39,16 @@ class RedisMusicPlayer implements MusicPlayer {
     private final DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
     private final MusicPlayerPoolProperties properties;
 
-    static PendingBuilder pending() {
-        return new PendingBuilder();
-    }
-
-    static ConnectedBuilder connected() {
-        return new ConnectedBuilder();
-    }
-
-    private RedisMusicPlayer(String guildId,
-                             String voiceChannelId,
-                             StringRedisTemplate redis,
-                             ObjectMapper objectMapper,
-                             MusicPlayerPendingInteractions pendingInteractions,
-                             MusicPlayerAnnouncementRegistry announcementRegistry,
-                             DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
-                             MusicPlayerPoolProperties properties) {
-        this.state = new Pending();
-        this.guildId = guildId;
-        this.voiceChannelId = voiceChannelId;
-        this.redis = redis;
-        this.objectMapper = objectMapper;
-        this.pendingInteractions = pendingInteractions;
-        this.announcementRegistry = announcementRegistry;
-        this.trackAnnouncerFactory = trackAnnouncerFactory;
-        this.properties = properties;
-    }
-
-    private RedisMusicPlayer(String playerId,
-                             String guildId,
-                             String voiceChannelId,
-                             StringRedisTemplate redis,
-                             ObjectMapper objectMapper,
-                             MusicPlayerPendingInteractions pendingInteractions,
-                             MusicPlayerAnnouncementRegistry announcementRegistry,
-                             DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
-                             MusicPlayerPoolProperties properties) {
-        this.state = new Connected(playerId);
+    RedisMusicPlayer(Optional<String> playerId,
+                     String guildId,
+                     String voiceChannelId,
+                     StringRedisTemplate redis,
+                     ObjectMapper objectMapper,
+                     MusicPlayerPendingInteractions pendingInteractions,
+                     MusicPlayerAnnouncementRegistry announcementRegistry,
+                     DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
+                     MusicPlayerPoolProperties properties) {
+        this.state = playerId.<State>map(Connected::new).orElseGet(Pending::new);
         this.guildId = guildId;
         this.voiceChannelId = voiceChannelId;
         this.redis = redis;
@@ -94,9 +68,6 @@ class RedisMusicPlayer implements MusicPlayer {
     @Override
     public void play(TrackRequest request, MusicPlayerEventListener handler) { state.play(request, handler); }
 
-    // TODO AI maybe this is overkill for now, but I don't know if it's a good idea to just pass a requesterTAG.
-    //  let's say in a future impl. we build a webapp UI to control the bot, will we have access to a tag? or maybe just a name.
-    //  So should we encapulate this in somekind of object/concept? what do you think?
     @Override
     public void togglePause(String requesterTag, MusicPlayerEventListener handler) { state.togglePause(requesterTag, handler); }
 
@@ -323,56 +294,6 @@ class RedisMusicPlayer implements MusicPlayer {
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.Clear(playerId, new Request(UUID.randomUUID().toString(), requesterTag), guildId)));
-        }
-    }
-
-    static final class PendingBuilder {
-        private String guildId;
-        private String voiceChannelId;
-        private StringRedisTemplate redis;
-        private ObjectMapper objectMapper;
-        private MusicPlayerPendingInteractions pendingInteractions;
-        private MusicPlayerAnnouncementRegistry announcementRegistry;
-        private DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
-        private MusicPlayerPoolProperties properties;
-
-        PendingBuilder withGuildId(String guildId) { this.guildId = guildId; return this; }
-        PendingBuilder withVoiceChannelId(String voiceChannelId) { this.voiceChannelId = voiceChannelId; return this; }
-        PendingBuilder withRedis(StringRedisTemplate redis) { this.redis = redis; return this; }
-        PendingBuilder withObjectMapper(ObjectMapper objectMapper) { this.objectMapper = objectMapper; return this; }
-        PendingBuilder withPendingInteractions(MusicPlayerPendingInteractions pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
-        PendingBuilder withAnnouncementRegistry(MusicPlayerAnnouncementRegistry announcementRegistry) { this.announcementRegistry = announcementRegistry; return this; }
-        PendingBuilder withTrackAnnouncerFactory(DiscordPlaybackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
-        PendingBuilder withProperties(MusicPlayerPoolProperties properties) { this.properties = properties; return this; }
-
-        RedisMusicPlayer build() {
-            return new RedisMusicPlayer(guildId, voiceChannelId, redis, objectMapper, pendingInteractions, announcementRegistry, trackAnnouncerFactory, properties);
-        }
-    }
-
-    static final class ConnectedBuilder {
-        private String playerId;
-        private String guildId;
-        private String voiceChannelId;
-        private StringRedisTemplate redis;
-        private ObjectMapper objectMapper;
-        private MusicPlayerPendingInteractions pendingInteractions;
-        private MusicPlayerAnnouncementRegistry announcementRegistry;
-        private DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
-        private MusicPlayerPoolProperties properties;
-
-        ConnectedBuilder withPlayerId(String playerId) { this.playerId = playerId; return this; }
-        ConnectedBuilder withGuildId(String guildId) { this.guildId = guildId; return this; }
-        ConnectedBuilder withVoiceChannelId(String voiceChannelId) { this.voiceChannelId = voiceChannelId; return this; }
-        ConnectedBuilder withRedis(StringRedisTemplate redis) { this.redis = redis; return this; }
-        ConnectedBuilder withObjectMapper(ObjectMapper objectMapper) { this.objectMapper = objectMapper; return this; }
-        ConnectedBuilder withPendingInteractions(MusicPlayerPendingInteractions pendingInteractions) { this.pendingInteractions = pendingInteractions; return this; }
-        ConnectedBuilder withAnnouncementRegistry(MusicPlayerAnnouncementRegistry announcementRegistry) { this.announcementRegistry = announcementRegistry; return this; }
-        ConnectedBuilder withTrackAnnouncerFactory(DiscordPlaybackAnnouncerFactory trackAnnouncerFactory) { this.trackAnnouncerFactory = trackAnnouncerFactory; return this; }
-        ConnectedBuilder withProperties(MusicPlayerPoolProperties properties) { this.properties = properties; return this; }
-
-        RedisMusicPlayer build() {
-            return new RedisMusicPlayer(playerId, guildId, voiceChannelId, redis, objectMapper, pendingInteractions, announcementRegistry, trackAnnouncerFactory, properties);
         }
     }
 }
