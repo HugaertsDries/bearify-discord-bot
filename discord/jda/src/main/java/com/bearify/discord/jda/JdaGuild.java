@@ -37,7 +37,7 @@ class JdaGuild implements Guild {
             throw new IllegalArgumentException("Voice channel not found: " + channelId);
         }
         guild.getAudioManager().setSendingHandler(new ProviderAudioSendHandler(provider));
-        jda.addEventListener(new ListenerAdapter() {
+        var joinListener = new ListenerAdapter() {
             @Override
             public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {
                 if (!guildId.equals(event.getGuild().getId())) return;
@@ -46,10 +46,16 @@ class JdaGuild implements Guild {
                 jda.removeEventListener(this);
                 onJoined.onJoined(event.getChannelJoined().getId());
             }
-        });
+        };
+        jda.addEventListener(joinListener);
         guild.getAudioManager().setAutoReconnect(false);
         guild.getAudioManager().setSelfDeafened(true);
-        guild.getAudioManager().openAudioConnection(channel);
+        try {
+            guild.getAudioManager().openAudioConnection(channel);
+        } catch (RuntimeException e) {
+            jda.removeEventListener(joinListener);
+            throw e;
+        }
     }
 
     private net.dv8tion.jda.api.entities.Guild requireGuild() {
