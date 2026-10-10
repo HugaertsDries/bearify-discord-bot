@@ -12,6 +12,7 @@ import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
+import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
@@ -35,6 +36,11 @@ import tools.jackson.databind.ObjectMapper;
 
 import com.bearify.music.player.bridge.events.JoinRequest;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +85,8 @@ class VoiceConnectionManagerTest {
     @Autowired RedisConnectionFactory connectionFactory;
     @Autowired ObjectMapper objectMapper;
     @Autowired org.springframework.data.redis.core.StringRedisTemplate redis;
+    @Autowired MutableClock clock;
+    @Autowired PlayerProperties properties;
 
     private RedisMessageListenerContainer container;
 
@@ -87,6 +95,7 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.disconnect(GUILD_ID);
         voiceConnectionManager.disconnect(GUILD_ID_2);
         discordClient.reset();
+        clock.reset();
     }
 
     @AfterEach
@@ -368,6 +377,61 @@ class VoiceConnectionManagerTest {
         redis.delete(PlayerRedisProtocol.Keys.connectRequest("req-2"));
     }
 
+    // --- JOIN FAILURE ---
+
+    @Test
+    void releasesGuildAndAssignmentWhenJoinThrows() throws Exception {
+        seedLivenessKey(REQUEST_ID);
+        AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
+        startListener(body -> received.set(parseEvent(body)));
+        discordClient.guild(GUILD_ID).setJoinFails(true);
+
+        voiceConnectionManager.claim(new JoinRequest(REQUEST_ID, GUILD_ID, VOICE_CHANNEL_ID));
+
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isNull();
+        await().atMost(2, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertThat(received.get()).isInstanceOfSatisfying(MusicPlayerEvent.ConnectFailed.class, failed -> {
+                    assertThat(failed.requestId()).isEqualTo(REQUEST_ID);
+                    assertThat(failed.guildId()).isEqualTo(GUILD_ID);
+                }));
+
+        discordClient.guild(GUILD_ID).setJoinFails(false);
+        voiceConnectionManager.claim(new JoinRequest(REQUEST_ID, GUILD_ID, VOICE_CHANNEL_ID));
+
+        assertThat(discordClient.guild(GUILD_ID).joinCallCount()).isEqualTo(2);
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo(PLAYER_ID);
+    }
+
+    @Test
+    void acceptsNewClaimAfterStaleJoinExpires() {
+        seedLivenessKey(REQUEST_ID);
+        voiceConnectionManager.claim(new JoinRequest(REQUEST_ID, GUILD_ID, VOICE_CHANNEL_ID)); // join never calls back
+        redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID)); // as the TTL would
+
+        voiceConnectionManager.claim(new JoinRequest(REQUEST_ID, GUILD_ID, VOICE_CHANNEL_ID));
+        assertThat(discordClient.guild(GUILD_ID).joinCallCount()).isEqualTo(1);
+
+        clock.advance(properties.assignment().ttl().plusSeconds(1));
+        voiceConnectionManager.claim(new JoinRequest(REQUEST_ID, GUILD_ID, VOICE_CHANNEL_ID));
+
+        assertThat(discordClient.guild(GUILD_ID).joinCallCount()).isEqualTo(2);
+    }
+
+    @Test
+    void reportsConnectFailedWhenConnectJoinThrows() throws Exception {
+        AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
+        startListener(body -> received.set(parseEvent(body)));
+        discordClient.guild(GUILD_ID).setJoinFails(true);
+
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+
+        await().atMost(2, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertThat(received.get()).isInstanceOfSatisfying(MusicPlayerEvent.ConnectFailed.class, failed -> {
+                    assertThat(failed.requestId()).isEqualTo(REQUEST_ID);
+                    assertThat(failed.guildId()).isEqualTo(GUILD_ID);
+                }));
+    }
+
     private MusicPlayerEvent parseEvent(byte[] body) {
         try {
             return objectMapper.readValue(body, MusicPlayerEvent.class);
@@ -397,6 +461,41 @@ class VoiceConnectionManagerTest {
         @Bean
         DiscordClientFactory discordClientFactory(FakeDiscordClient client) {
             return new FakeDiscordClientFactory(client);
+        }
+
+        @Bean
+        @Primary
+        MutableClock mutableClock() {
+            return new MutableClock();
+        }
+    }
+
+    static final class MutableClock extends Clock {
+        private static final Instant INITIAL = Instant.parse("2026-03-26T12:00:00Z");
+
+        private Instant current = INITIAL;
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return current;
+        }
+
+        void advance(Duration duration) {
+            current = current.plus(duration);
+        }
+
+        void reset() {
+            current = INITIAL;
         }
     }
 
@@ -459,9 +558,12 @@ class VoiceConnectionManagerTest {
         private int leaveCount;
         private VoiceSessionListener joinListener;
         private boolean lonely = true;
+        private boolean joinFails;
         private final AtomicInteger joinCallCount = new AtomicInteger();
 
         void setLonely(boolean lonely) { this.lonely = lonely; }
+
+        void setJoinFails(boolean joinFails) { this.joinFails = joinFails; }
 
         int joinCallCount() { return joinCallCount.get(); }
 
@@ -480,6 +582,9 @@ class VoiceConnectionManagerTest {
         @Override
         public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
             joinCallCount.incrementAndGet();
+            if (joinFails) {
+                throw new IllegalStateException("Missing permission to join " + channelId);
+            }
             joinedChannelId = channelId;
             joinListener = onJoined;
         }

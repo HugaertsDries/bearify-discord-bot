@@ -263,7 +263,7 @@ class VoiceSessionHeartbeatTest {
         private boolean failNextDisconnect;
 
         TestVoiceConnectionManager() {
-            super(null, null, null, null, null, "test");
+            super(null, null, null, null, null, "test", null);
         }
 
         @Override
