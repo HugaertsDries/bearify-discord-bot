@@ -157,6 +157,23 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void clearsTemporaryActionOffTheSchedulerThread() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        AtomicReference<Thread> updatingThread = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = new DiscordPlaybackAnnouncer(
+                discordClient(new AtomicReference<>(), new AtomicInteger(), updated, new AtomicInteger(), updatingThread),
+                new AnnouncerProperties("#FFA500", "#FF4444", "Bearify", Duration.ofMillis(50)),
+                "text-1");
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Forwarded("player-1", new Request("req-2", "@user"), "guild-1", 30_000));
+
+        Awaitility.await().atMost(Duration.ofSeconds(1)).untilAsserted(() ->
+                assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Forwarded by @user")));
+        assertThat(updatingThread.get().isVirtual()).isTrue();
+    }
+
+    @Test
     void acceptUpdatesExistingMessageWhenTrackErrorArrives() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         AtomicInteger sends = new AtomicInteger();
@@ -308,7 +325,7 @@ class DiscordPlaybackAnnouncerTest {
                                                AtomicInteger deletes,
                                                Duration timeout) {
         return new DiscordPlaybackAnnouncer(
-                discordClient(sent, sends, updated, deletes),
+                discordClient(sent, sends, updated, deletes, new AtomicReference<>()),
                 new AnnouncerProperties("#FFA500", "#FF4444", "Bearify", timeout),
                 "text-1");
     }
@@ -335,7 +352,8 @@ class DiscordPlaybackAnnouncerTest {
     private static DiscordClient discordClient(AtomicReference<ComponentMessage> sent,
                                                AtomicInteger sends,
                                                AtomicReference<ComponentMessage> updated,
-                                               AtomicInteger deletes) {
+                                               AtomicInteger deletes,
+                                               AtomicReference<Thread> updatingThread) {
         return new DiscordClient() {
             @Override
             public void start(String token) {
@@ -378,6 +396,7 @@ class DiscordPlaybackAnnouncerTest {
 
                             @Override
                             public void update(ComponentMessage updatedMessage) {
+                                updatingThread.set(Thread.currentThread());
                                 updated.set(updatedMessage);
                             }
                         };

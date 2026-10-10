@@ -111,7 +111,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private void notify(String action) {
         temporaryAction = action;
         cancelClearTask();
-        clearActionTask = ACTION_TIMEOUTS.schedule(this::clearTemporaryActionSafely,
+        // Hand the blocking Discord edit off so one slow guild can't delay every other guild's clear
+        clearActionTask = ACTION_TIMEOUTS.schedule(() -> Thread.startVirtualThread(this::clearTemporaryActionSafely),
                 properties.actionTimeout().toMillis(), TimeUnit.MILLISECONDS);
         refreshNowPlayingEmbed();
     }
