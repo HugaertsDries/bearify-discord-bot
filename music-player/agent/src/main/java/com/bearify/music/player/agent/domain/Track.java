@@ -1,5 +1,7 @@
 package com.bearify.music.player.agent.domain;
 
+import com.bearify.music.player.bridge.model.TrackMetadata;
+
 /**
  * Abstraction over a playable audio track. Decouples domain logic from LavaPlayer's {@code AudioTrack}.
  */
@@ -18,4 +20,8 @@ public interface Track {
     String requesterTag();
 
     Track clone();
+
+    default TrackMetadata toMetadata() {
+        return new TrackMetadata(title(), author(), uri(), duration());
+    }
 }

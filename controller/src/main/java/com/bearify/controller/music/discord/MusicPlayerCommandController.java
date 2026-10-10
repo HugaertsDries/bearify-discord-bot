@@ -9,12 +9,15 @@ import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.spring.annotation.Option;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+
+import static com.bearify.controller.music.discord.AnsweringListener.NO_PLAYER_MESSAGE;
 
 @DiscordController
 @InteractionGroup(value = "player", description = "Player commands")
@@ -27,13 +30,11 @@ public class MusicPlayerCommandController {
     private static final String PLAY_UNAVAILABLE_MESSAGE = BearifyEmoji.BLOCKED + " | Bearly any bears left! They're all busy right now. Try again in a moment.";
     private static final String CONNECT_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | The bear couldn't reach your channel. Try again in a moment.";
     private static final String LEAVING_MESSAGE = BearifyEmoji.HONEY + " | Alright, cleaning up after myself. Talk to you later! " + BearifyEmoji.WAVE;
-    private static final String NO_PLAYER_MESSAGE = BearifyEmoji.BLOCKED + " | Seems like I'm not even playing songs! If you'd like me to, have you tried the `/player play` command?";
-    private static final String TIMED_OUT_MESSAGE = BearifyEmoji.BLOCKED + " | The bear didn't answer in time. Try again in a moment.";
     private static final String LEAVE_OTHER_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | Bear with me, I can't lumber out of your voice channel when I'm not with you.";
     private static final String TRACK_NOT_FOUND_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that track. Try a different search or link?";
+    private static final String NEGATIVE_REWIND_MESSAGE = BearifyEmoji.REWIND + " | Use a positive number of seconds, bear with me.";
+    private static final String NEGATIVE_FORWARD_MESSAGE = BearifyEmoji.FORWARD + " | Use a positive number of seconds, bear with me.";
     private static final String TRACK_LOAD_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | Oops! Something went wrong loading this track. This could be due to age-restrictions or region lock. (I'm technically less than 1 year old)";
-    private static final String QUEUE_EMPTY_MESSAGE = BearifyEmoji.HONEY + " | This is where the trail ends. Try adding more using `/player play` command!";
-    private static final String NOTHING_TO_GO_BACK_MESSAGE = BearifyEmoji.HONEY + " | This is where the trail begins. Nothing to go back to!";
 
     private static final List<String> JOIN_ENDINGS = List.of(
             "Let's just chill for a bit?",
@@ -86,8 +87,13 @@ public class MusicPlayerCommandController {
     public void leave(CommandInteraction interaction) {
         requireVoiceSession(interaction).ifPresent(ctx ->
                 pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(player -> {
-                    player.stop();
-                    interaction.reply(LEAVING_MESSAGE).send();
+                    EditableMessage message = interaction.defer();
+                    player.stop(new AnsweringListener(message::edit) {
+                        @Override
+                        public void onStopped() {
+                            answer(LEAVING_MESSAGE);
+                        }
+                    });
                 }, () -> replyNoPlayerForLeave(interaction, ctx.guildId()))
         );
     }
@@ -100,24 +106,12 @@ public class MusicPlayerCommandController {
             String textChannelId = interaction.getTextChannelId()
                     .orElseThrow(() -> new IllegalStateException("No text channel ID on interaction"));
             String resolvedQuery = query.startsWith("http://") || query.startsWith("https://") ? query : "ytsearch:" + query;
-            String userMention = interaction.getUserMention();
-            var trackRequest = new TrackRequest(resolvedQuery, textChannelId, userMention);
+            var trackRequest = new TrackRequest(resolvedQuery, textChannelId, interaction.getUserMention());
 
             pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                     player -> {
                         EditableMessage message = interaction.defer(true);
-                        player.play(trackRequest, new MusicPlayerEventListener() {
-                            @Override
-                            public void onTrackNotFound(String q) {
-                                message.edit(TRACK_NOT_FOUND_MESSAGE);
-                            }
-
-                            @Override
-                            public void onTrackLoadFailed(String reason) {
-                                message.edit(TRACK_LOAD_FAILED_MESSAGE);
-                            }
-                        });
-                        message.edit(trackQueuedMessage(userMention));
+                        player.play(trackRequest, queueing(message));
                     },
                     () -> {
                         var player = pool.acquire(ctx.guildId(), ctx.voiceChannelId());
@@ -126,18 +120,7 @@ public class MusicPlayerCommandController {
                         player.join(new MusicPlayerEventListener() {
                             @Override
                             public void onReady() {
-                                player.play(trackRequest, new MusicPlayerEventListener() {
-                                    @Override
-                                    public void onTrackNotFound(String q) {
-                                        message.edit(TRACK_NOT_FOUND_MESSAGE);
-                                    }
-
-                                    @Override
-                                    public void onTrackLoadFailed(String reason) {
-                                        message.edit(TRACK_LOAD_FAILED_MESSAGE);
-                                    }
-                                });
-                                message.edit(trackQueuedMessage(userMention));
+                                player.play(trackRequest, queueing(message));
                             }
 
                             @Override
@@ -162,25 +145,15 @@ public class MusicPlayerCommandController {
                 pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                         player -> {
                             EditableMessage message = interaction.defer(true);
-                            player.togglePause(interaction.getUserMention(), new MusicPlayerEventListener() {
+                            player.togglePause(interaction.getUserMention(), new AnsweringListener(message::edit) {
                                 @Override
                                 public void onPaused() {
-                                    message.edit(pausedMessage());
+                                    answer(pausedMessage());
                                 }
 
                                 @Override
                                 public void onResumed() {
-                                    message.edit(resumedMessage());
-                                }
-
-                                @Override
-                                public void onFailed(String reason) {
-                                    message.edit(NO_PLAYER_MESSAGE);
-                                }
-
-                                @Override
-                                public void onTimedOut() {
-                                    message.edit(TIMED_OUT_MESSAGE);
+                                    answer(resumedMessage());
                                 }
                             });
                         },
@@ -196,23 +169,17 @@ public class MusicPlayerCommandController {
                 pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                         player -> {
                             EditableMessage message = interaction.defer(true);
-                            player.previous(interaction.getUserMention(), new MusicPlayerEventListener() {
+                            player.previous(interaction.getUserMention(), new AnsweringListener(message::edit) {
                                 @Override
-                                public void onNothingToGoBack() {
-                                    message.edit(NOTHING_TO_GO_BACK_MESSAGE);
+                                public void onWentBack() {
+                                    answer(previousMessage());
                                 }
 
                                 @Override
-                                public void onFailed(String reason) {
-                                    message.edit(NO_PLAYER_MESSAGE);
-                                }
-
-                                @Override
-                                public void onTimedOut() {
-                                    message.edit(TIMED_OUT_MESSAGE);
+                                public void onRestarted() {
+                                    answer(restartedMessage());
                                 }
                             });
-                            message.edit(previousMessage());
                         },
                         () -> replyNoPlayer(interaction)
                 )
@@ -226,23 +193,12 @@ public class MusicPlayerCommandController {
                 pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                         player -> {
                             EditableMessage message = interaction.defer(true);
-                            player.next(interaction.getUserMention(), new MusicPlayerEventListener() {
+                            player.next(interaction.getUserMention(), new AnsweringListener(message::edit) {
                                 @Override
-                                public void onNothingToAdvance() {
-                                    message.edit(QUEUE_EMPTY_MESSAGE);
-                                }
-
-                                @Override
-                                public void onFailed(String reason) {
-                                    message.edit(NO_PLAYER_MESSAGE);
-                                }
-
-                                @Override
-                                public void onTimedOut() {
-                                    message.edit(TIMED_OUT_MESSAGE);
+                                public void onSkipped() {
+                                    answer(nextMessage());
                                 }
                             });
-                            message.edit(nextMessage());
                         },
                         () -> replyNoPlayer(interaction)
                 )
@@ -253,11 +209,20 @@ public class MusicPlayerCommandController {
     @Interaction(value = "rewind", description = "I'll rewind the current track for you")
     public void rewind(CommandInteraction interaction,
                        @Option(name = "seconds", description = "The duration I should rewind back in seconds", defaultValue = "0") long seconds) {
+        if (seconds < 0) {
+            interaction.reply(NEGATIVE_REWIND_MESSAGE).ephemeral().send();
+            return;
+        }
         requireVoiceSession(interaction).ifPresent(ctx ->
                 pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                         player -> {
-                            player.rewind(Duration.ofSeconds(seconds), interaction.getUserMention());
-                            interaction.reply(rewoundMessage(seconds)).ephemeral().send();
+                            EditableMessage message = interaction.defer(true);
+                            player.rewind(Duration.ofSeconds(seconds), interaction.getUserMention(), new AnsweringListener(message::edit) {
+                                @Override
+                                public void onRewound(Duration seek) {
+                                    answer(rewoundMessage(seek));
+                                }
+                            });
                         },
                         () -> replyNoPlayer(interaction)
                 )
@@ -268,27 +233,25 @@ public class MusicPlayerCommandController {
     @Interaction(value = "forward", description = "I'll forward the current track for you")
     public void forward(CommandInteraction interaction,
                         @Option(name = "seconds", description = "The duration I should skip forward in seconds", defaultValue = "0") long seconds) {
+        if (seconds < 0) {
+            interaction.reply(NEGATIVE_FORWARD_MESSAGE).ephemeral().send();
+            return;
+        }
         requireVoiceSession(interaction).ifPresent(ctx ->
                 pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                         player -> {
                             EditableMessage message = interaction.defer(true);
-                            player.forward(Duration.ofSeconds(seconds), interaction.getUserMention(), new MusicPlayerEventListener() {
+                            player.forward(Duration.ofSeconds(seconds), interaction.getUserMention(), new AnsweringListener(message::edit) {
                                 @Override
-                                public void onNothingToAdvance() {
-                                    message.edit(QUEUE_EMPTY_MESSAGE);
+                                public void onForwarded(Duration seek) {
+                                    answer(forwardedMessage(seek));
                                 }
 
                                 @Override
-                                public void onFailed(String reason) {
-                                    message.edit(NO_PLAYER_MESSAGE);
-                                }
-
-                                @Override
-                                public void onTimedOut() {
-                                    message.edit(TIMED_OUT_MESSAGE);
+                                public void onSkipped() {
+                                    answer(nextMessage());
                                 }
                             });
-                            message.edit(forwardedMessage(seconds));
                         },
                         () -> replyNoPlayer(interaction)
                 )
@@ -301,8 +264,13 @@ public class MusicPlayerCommandController {
         requireVoiceSession(interaction).ifPresent(ctx ->
                 pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
                         player -> {
-                            player.clear(interaction.getUserMention());
-                            interaction.reply(clearedMessage()).ephemeral().send();
+                            EditableMessage message = interaction.defer(true);
+                            player.clear(interaction.getUserMention(), new AnsweringListener(message::edit) {
+                                @Override
+                                public void onCleared() {
+                                    answer(clearedMessage());
+                                }
+                            });
                         },
                         () -> replyNoPlayer(interaction)
                 )
@@ -336,8 +304,30 @@ public class MusicPlayerCommandController {
         return BearifyEmoji.HONEY + " | Joined <#" + channelId + ">, " + JOIN_ENDINGS.get(RANDOM.nextInt(JOIN_ENDINGS.size()));
     }
 
-    private static String trackQueuedMessage(String userMention) {
-        return BearifyEmoji.CLOCK + " | " + userMention + " added your track to the mix.";
+    private static MusicPlayerEventListener queueing(EditableMessage message) {
+        return new AnsweringListener(message::edit) {
+            @Override
+            public void onTrackQueued(TrackMetadata track, int queuedCount) {
+                answer(queuedMessage(track, queuedCount));
+            }
+
+            @Override
+            public void onTrackNotFound(String query) {
+                answer(TRACK_NOT_FOUND_MESSAGE);
+            }
+
+            @Override
+            public void onTrackLoadFailed(String reason) {
+                answer(TRACK_LOAD_FAILED_MESSAGE);
+            }
+        };
+    }
+
+    private static String queuedMessage(TrackMetadata track, int queuedCount) {
+        if (queuedCount > 1) {
+            return BearifyEmoji.MUSIC + " | Queued **" + queuedCount + "** tracks from the playlist.";
+        }
+        return BearifyEmoji.MUSIC + " | Queued **" + track.title() + "**.";
     }
 
     private static String pausedMessage() {
@@ -356,18 +346,16 @@ public class MusicPlayerCommandController {
         return BearifyEmoji.PREVIOUS + " | Back on the trail to the previous track.";
     }
 
-    private static String rewoundMessage(long seconds) {
-        if (seconds == 0) {
-            return BearifyEmoji.REWIND + " | Bold strategy. Rewinding by exactly 0 seconds.";
-        }
-        return BearifyEmoji.REWIND + " | Rewound the current track by " + seconds + "s for you.";
+    private static String restartedMessage() {
+        return BearifyEmoji.PREVIOUS + " | Back to the start of this track.";
     }
 
-    private static String forwardedMessage(long seconds) {
-        if (seconds == 0) {
-            return BearifyEmoji.FORWARD + " | Bold strategy. Forwarding by exactly 0 seconds.";
-        }
-        return BearifyEmoji.FORWARD + " | Forwarded the current track by " + seconds + "s for you.";
+    private static String rewoundMessage(Duration seek) {
+        return BearifyEmoji.REWIND + " | Rewound the current track by " + seek.toSeconds() + "s for you.";
+    }
+
+    private static String forwardedMessage(Duration seek) {
+        return BearifyEmoji.FORWARD + " | Forwarded the current track by " + seek.toSeconds() + "s for you.";
     }
 
     private static String clearedMessage() {

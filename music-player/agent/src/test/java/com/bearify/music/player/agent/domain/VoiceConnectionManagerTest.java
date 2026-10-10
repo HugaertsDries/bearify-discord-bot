@@ -173,6 +173,19 @@ class VoiceConnectionManagerTest {
     }
 
     @Test
+    void answersStoppedWithRequestIdWhenDisconnectingForRequest() throws Exception {
+        AtomicReference<MusicPlayerEvent> stopped = new AtomicReference<>();
+        startListener(body -> {
+            if (parseEvent(body) instanceof MusicPlayerEvent.Stopped event) stopped.set(event);
+        });
+
+        voiceConnectionManager.disconnect(GUILD_ID, REQUEST_ID);
+
+        await().atMost(2, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertThat(stopped.get()).isEqualTo(new MusicPlayerEvent.Stopped(PLAYER_ID, REQUEST_ID, GUILD_ID)));
+    }
+
+    @Test
     void doesNothingWhenDisconnectingWithoutActiveGuild() {
         voiceConnectionManager.disconnect(GUILD_ID);
 

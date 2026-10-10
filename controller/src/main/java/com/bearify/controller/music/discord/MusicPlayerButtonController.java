@@ -31,7 +31,7 @@ public class MusicPlayerButtonController {
     public void pausePlay(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
-            player.togglePause(interaction.getUserMention(), new MusicPlayerEventListener() {});
+            player.togglePause(interaction.getUserMention(), answerFailuresPrivately(interaction));
         });
     }
 
@@ -40,7 +40,7 @@ public class MusicPlayerButtonController {
     public void previous(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
-            player.previous(interaction.getUserMention(), new MusicPlayerEventListener() {});
+            player.previous(interaction.getUserMention(), answerFailuresPrivately(interaction));
         });
     }
 
@@ -49,7 +49,7 @@ public class MusicPlayerButtonController {
     public void rewind(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
-            player.rewind(DEFAULT_SEEK, interaction.getUserMention());
+            player.rewind(DEFAULT_SEEK, interaction.getUserMention(), answerFailuresPrivately(interaction));
         });
     }
 
@@ -58,7 +58,7 @@ public class MusicPlayerButtonController {
     public void forward(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
-            player.forward(DEFAULT_SEEK, interaction.getUserMention(), new MusicPlayerEventListener() {});
+            player.forward(DEFAULT_SEEK, interaction.getUserMention(), answerFailuresPrivately(interaction));
         });
     }
 
@@ -67,7 +67,7 @@ public class MusicPlayerButtonController {
     public void next(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
-            player.next(interaction.getUserMention(), new MusicPlayerEventListener() {});
+            player.next(interaction.getUserMention(), answerFailuresPrivately(interaction));
         });
     }
 
@@ -76,8 +76,13 @@ public class MusicPlayerButtonController {
     public void clear(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
-            player.clear(interaction.getUserMention());
+            player.clear(interaction.getUserMention(), answerFailuresPrivately(interaction));
         });
+    }
+
+    // success already shows as a label on the player message, so only failures get an answer
+    private static MusicPlayerEventListener answerFailuresPrivately(ButtonInteraction interaction) {
+        return new AnsweringListener(text -> interaction.reply(text).ephemeral().send());
     }
 
     private Optional<MusicPlayer> requirePlayer(ButtonInteraction interaction) {

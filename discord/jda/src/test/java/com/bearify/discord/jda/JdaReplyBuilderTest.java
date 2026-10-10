@@ -4,6 +4,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
+import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,7 @@ class JdaReplyBuilderTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void sendsFollowUpWhenInteractionAlreadyAcknowledged() {
+    void sendsFollowUpWhenInteractionWasAcknowledgedWithoutDeferring() {
         IReplyCallback event = mock(IReplyCallback.class);
         InteractionHook hook = mock(InteractionHook.class);
         WebhookMessageCreateAction<Message> followUp = mock(WebhookMessageCreateAction.class);
@@ -32,10 +33,27 @@ class JdaReplyBuilderTest {
         when(hook.sendMessage(MESSAGE)).thenReturn(followUp);
         when(followUp.setEphemeral(true)).thenReturn(followUp);
 
-        new JdaReplyBuilder(event, MESSAGE).ephemeral().send();
+        new JdaReplyBuilder(event, MESSAGE, false).ephemeral().send();
 
         verify(followUp).setEphemeral(true);
         verify(followUp).queue(isNull(), any());
+        verify(event, never()).reply(anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void editsOriginalMessageWhenReplyingToDeferredCommand() {
+        IReplyCallback event = mock(IReplyCallback.class);
+        InteractionHook hook = mock(InteractionHook.class);
+        WebhookMessageEditAction<Message> edit = mock(WebhookMessageEditAction.class);
+        when(event.isAcknowledged()).thenReturn(true);
+        when(event.getHook()).thenReturn(hook);
+        when(hook.editOriginal(MESSAGE)).thenReturn(edit);
+
+        new JdaReplyBuilder(event, MESSAGE, true).ephemeral().send();
+
+        verify(edit).queue(isNull(), any());
+        verify(hook, never()).sendMessage(anyString());
         verify(event, never()).reply(anyString());
     }
 
@@ -47,7 +65,7 @@ class JdaReplyBuilderTest {
         when(event.reply(MESSAGE)).thenReturn(reply);
         when(reply.setEphemeral(false)).thenReturn(reply);
 
-        new JdaReplyBuilder(event, MESSAGE).send();
+        new JdaReplyBuilder(event, MESSAGE, false).send();
 
         verify(reply).setEphemeral(false);
         verify(reply).queue(isNull(), any());

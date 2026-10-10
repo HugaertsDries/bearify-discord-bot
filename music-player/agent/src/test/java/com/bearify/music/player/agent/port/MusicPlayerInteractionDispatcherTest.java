@@ -153,13 +153,74 @@ class MusicPlayerInteractionDispatcherTest {
                 throw new AssertionError("Search should not be used");
             }
         };
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, loader, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID,
                 new TrackRequest("https://youtube.com/playlist?list=PLxyz", TEXT_CHANNEL_ID, null)));
 
         assertThat(pool.playPlaylistCalls).containsExactly(GUILD_ID  + "|3");
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.TrackQueued(PLAYER_ID, REQUEST_ID, GUILD_ID, metadata("Song A"), 3));
+    }
+
+    @Test
+    void answersTrackQueuedWithRequestIdWhenTrackLoads() {
+        AudioTrackLoader loader = new AudioTrackLoader() {
+            @Override
+            public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+                callback.trackLoaded(track("Song A"));
+            }
+
+            @Override
+            public void search(String query, int limit, AudioTrackSearchCallback callback) {
+                throw new AssertionError("Search should not be used");
+            }
+        };
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("song a", TEXT_CHANNEL_ID, null)));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.TrackQueued(PLAYER_ID, REQUEST_ID, GUILD_ID, metadata("Song A"), 1));
+    }
+
+    @Test
+    void answersTrackNotFoundWhenPlaylistIsEmpty() {
+        AudioTrackLoader loader = new AudioTrackLoader() {
+            @Override
+            public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+                callback.playlistLoaded(List.of());
+            }
+
+            @Override
+            public void search(String query, int limit, AudioTrackSearchCallback callback) {
+                throw new AssertionError("Search should not be used");
+            }
+        };
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("empty list", TEXT_CHANNEL_ID, null)));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.TrackNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID, "empty list"));
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenClearingWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Clear(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
     }
 
     @Test

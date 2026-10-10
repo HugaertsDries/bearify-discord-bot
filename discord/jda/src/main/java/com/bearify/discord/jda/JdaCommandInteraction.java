@@ -19,6 +19,7 @@ import java.util.Optional;
 class JdaCommandInteraction implements CommandInteraction {
 
     private final SlashCommandInteractionEvent event;
+    private volatile boolean deferred;
 
     JdaCommandInteraction(SlashCommandInteractionEvent event) {
         this.event = event;
@@ -28,6 +29,7 @@ class JdaCommandInteraction implements CommandInteraction {
     public EditableMessage defer(boolean ephemeral) {
         Instant createdAt = Instant.now();
         InteractionHook hook = event.deferReply(ephemeral).complete();
+        deferred = true;
         return new JdaEditableMessage(hook, createdAt);
     }
 
@@ -40,7 +42,7 @@ class JdaCommandInteraction implements CommandInteraction {
 
     @Override
     public ReplyBuilder reply(String message) {
-        return new JdaReplyBuilder(event, message);
+        return new JdaReplyBuilder(event, message, deferred);
     }
 
     @Override

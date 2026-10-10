@@ -7,7 +7,9 @@ import com.bearify.discord.testing.MockButtonInteraction;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -92,6 +94,70 @@ class MusicPlayerButtonControllerTest {
         assertThat(interaction.getReplies()).isEmpty();
     }
 
+    @Test
+    void answersEachButtonOnceWhenItsRequestTimesOut() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        player.answerWith(MusicPlayerEventListener::onTimedOut);
+        MusicPlayerButtonController handler = new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player)));
+        List<Consumer<MockButtonInteraction>> buttons = List.of(
+                handler::pausePlay, handler::previous, handler::rewind, handler::forward, handler::next, handler::clear);
+
+        for (Consumer<MockButtonInteraction> button : buttons) {
+            MockButtonInteraction interaction = buttonInteraction();
+
+            button.accept(interaction);
+
+            assertThat(interaction.getReplies()).hasSize(1);
+            assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+            assertThat(interaction.getReplies().getFirst().getContent()).contains("didn't answer in time");
+        }
+    }
+
+    @Test
+    void repliesEphemerallyWhenNothingIsPlaying() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        player.answerWith(MusicPlayerEventListener::onNothingPlaying);
+        MockButtonInteraction interaction = buttonInteraction();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).pausePlay(interaction);
+
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("Nothing's playing right now");
+    }
+
+    @Test
+    void repliesEphemerallyWhenThereIsNothingToSkipTo() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        player.answerWith(MusicPlayerEventListener::onNothingToAdvance);
+        MockButtonInteraction interaction = buttonInteraction();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).next(interaction);
+
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("where the trail ends");
+    }
+
+    @Test
+    void sendsNoReplyWhenButtonActionSucceeds() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        player.answerWith(MusicPlayerEventListener::onSkipped);
+        MockButtonInteraction interaction = buttonInteraction();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).next(interaction);
+
+        assertThat(interaction.isAcknowledged()).isTrue();
+        assertThat(interaction.getReplies()).isEmpty();
+    }
+
+    private static MockButtonInteraction buttonInteraction() {
+        return MockButtonInteraction.forButton("player:any")
+                .guildId("guild-1")
+                .voiceChannelId("vc-123")
+                .userMention("@dries")
+                .build();
+    }
+
     private static final class RecordingMusicPlayerPool implements MusicPlayerPool {
         private final Optional<MusicPlayer> player;
 
@@ -122,13 +188,19 @@ class MusicPlayerButtonControllerTest {
         private Duration rewindSeek;
         private Duration forwardSeek;
         private String clearRequester;
+        private Consumer<MusicPlayerEventListener> answer = handler -> {};
+
+        /** How the player answers every request, as the agent's reply would. */
+        private void answerWith(Consumer<MusicPlayerEventListener> answer) {
+            this.answer = answer;
+        }
 
         @Override
         public void join(MusicPlayerEventListener handler) {
         }
 
         @Override
-        public void stop() {
+        public void stop(MusicPlayerEventListener handler) {
         }
 
         @Override
@@ -138,31 +210,37 @@ class MusicPlayerButtonControllerTest {
         @Override
         public void togglePause(String requesterTag, MusicPlayerEventListener handler) {
             togglePauseRequester = requesterTag;
+            answer.accept(handler);
         }
 
         @Override
         public void previous(String requesterTag, MusicPlayerEventListener handler) {
             previousRequester = requesterTag;
+            answer.accept(handler);
         }
 
         @Override
         public void next(String requesterTag, MusicPlayerEventListener handler) {
             nextRequester = requesterTag;
+            answer.accept(handler);
         }
 
         @Override
-        public void rewind(Duration seek, String requesterTag) {
+        public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
             rewindSeek = seek;
+            answer.accept(handler);
         }
 
         @Override
         public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
             forwardSeek = seek;
+            answer.accept(handler);
         }
 
         @Override
-        public void clear(String requesterTag) {
+        public void clear(String requesterTag, MusicPlayerEventListener handler) {
             clearRequester = requesterTag;
+            answer.accept(handler);
         }
     }
 }

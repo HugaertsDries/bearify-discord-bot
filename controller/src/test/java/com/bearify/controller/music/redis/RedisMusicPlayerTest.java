@@ -7,6 +7,8 @@ import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +41,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
     private static final String TEXT_CHANNEL_ID = "text-1";
     private static final String REQUESTER_TAG = "<@user-1>";
     private static final String QUERY = "ytsearch:daft punk";
+    private static final TrackMetadata TRACK = new TrackMetadata("One More Time", "Daft Punk", "https://youtu.be/one-more-time", 320_000);
 
     @Autowired MusicPlayerPool pool;
     @Autowired StringRedisTemplate redis;
@@ -140,7 +144,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             // Now verify the player is in Connected state by calling stop() and checking it routes to the player channel
             var stopContainer = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), interactionQueue);
             try {
-                player.stop();
+                player.stop(new MusicPlayerEventListener() {});
                 String stopJson = interactionQueue.poll(2, TimeUnit.SECONDS);
                 assertThat(stopJson).isNotNull();
                 MusicPlayerInteraction interaction = objectMapper.readValue(stopJson, MusicPlayerInteraction.class);
@@ -201,7 +205,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
 
         try {
             MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
-            player.stop();
+            player.stop(new MusicPlayerEventListener() {});
 
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();
@@ -217,7 +221,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
 
         MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
-        player.stop();
+        player.stop(new MusicPlayerEventListener() {});
 
         assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo(PLAYER_ID);
     }
@@ -253,19 +257,178 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
     }
 
     @Test
-    void staysSilentWhenPlayTimesOut() {
+    void reportsTimeoutWhenPlayIsNotAnswered() {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
-        AtomicBoolean answered = new AtomicBoolean(false);
+        AtomicBoolean timedOut = new AtomicBoolean(false);
 
         MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
         player.play(new TrackRequest(QUERY, TEXT_CHANNEL_ID, REQUESTER_TAG), new MusicPlayerEventListener() {
-            @Override public void onFailed(String reason) { answered.set(true); }
-            @Override public void onTrackNotFound(String query) { answered.set(true); }
-            @Override public void onTrackLoadFailed(String reason) { answered.set(true); }
+            @Override public void onTimedOut() { timedOut.set(true); }
         });
 
-        // outlasts the 500ms interaction timeout
-        await().during(1, TimeUnit.SECONDS).atMost(2, TimeUnit.SECONDS)
-                .until(() -> !answered.get());
+        await().atMost(3, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertThat(timedOut.get()).isTrue());
+    }
+
+    // --- REPLIES ---
+
+    @Test
+    void reportsQueuedTrackWithoutTimingOutWhenAgentConfirmsPlay() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicReference<TrackMetadata> queued = new AtomicReference<>();
+        AtomicBoolean timedOut = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.play(new TrackRequest(QUERY, TEXT_CHANNEL_ID, REQUESTER_TAG), new MusicPlayerEventListener() {
+                @Override public void onTrackQueued(TrackMetadata track, int queuedCount) { queued.set(track); }
+                @Override public void onTimedOut() { timedOut.set(true); }
+            });
+            publish(new MusicPlayerEvent.TrackQueued(PLAYER_ID, nextInteraction(received).requestId(), GUILD_ID, TRACK, 1));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(queued.get()).isEqualTo(TRACK));
+            // outlasts the 500ms interaction timeout
+            await().during(1, TimeUnit.SECONDS).atMost(2, TimeUnit.SECONDS).until(() -> !timedOut.get());
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void reportsRestartWhenAgentRestartsTrack() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicBoolean restarted = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.previous(REQUESTER_TAG, new MusicPlayerEventListener() {
+                @Override public void onRestarted() { restarted.set(true); }
+            });
+            publish(new MusicPlayerEvent.Restarted(PLAYER_ID, new Request(nextInteraction(received).requestId(), REQUESTER_TAG), GUILD_ID));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(restarted.get()).isTrue());
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void reportsAppliedSeekWhenAgentRewindsByItsDefault() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicReference<Duration> rewound = new AtomicReference<>();
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.rewind(Duration.ZERO, REQUESTER_TAG, new MusicPlayerEventListener() {
+                @Override public void onRewound(Duration seek) { rewound.set(seek); }
+            });
+            publish(new MusicPlayerEvent.Rewound(PLAYER_ID, new Request(nextInteraction(received).requestId(), REQUESTER_TAG), GUILD_ID, 10_000));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(rewound.get()).isEqualTo(Duration.ofSeconds(10)));
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void reportsNothingPlayingWhenAgentHasNoTrackToForward() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicBoolean nothingPlaying = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.forward(Duration.ZERO, REQUESTER_TAG, new MusicPlayerEventListener() {
+                @Override public void onNothingPlaying() { nothingPlaying.set(true); }
+            });
+            publish(new MusicPlayerEvent.NothingPlaying(PLAYER_ID, nextInteraction(received).requestId(), GUILD_ID));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(nothingPlaying.get()).isTrue());
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void reportsClearedWhenAgentConfirmsClear() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicBoolean cleared = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.clear(REQUESTER_TAG, new MusicPlayerEventListener() {
+                @Override public void onCleared() { cleared.set(true); }
+            });
+            publish(new MusicPlayerEvent.Cleared(PLAYER_ID, new Request(nextInteraction(received).requestId(), REQUESTER_TAG), GUILD_ID, java.util.List.of()));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(cleared.get()).isTrue());
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void reportsStoppedWhenAgentConfirmsStop() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicBoolean stopped = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.stop(new MusicPlayerEventListener() {
+                @Override public void onStopped() { stopped.set(true); }
+            });
+            publish(new MusicPlayerEvent.Stopped(PLAYER_ID, nextInteraction(received).requestId(), GUILD_ID));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(stopped.get()).isTrue());
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void keepsAnsweringAfterAListenerThrows() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicBoolean paused = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.togglePause(REQUESTER_TAG, new MusicPlayerEventListener() {
+                @Override public void onPaused() { throw new IllegalStateException("Discord edit failed"); }
+            });
+            publish(new MusicPlayerEvent.Paused(PLAYER_ID, new Request(nextInteraction(received).requestId(), REQUESTER_TAG), GUILD_ID));
+            player.togglePause(REQUESTER_TAG, new MusicPlayerEventListener() {
+                @Override public void onPaused() { paused.set(true); }
+            });
+            publish(new MusicPlayerEvent.Paused(PLAYER_ID, new Request(nextInteraction(received).requestId(), REQUESTER_TAG), GUILD_ID));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(paused.get()).isTrue());
+        } finally {
+            container.stop();
+        }
+    }
+
+    // --- HELPERS ---
+
+    private MusicPlayerInteraction nextInteraction(BlockingQueue<String> received) throws Exception {
+        String json = received.poll(2, TimeUnit.SECONDS);
+        assertThat(json).isNotNull();
+        return objectMapper.readValue(json, MusicPlayerInteraction.class);
+    }
+
+    private void publish(MusicPlayerEvent event) {
+        redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(event));
     }
 }

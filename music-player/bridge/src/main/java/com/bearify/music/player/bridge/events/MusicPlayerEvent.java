@@ -29,6 +29,9 @@ import java.util.List;
         @JsonSubTypes.Type(value = MusicPlayerEvent.Stopped.class, name = "player_stopped"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.ConnectFailed.class, name = "connect_failed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.PlayerNotFound.class, name = "player_not_found"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.Restarted.class, name = "restarted"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.NothingPlaying.class, name = "nothing_playing"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.TrackQueued.class, name = "track_queued"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -50,7 +53,10 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.Ready,
         MusicPlayerEvent.Stopped,
         MusicPlayerEvent.ConnectFailed,
-        MusicPlayerEvent.PlayerNotFound {
+        MusicPlayerEvent.PlayerNotFound,
+        MusicPlayerEvent.Restarted,
+        MusicPlayerEvent.NothingPlaying,
+        MusicPlayerEvent.TrackQueued {
 
     String playerId();
     String requestId();
@@ -106,4 +112,9 @@ public sealed interface MusicPlayerEvent permits
     record Stopped(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record ConnectFailed(String playerId, String requestId, String guildId, String reason) implements MusicPlayerEvent {}
     record PlayerNotFound(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    record Restarted(String playerId, Request request, String guildId) implements MusicPlayerEvent {
+        @Override public String requestId() { return request.id(); }
+    }
+    record NothingPlaying(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    record TrackQueued(String playerId, String requestId, String guildId, TrackMetadata track, int queuedCount) implements MusicPlayerEvent {}
 }

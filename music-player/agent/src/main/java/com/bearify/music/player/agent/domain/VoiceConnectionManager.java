@@ -91,13 +91,18 @@ public class VoiceConnectionManager implements AutoCloseable {
     }
 
     public void disconnect(String guildId) {
+        disconnect(guildId, UUID.randomUUID().toString());
+    }
+
+    /** Leaves voice and answers {@code Stopped} under {@code requestId}, so a stop request gets its reply. */
+    public void disconnect(String guildId, String requestId) {
         joiningGuilds.remove(guildId);
         client.guild(guildId).voice().ifPresent(session -> {
             redis.delete(PlayerRedisProtocol.Keys.assignment(guildId, session.getChannelId()));
             session.leave();
         });
         pool.get(guildId).ifPresent(AudioPlayer::close);
-        eventDispatcher.dispatch(new MusicPlayerEvent.Stopped(playerId, UUID.randomUUID().toString(), guildId));
+        eventDispatcher.dispatch(new MusicPlayerEvent.Stopped(playerId, requestId, guildId));
     }
 
     private void handleInVoice(JoinRequest request, Guild guild, VoiceSession session) {

@@ -21,6 +21,8 @@ REDIS_PASSWORD= \
 
 ## Commands
 
+Every `/player` command answers only once the bear has confirmed it, or says the bear didn't answer in time. A player button that fails answers privately to whoever pressed it.
+
 ### `/player join`
 Lures a bear into your voice channel. Acquires a free player agent from the pool.
 

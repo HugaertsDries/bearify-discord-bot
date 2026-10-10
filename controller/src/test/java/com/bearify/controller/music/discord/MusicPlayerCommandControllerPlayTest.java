@@ -6,6 +6,7 @@ import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,8 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
     private static final String PLAYER_ID = "player-1";
     private static final String QUERY = "never gonna give you up";
     private static final String RESOLVED_QUERY = "ytsearch:" + QUERY;
+    private static final TrackMetadata TRACK = new TrackMetadata("Never Gonna Give You Up", "Rick Astley", "https://youtu.be/dQw4w9WgXcQ", 213_000);
+    private static final String QUEUED_MESSAGE = "Queued **Never Gonna Give You Up**.";
 
     @Autowired CommandRegistry commandRegistry;
     @Autowired StringRedisTemplate redis;
@@ -63,8 +66,6 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
 
             assertThat(interaction.getDeferredMessage()).isPresent();
             assertThat(interaction.isDeferredEphemeral()).isTrue();
-            assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                    .contains("added your track to the mix");
 
             String json = received.poll(2, TimeUnit.SECONDS);
             assertThat(json).isNotNull();
@@ -73,6 +74,12 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
             MusicPlayerInteraction.Play play = (MusicPlayerInteraction.Play) playerInteraction;
             assertThat(play.trackRequest().query()).isEqualTo(RESOLVED_QUERY);
             assertThat(play.trackRequest().textChannelId()).isEqualTo(TEXT_CHANNEL_ID);
+
+            redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
+                    new MusicPlayerEvent.TrackQueued(PLAYER_ID, play.requestId(), GUILD_ID, TRACK, 1)));
+
+            Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains(QUEUED_MESSAGE));
         } finally {
             container.stop();
         }
@@ -148,9 +155,11 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
                 assertThat(play.trackRequest().query()).isEqualTo(RESOLVED_QUERY);
                 assertThat(play.trackRequest().textChannelId()).isEqualTo(TEXT_CHANNEL_ID);
 
+                redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(
+                        new MusicPlayerEvent.TrackQueued(PLAYER_ID, play.requestId(), GUILD_ID, TRACK, 1)));
+
                 Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
-                        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                                .contains("added your track to the mix"));
+                        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains(QUEUED_MESSAGE));
             } finally {
                 interactionContainer.stop();
             }

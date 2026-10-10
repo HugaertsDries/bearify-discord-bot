@@ -11,11 +11,17 @@ class JdaReplyBuilder implements ReplyBuilder {
 
     private final IReplyCallback event;
     private final String message;
+    private final boolean editsDeferredReply;
     private boolean ephemeral = false;
 
-    JdaReplyBuilder(IReplyCallback event, String message) {
+    /**
+     * @param editsDeferredReply true when the command deferred: its "thinking…" message is then replaced
+     *                           instead of left hanging next to a follow-up
+     */
+    JdaReplyBuilder(IReplyCallback event, String message, boolean editsDeferredReply) {
         this.event = event;
         this.message = message;
+        this.editsDeferredReply = editsDeferredReply;
     }
 
     @Override
@@ -26,8 +32,11 @@ class JdaReplyBuilder implements ReplyBuilder {
 
     @Override
     public void send() {
-        // A deferred interaction can no longer be replied to, only followed up through its hook
-        if (event.isAcknowledged()) {
+        // A deferred interaction can no longer be replied to, only edited or followed up through its hook
+        if (editsDeferredReply) {
+            event.getHook().editOriginal(message)
+                    .queue(null, failure -> LOG.warn("Failed to edit deferred reply: {}", failure.getMessage(), failure));
+        } else if (event.isAcknowledged()) {
             event.getHook().sendMessage(message).setEphemeral(ephemeral)
                     .queue(null, failure -> LOG.warn("Failed to send follow-up reply: {}", failure.getMessage(), failure));
         } else {

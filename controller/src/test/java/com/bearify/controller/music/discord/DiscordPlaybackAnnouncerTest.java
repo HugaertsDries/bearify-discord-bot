@@ -130,6 +130,17 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void showsRestartedLabelWithRequester() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Restarted("player-1", new Request("req-2", "@user"), "guild-1"));
+
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Restarted by @user"));
+    }
+
+    @Test
     void acceptReplacesOlderTemporaryActionWithNewerOne() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));

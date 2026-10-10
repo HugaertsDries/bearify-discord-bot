@@ -41,7 +41,7 @@ public class MusicPlayerInteractionDispatcher {
             case MusicPlayerInteraction.Connect connect ->
                     manager.connect(connect);
             case MusicPlayerInteraction.Stop stop ->
-                    manager.disconnect(stop.guildId());
+                    manager.disconnect(stop.guildId(), stop.requestId());
             case MusicPlayerInteraction.Play play ->
                     loadAndPlay(play);
             case MusicPlayerInteraction.TogglePause p ->
@@ -65,7 +65,9 @@ public class MusicPlayerInteractionDispatcher {
                             player -> player.forward(Duration.ofMillis(f.seekMs()), f.request()),
                             () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, f.requestId(), f.guildId())));
             case MusicPlayerInteraction.Clear c ->
-                    pool.get(c.guildId()).ifPresent(player -> player.clear(c.request()));
+                    pool.get(c.guildId()).ifPresentOrElse(
+                            player -> player.clear(c.request()),
+                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, c.requestId(), c.guildId())));
             case MusicPlayerInteraction.Search search ->
                     search(search);
         }
@@ -78,11 +80,21 @@ public class MusicPlayerInteractionDispatcher {
             @Override
             public void trackLoaded(Track track) {
                 player.play(track);
+                queued(track, 1);
             }
 
             @Override
             public void playlistLoaded(List<Track> tracks) {
+                if (tracks.isEmpty()) {
+                    noMatches();
+                    return;
+                }
                 player.play(tracks);
+                queued(tracks.getFirst(), tracks.size());
+            }
+
+            private void queued(Track first, int count) {
+                eventDispatcher.dispatch(new MusicPlayerEvent.TrackQueued(playerId, play.requestId(), play.guildId(), first.toMetadata(), count));
             }
 
             @Override

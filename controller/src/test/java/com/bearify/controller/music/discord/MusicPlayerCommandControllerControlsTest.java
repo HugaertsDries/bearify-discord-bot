@@ -6,13 +6,16 @@ import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
@@ -21,8 +24,10 @@ import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegrationTest {
 
@@ -31,6 +36,10 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String TEXT_CHANNEL_ID = "txt-789";
     private static final String PLAYER_ID = "player-1";
     private static final String FAILURE_REASON = "Request timed out";
+    private static final String REQUESTER_TAG = "<@user-1>";
+    private static final String RESTARTED_MESSAGE = "\u23EE\uFE0F | Back to the start of this track.";
+    private static final String NOTHING_PLAYING_MESSAGE = "\uD83C\uDF6F | Nothing's playing right now. Queue something with `/player play`!";
+    private static final String QUEUE_EMPTY_MESSAGE = "\uD83C\uDF6F | This is where the trail ends. Try adding more using `/player play` command!";
 
     @Autowired CommandRegistry commandRegistry;
     @Autowired StringRedisTemplate redis;
@@ -156,6 +165,109 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         }
     }
 
+    // --- ANSWERS ---
+
+    @Test
+    void answersPreviousWithRestartTextWhenBearRestartsTrack() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.Restarted(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("previous");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(RESTARTED_MESSAGE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void answersPauseWithNothingPlayingTextWhenNothingPlays() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.NothingPlaying(PLAYER_ID, interaction.requestId(), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("pause");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(NOTHING_PLAYING_MESSAGE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void answersRewindWithTheSecondsTheBearApplied() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.Rewound(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, 30_000));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("rewind");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                            .contains("Rewound the current track by 30s for you."));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void neverWritesSkipTextWhenBearHasNothingToSkipTo() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.NothingToAdvance(PLAYER_ID, interaction.requestId(), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("next");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(QUEUE_EMPTY_MESSAGE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void answersClearAfterBearConfirms() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.Cleared(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, java.util.List.of()));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("clear");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                            .contains("Cleared the playlist. Fresh paws."));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void answersLeavePubliclyAfterBearConfirms() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.Stopped(PLAYER_ID, interaction.requestId(), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("leave");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isFalse();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                            .contains("cleaning up after myself"));
+        } finally {
+            bear.stop();
+        }
+    }
+
     // --- EDGE CASES ---
 
     @Test
@@ -242,6 +354,19 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
     // --- HELPERS ---
 
+    /** Plays the bear: answers every request on the player's channel with {@code answer}. */
+    private RedisMessageListenerContainer answerAs(Function<MusicPlayerInteraction, MusicPlayerEvent> answer) {
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(redisConnectionFactory);
+        container.addMessageListener((message, pattern) -> {
+            MusicPlayerInteraction interaction = objectMapper.readValue(message.getBody(), MusicPlayerInteraction.class);
+            redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(answer.apply(interaction)));
+        }, new ChannelTopic(PlayerRedisProtocol.Channels.interactions(PLAYER_ID)));
+        container.afterPropertiesSet();
+        container.start();
+        return container;
+    }
+
     private MockCommandInteraction buildInteraction(String subcommand) {
         return MockCommandInteraction.forCommand("player")
                 .subcommand(subcommand)
@@ -269,25 +394,25 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
     private static final class FailingMusicPlayer implements MusicPlayer {
         @Override public void join(MusicPlayerEventListener handler) {}
-        @Override public void stop() {}
+        @Override public void stop(MusicPlayerEventListener handler) {}
         @Override public void play(TrackRequest request, MusicPlayerEventListener handler) {}
         @Override public void togglePause(String requesterTag, MusicPlayerEventListener handler) { handler.onFailed(FAILURE_REASON); }
         @Override public void previous(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void next(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void rewind(Duration seek, String requesterTag) {}
+        @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void clear(String requesterTag) {}
+        @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
     }
 
     private static final class TimingOutMusicPlayer implements MusicPlayer {
         @Override public void join(MusicPlayerEventListener handler) {}
-        @Override public void stop() {}
+        @Override public void stop(MusicPlayerEventListener handler) {}
         @Override public void play(TrackRequest request, MusicPlayerEventListener handler) {}
         @Override public void togglePause(String requesterTag, MusicPlayerEventListener handler) { handler.onTimedOut(); }
         @Override public void previous(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void next(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void rewind(Duration seek, String requesterTag) {}
+        @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void clear(String requesterTag) {}
+        @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
     }
 }

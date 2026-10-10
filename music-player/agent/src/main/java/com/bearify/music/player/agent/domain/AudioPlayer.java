@@ -80,7 +80,7 @@ public class AudioPlayer implements AudioProvider {
             engine.play(track);
         } else {
             queue.addLast(track);
-            List<TrackMetadata> upNext = queue.stream().limit(3).map(this::toTrackMetadata).toList();
+            List<TrackMetadata> upNext = queue.stream().limit(3).map(Track::toMetadata).toList();
             eventDispatcher.dispatch(new MusicPlayerEvent.QueueUpdated(playerId, randomId(), guildId, upNext));
         }
     }
@@ -93,11 +93,15 @@ public class AudioPlayer implements AudioProvider {
         if (engine.getPlayingTrack().isEmpty()) {
             engine.play(queue.pollFirst());
         }
-        List<TrackMetadata> upNext = queue.stream().limit(3).map(this::toTrackMetadata).toList();
+        List<TrackMetadata> upNext = queue.stream().limit(3).map(Track::toMetadata).toList();
         eventDispatcher.dispatch(new MusicPlayerEvent.QueueUpdated(playerId, randomId(), guildId, upNext));
     }
 
-    public void togglePause(Request request) {
+    public synchronized void togglePause(Request request) {
+        if (engine.getPlayingTrack().isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.NothingPlaying(playerId, request.id(), guildId));
+            return;
+        }
         boolean nowPaused = !engine.isPaused();
         engine.setPaused(nowPaused);
         if (nowPaused) {
@@ -124,6 +128,7 @@ public class AudioPlayer implements AudioProvider {
         if (!justRestarted && current.isPresent() && current.get().position() > properties.previousRestartThreshold().toMillis()) {
             current.get().setPosition(0);
             justRestarted = true;
+            eventDispatcher.dispatch(new MusicPlayerEvent.Restarted(playerId, request, guildId));
             return;
         }
         justRestarted = false;
@@ -137,38 +142,49 @@ public class AudioPlayer implements AudioProvider {
         eventDispatcher.dispatch(new MusicPlayerEvent.WentBack(playerId, request, guildId));
     }
 
-    public void rewind(Duration seek, Request request) {
+    public synchronized void rewind(Duration seek, Request request) {
         Optional<Track> playing = engine.getPlayingTrack();
-        if (playing.isEmpty()) return;
+        if (playing.isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.NothingPlaying(playerId, request.id(), guildId));
+            return;
+        }
         Track track = playing.get();
         long effectiveSeekMs = seek.isZero() ? defaultSeekMs(track) : seek.toMillis();
-        long newPosition = Math.max(0, track.position() - effectiveSeekMs);
-        track.setPosition(newPosition);
-        eventDispatcher.dispatch(new MusicPlayerEvent.Rewound(playerId, request, guildId, effectiveSeekMs));
+        long before = track.position();
+        long after = Math.max(0, before - effectiveSeekMs);
+        track.setPosition(after);
+        // the distance actually moved: rewinding past the start stops at 0
+        eventDispatcher.dispatch(new MusicPlayerEvent.Rewound(playerId, request, guildId, before - after));
     }
 
     public synchronized void forward(Duration seek, Request request) {
         Optional<Track> playing = engine.getPlayingTrack();
-        if (playing.isEmpty()) return;
+        if (playing.isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.NothingPlaying(playerId, request.id(), guildId));
+            return;
+        }
         Track track = playing.get();
         long effectiveSeekMs = seek.isZero() ? defaultSeekMs(track) : seek.toMillis();
-        long newPosition = track.position() + effectiveSeekMs;
-        if (newPosition >= track.duration()) {
-            if (queue.isEmpty()) {
-                eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
-                return;
-            } else {
-                boolean wasPaused = engine.isPaused();
-                history.addFirst(track.clone());
-                engine.play(queue.pollFirst());
-                if (wasPaused) {
-                    eventDispatcher.dispatch(new MusicPlayerEvent.Paused(playerId, request, guildId));
-                }
-            }
-        } else {
-            track.setPosition(newPosition);
+        long before = track.position();
+        long after = before + effectiveSeekMs;
+        if (after < track.duration()) {
+            track.setPosition(after);
+            eventDispatcher.dispatch(new MusicPlayerEvent.Forwarded(playerId, request, guildId, after - before));
+            return;
         }
-        eventDispatcher.dispatch(new MusicPlayerEvent.Forwarded(playerId, request, guildId, effectiveSeekMs));
+        // forwarding past the end is a skip to the next track
+        if (queue.isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
+            return;
+        }
+        boolean wasPaused = engine.isPaused();
+        history.addFirst(track.clone());
+        engine.play(queue.pollFirst());
+        if (wasPaused) {
+            // a fresh id, so this Paused doesn't answer the forward request in place of Skipped
+            eventDispatcher.dispatch(new MusicPlayerEvent.Paused(playerId, new Request(randomId(), request.requesterTag()), guildId));
+        }
+        eventDispatcher.dispatch(new MusicPlayerEvent.Skipped(playerId, request, guildId));
     }
 
     public synchronized void clear(Request request) {
@@ -197,10 +213,6 @@ public class AudioPlayer implements AudioProvider {
         return UUID.randomUUID().toString();
     }
 
-    private TrackMetadata toTrackMetadata(Track t) {
-        return new TrackMetadata(t.title(), t.author(), t.uri(), t.duration());
-    }
-
     private class TrackEventHandler implements AudioEngineListener {
 
         @Override
@@ -208,14 +220,14 @@ public class AudioPlayer implements AudioProvider {
             List<TrackMetadata> upNext;
             synchronized (AudioPlayer.this) {
                 justRestarted = false;
-                upNext = queue.stream().limit(3).map(AudioPlayer.this::toTrackMetadata).toList();
+                upNext = queue.stream().limit(3).map(Track::toMetadata).toList();
             }
             LOG.info("Now playing: {} by {}", track.title(), track.author());
             eventDispatcher.dispatch(new MusicPlayerEvent.TrackStart(
                     playerId,
                     new Request(randomId(), track.requesterTag()),
                     guildId,
-                    toTrackMetadata(track),
+                    track.toMetadata(),
                     upNext));
         }
 
@@ -244,7 +256,7 @@ public class AudioPlayer implements AudioProvider {
         public void onTrackError(Track track, String message) {
             LOG.error("Track error for '{}': {}", track.title(), message);
             lastTrackWasError = true;
-            eventDispatcher.dispatch(new MusicPlayerEvent.TrackError(playerId, randomId(), guildId, toTrackMetadata(track)));
+            eventDispatcher.dispatch(new MusicPlayerEvent.TrackError(playerId, randomId(), guildId, track.toMetadata()));
         }
 
         @Override

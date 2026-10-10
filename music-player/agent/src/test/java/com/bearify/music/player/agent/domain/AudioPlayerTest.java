@@ -63,6 +63,7 @@ class AudioPlayerTest {
 
     @Test
     void pausesPlaybackWhenPlaying() {
+        engine.play(track("Song A", 120_000));
         engine.setPaused(false);
 
         player.togglePause(new Request("req-1", "@user"));
@@ -74,6 +75,7 @@ class AudioPlayerTest {
 
     @Test
     void resumesPlaybackWhenPaused() {
+        engine.play(track("Song A", 120_000));
         engine.setPaused(true);
 
         player.togglePause(new Request("req-1", "@user"));
@@ -112,7 +114,7 @@ class AudioPlayerTest {
     }
 
     @Test
-    void restartsCurrentTrackWhenPastThreshold() {
+    void restartsTrackAndAnnouncesRestartWhenPastThreshold() {
         InMemoryTrack trackA = track("Song A", 120_000);
         trackA.setPosition(5_000);
         engine.play(trackA);
@@ -120,6 +122,50 @@ class AudioPlayerTest {
         player.previous(new Request("req-1", "@user"));
 
         assertThat(trackA.position()).isEqualTo(0);
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.Restarted(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID));
+    }
+
+    @Test
+    void answersNothingPlayingWhenTogglingPauseWithoutTrack() {
+        player.togglePause(new Request("req-1", "@user"));
+
+        assertThat(engine.isPaused()).isFalse();
+        assertThat(eventDispatcher.getEvents())
+                .containsExactly(new MusicPlayerEvent.NothingPlaying(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
+    void answersNothingPlayingWhenRewindingWithoutTrack() {
+        player.rewind(Duration.ZERO, new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getEvents())
+                .containsExactly(new MusicPlayerEvent.NothingPlaying(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
+    void answersNothingPlayingWhenForwardingWithoutTrack() {
+        player.forward(Duration.ZERO, new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getEvents())
+                .containsExactly(new MusicPlayerEvent.NothingPlaying(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
+    void answersSkippedOnlyOnceWhenForwardingPausedTrackPastItsEnd() {
+        InMemoryTrack trackA = track("Song A", 120_000, "@alice");
+        InMemoryTrack trackB = track("Song B", 180_000, "@alice");
+        engine.play(trackA);
+        player.play(trackB);
+        engine.setPaused(true);
+        trackA.setPosition(115_000);
+
+        player.forward(Duration.ofMillis(10_000), new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getEvents())
+                .filteredOn(event -> event.requestId().equals("req-1"))
+                .containsExactly(new MusicPlayerEvent.Skipped(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID));
+        assertThat(eventDispatcher.getEvents()).anySatisfy(event -> assertThat(event).isInstanceOf(MusicPlayerEvent.Paused.class));
     }
 
     @Test
@@ -311,7 +357,7 @@ class AudioPlayerTest {
     }
 
     @Test
-    void advancesToNextTrackWhenForwardExceedsDuration() {
+    void answersAsSkipWhenForwardRunsPastTheEndOfTheTrack() {
         InMemoryTrack trackA = track("Song A", 120_000, "@alice");
         InMemoryTrack trackB = track("Song B", 180_000, "@alice");
         engine.play(trackA);
@@ -323,7 +369,20 @@ class AudioPlayerTest {
 
         assertThat(engine.getPlayingTrack()).containsSame(trackB);
         assertThat(eventDispatcher.getEvents())
-                .contains(new MusicPlayerEvent.Forwarded(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 10_000));
+                .filteredOn(event -> event.requestId().equals("req-1"))
+                .containsExactly(new MusicPlayerEvent.Skipped(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID));
+    }
+
+    @Test
+    void reportsDistanceMovedWhenRewindingPastTheStart() {
+        InMemoryTrack track = track("Track", 120_000);
+        track.setPosition(5_000);
+        engine.play(track);
+
+        player.rewind(Duration.ZERO, new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.Rewound(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 5_000));
     }
 
     @Test

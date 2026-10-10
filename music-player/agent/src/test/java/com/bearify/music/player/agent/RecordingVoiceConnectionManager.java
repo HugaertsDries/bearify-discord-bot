@@ -29,6 +29,11 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
     }
 
     @Override
+    public void disconnect(String guildId, String requestId) {
+        disconnectedGuilds.add(guildId);
+    }
+
+    @Override
     public void close() {
     }
 

@@ -4,6 +4,7 @@ import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
 
@@ -115,13 +116,35 @@ class MusicPlayerInteractionTest {
                 .build();
 
         new MusicPlayerCommandController(pool).leave(interaction);
+        musicPlayer.stopHandler.onStopped();
 
         assertThat(pool.findGuildId).isEqualTo(GUILD_ID);
         assertThat(pool.findVoiceChannelId).isEqualTo(VOICE_CHANNEL_ID);
         assertThat(musicPlayer.stopped).isTrue();
-        assertThat(interaction.getReplies()).hasSize(1);
-        assertThat(interaction.getReplies().getFirst().isEphemeral()).isFalse();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("cleaning up after myself");
+        assertThat(interaction.isDeferredEphemeral()).isFalse();
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains("cleaning up after myself");
+    }
+
+    @Test
+    void waitsForTheBearBeforeSayingGoodbye() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("leave");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).leave(interaction);
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().hasEdits()).isFalse();
+        assertThat(interaction.getReplies()).isEmpty();
+    }
+
+    @Test
+    void showsTimeoutMessageWhenBearDoesNotConfirmLeaving() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("leave");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).leave(interaction);
+        musicPlayer.stopHandler.onTimedOut();
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains("didn't answer in time");
     }
 
     @Test
@@ -198,6 +221,58 @@ class MusicPlayerInteractionTest {
     }
 
     @Test
+    void showsQueuedTitleWhenTrackIsQueued() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("play");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, "one more time");
+        musicPlayer.playHandler.onTrackQueued(TRACK, 1);
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(QUEUED_TRACK_MESSAGE);
+    }
+
+    @Test
+    void showsQueuedCountWhenPlaylistIsQueued() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("play");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, "https://youtube.com/playlist?list=PLxyz");
+        musicPlayer.playHandler.onTrackQueued(TRACK, 12);
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("Queued **12** tracks from the playlist.");
+    }
+
+    @Test
+    void showsTimeoutMessageWhenPlayIsNotAnswered() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("play");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).play(interaction, "one more time");
+        musicPlayer.playHandler.onTimedOut();
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains("didn't answer in time");
+    }
+
+    @Test
+    void replacesJoiningMessageWhenPlayAfterJoinFails() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MusicPlayerPool pool = new MusicPlayerPool() {
+            @Override public MusicPlayer acquire(String guildId, String voiceChannelId) { return musicPlayer; }
+            @Override public Optional<MusicPlayer> find(String guildId, String voiceChannelId) { return Optional.empty(); }
+            @Override public boolean hasActiveSessionFor(String guildId) { return false; }
+        };
+        MockCommandInteraction interaction = buildInteraction("play");
+
+        new MusicPlayerCommandController(pool).play(interaction, "one more time");
+        musicPlayer.fireReady();
+        musicPlayer.playHandler.onFailed("Could not reach the music players");
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .doesNotContain("Sending a bear your way");
+    }
+
+    @Test
     void usesSelectedAutocompleteUriWithoutYtsearchPrefix() {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         String uri = "https://youtube.com/watch?v=dQw4w9WgXcQ";
@@ -243,6 +318,18 @@ class MusicPlayerInteractionTest {
                 .contains("Resumed the current track for you.");
     }
 
+    @Test
+    void showsNothingPlayingMessageWhenPausingWithoutTrack() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("pause");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).pause(interaction);
+        musicPlayer.togglePauseHandler.onNothingPlaying();
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("Nothing's playing right now.");
+    }
+
     // --- PREVIOUS ---
 
     @Test
@@ -251,10 +338,23 @@ class MusicPlayerInteractionTest {
         MockCommandInteraction interaction = buildInteraction("previous");
 
         new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).previous(interaction);
+        musicPlayer.previousHandler.onWentBack();
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                 .contains("Back on the trail to the previous track.");
+    }
+
+    @Test
+    void showsRestartMessageWhenTrackRestarts() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("previous");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).previous(interaction);
+        musicPlayer.previousHandler.onRestarted();
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getEdits())
+                .containsExactly(RESTARTED_MESSAGE);
     }
 
     @Test
@@ -278,10 +378,23 @@ class MusicPlayerInteractionTest {
         MockCommandInteraction interaction = buildInteraction("next");
 
         new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).next(interaction);
+        musicPlayer.nextHandler.onSkipped();
 
         assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                 .contains("On to the next track.");
+    }
+
+    @Test
+    void neverWritesSkipTextWhenThereIsNothingToSkipTo() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("next");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).next(interaction);
+        musicPlayer.fireNextNothingToAdvance();
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getEdits())
+                .singleElement().asString().contains("This is where the trail ends.");
     }
 
     @Test
@@ -300,17 +413,17 @@ class MusicPlayerInteractionTest {
     // --- REWIND ---
 
     @Test
-    void showsSarcasticMessageWhenRewindingByZeroSeconds() {
+    void showsAppliedSecondsWhenRewindingByTheDefault() {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("rewind");
 
         new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, 0);
+        musicPlayer.rewindHandler.onRewound(Duration.ofSeconds(10));
 
         assertThat(musicPlayer.rewindSeek).isEqualTo(Duration.ZERO);
-        assertThat(interaction.getReplies()).hasSize(1);
-        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent())
-                .contains("Bold strategy. Rewinding by exactly 0 seconds.");
+        assertThat(interaction.isDeferredEphemeral()).isTrue();
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("Rewound the current track by 10s for you.");
     }
 
     @Test
@@ -319,27 +432,52 @@ class MusicPlayerInteractionTest {
         MockCommandInteraction interaction = buildInteraction("rewind");
 
         new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, 30);
+        musicPlayer.rewindHandler.onRewound(Duration.ofSeconds(30));
 
         assertThat(musicPlayer.rewindSeek).isEqualTo(Duration.ofSeconds(30));
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("Rewound the current track by 30s for you.");
+    }
+
+    @Test
+    void rejectsRewindWithNegativeSeconds() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("rewind");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, -5);
+
+        assertThat(musicPlayer.rewindSeek).isNull();
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent())
-                .contains("Rewound the current track by 30s for you.");
+        assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo(NEGATIVE_REWIND_MESSAGE);
+    }
+
+    @Test
+    void showsNothingPlayingMessageWhenRewindingWithoutTrack() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("rewind");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).rewind(interaction, 0);
+        musicPlayer.rewindHandler.onNothingPlaying();
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("Nothing's playing right now.");
     }
 
     // --- FORWARD ---
 
     @Test
-    void showsSarcasticMessageWhenForwardingByZeroSeconds() {
+    void showsAppliedSecondsWhenForwardingByTheDefault() {
         RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
         MockCommandInteraction interaction = buildInteraction("forward");
 
         new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 0);
+        musicPlayer.forwardHandler.onForwarded(Duration.ofSeconds(30));
 
         assertThat(musicPlayer.forwardSeek).isEqualTo(Duration.ZERO);
         assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                .contains("Bold strategy. Forwarding by exactly 0 seconds.");
+                .contains("Forwarded the current track by 30s for you.");
     }
 
     @Test
@@ -348,11 +486,37 @@ class MusicPlayerInteractionTest {
         MockCommandInteraction interaction = buildInteraction("forward");
 
         new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 30);
+        musicPlayer.forwardHandler.onForwarded(Duration.ofSeconds(30));
 
         assertThat(musicPlayer.forwardSeek).isEqualTo(Duration.ofSeconds(30));
         assertThat(interaction.isDeferredEphemeral()).isTrue();
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
                 .contains("Forwarded the current track by 30s for you.");
+    }
+
+    @Test
+    void rejectsForwardWithNegativeSeconds() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("forward");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, -5);
+
+        assertThat(musicPlayer.forwardSeek).isNull();
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+        assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo(NEGATIVE_FORWARD_MESSAGE);
+    }
+
+    @Test
+    void showsSkipMessageWhenForwardRunsPastTheEndOfTheTrack() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("forward");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).forward(interaction, 60);
+        musicPlayer.forwardHandler.onSkipped();
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                .contains("On to the next track.");
     }
 
     @Test
@@ -376,11 +540,21 @@ class MusicPlayerInteractionTest {
         MockCommandInteraction interaction = buildInteraction("clear");
 
         new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).clear(interaction);
+        musicPlayer.clearHandler.onCleared();
 
         assertThat(musicPlayer.cleared).isTrue();
-        assertThat(interaction.getReplies()).hasSize(1);
-        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("Cleared the playlist. Fresh paws.");
+        assertThat(interaction.isDeferredEphemeral()).isTrue();
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains("Cleared the playlist. Fresh paws.");
+    }
+
+    @Test
+    void waitsForTheBearBeforeConfirmingClear() {
+        RecordingMusicPlayer musicPlayer = new RecordingMusicPlayer();
+        MockCommandInteraction interaction = buildInteraction("clear");
+
+        new MusicPlayerCommandController(new RecordingMusicPlayerPool(Optional.of(musicPlayer))).clear(interaction);
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().hasEdits()).isFalse();
     }
 
     // --- LEAVE: VALIDATION ---
@@ -412,6 +586,13 @@ class MusicPlayerInteractionTest {
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
         assertThat(interaction.getReplies().getFirst().getContent()).contains("server");
     }
+
+    private static final TrackMetadata TRACK = new TrackMetadata("One More Time", "Daft Punk", "https://youtu.be/one-more-time", 320_000);
+
+    private static final String QUEUED_TRACK_MESSAGE = "\uD83C\uDFB5 | Queued **One More Time**.";
+    private static final String NEGATIVE_REWIND_MESSAGE = "\u23EA | Use a positive number of seconds, bear with me.";
+    private static final String NEGATIVE_FORWARD_MESSAGE = "\u23E9 | Use a positive number of seconds, bear with me.";
+    private static final String RESTARTED_MESSAGE = "\u23EE\uFE0F | Back to the start of this track.";
 
     private MockCommandInteraction buildInteraction(String subcommand) {
         return MockCommandInteraction.forCommand("player")
@@ -471,6 +652,9 @@ class MusicPlayerInteractionTest {
         private MusicPlayerEventListener previousHandler;
         private MusicPlayerEventListener nextHandler;
         private MusicPlayerEventListener forwardHandler;
+        private MusicPlayerEventListener rewindHandler;
+        private MusicPlayerEventListener clearHandler;
+        private MusicPlayerEventListener stopHandler;
         private TrackRequest playRequest;
 
         private void fireReady() {
@@ -516,8 +700,9 @@ class MusicPlayerInteractionTest {
         }
 
         @Override
-        public void stop() {
+        public void stop(MusicPlayerEventListener handler) {
             stopped = true;
+            stopHandler = handler;
         }
 
         @Override
@@ -542,8 +727,9 @@ class MusicPlayerInteractionTest {
         }
 
         @Override
-        public void rewind(Duration seek, String requesterTag) {
+        public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
             rewindSeek = seek;
+            rewindHandler = handler;
         }
 
         @Override
@@ -553,8 +739,9 @@ class MusicPlayerInteractionTest {
         }
 
         @Override
-        public void clear(String requesterTag) {
+        public void clear(String requesterTag, MusicPlayerEventListener handler) {
             cleared = true;
+            clearHandler = handler;
         }
     }
 }

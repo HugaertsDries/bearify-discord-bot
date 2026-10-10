@@ -23,7 +23,7 @@ class JdaButtonInteraction implements ButtonInteraction {
 
     @Override
     public ReplyBuilder reply(String message) {
-        return new JdaReplyBuilder(event, message);
+        return new JdaReplyBuilder(event, message, false);
     }
 
     @Override
