@@ -1,5 +1,7 @@
 # Bearify Discord Bot
 
+[![build](https://github.com/HugaertsDries/bearify-discord-bot/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/HugaertsDries/bearify-discord-bot/actions/workflows/build.yml)
+
 A Discord music bot built with Java 25 and Spring Boot. Uses a controller + player architecture where a main bot handles user commands and separate player agents handle audio playback per guild.
 
 ## Architecture
@@ -80,3 +82,13 @@ Both apps import `.env` from their working directory, so run them from the repo 
 Tests need Docker running: they start Redis with Testcontainers.
 
 > On Windows, set `JAVA_HOME` to your JDK 25 installation before running Gradle.
+
+## CI
+
+Every push and pull request runs `./gradlew build` on GitHub Actions (`.github/workflows/build.yml`). Test results are published as a "JUnit Test Report" check: the counts appear on the run summary, and failures are annotated on the failing test.
+
+The Docker images skip tests (`-x test`), so let Railway wait for that check before deploying. Enable **Settings → Deploy → Wait for CI** on both the controller and the agent service. A deploy then waits while the workflow runs and is skipped if it fails.
+
+- The toggle only appears once a workflow runs on `push` to the deploy branch.
+- A manual Redeploy bypasses the check.
+- If a deploy gets stuck in WAITING, use **Deploy latest commit**.

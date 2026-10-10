@@ -101,10 +101,20 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
         @Primary
         RecordingMusicPlayerInteractionDispatcher recordingMusicPlayerInteractionDispatcher(VoiceConnectionManager manager,
                                                                                             AudioPlayerPool pool,
-                                                                                            AudioTrackLoader loader,
                                                                                             MusicPlayerEventDispatcher eventDispatcher,
                                                                                             @Value("${player.id}") String playerId) {
-            return new RecordingMusicPlayerInteractionDispatcher(manager, pool, loader, eventDispatcher, playerId);
+            return new RecordingMusicPlayerInteractionDispatcher(manager, pool, new NoOpTrackLoader(), eventDispatcher, playerId);
+        }
+    }
+
+    // keeps these routing tests off the network: the real loader would search YouTube
+    private static final class NoOpTrackLoader implements AudioTrackLoader {
+        @Override
+        public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+        }
+
+        @Override
+        public void search(String query, int limit, AudioTrackSearchCallback callback) {
         }
     }
 }
