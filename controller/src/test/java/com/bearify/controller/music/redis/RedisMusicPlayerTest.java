@@ -227,29 +227,29 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
     @Test
     void reportsFailureWhenTogglePauseTimesOut() {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
-        AtomicReference<String> failure = new AtomicReference<>();
+        AtomicBoolean timedOut = new AtomicBoolean(false);
 
         MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
         player.togglePause(REQUESTER_TAG, new MusicPlayerEventListener() {
-            @Override public void onFailed(String reason) { failure.set(reason); }
+            @Override public void onTimedOut() { timedOut.set(true); }
         });
 
         await().atMost(3, TimeUnit.SECONDS)
-                .untilAsserted(() -> assertThat(failure.get()).isEqualTo("Request timed out"));
+                .untilAsserted(() -> assertThat(timedOut.get()).isTrue());
     }
 
     @Test
     void reportsFailureWhenNextTimesOut() {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
-        AtomicReference<String> failure = new AtomicReference<>();
+        AtomicBoolean timedOut = new AtomicBoolean(false);
 
         MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
         player.next(REQUESTER_TAG, new MusicPlayerEventListener() {
-            @Override public void onFailed(String reason) { failure.set(reason); }
+            @Override public void onTimedOut() { timedOut.set(true); }
         });
 
         await().atMost(3, TimeUnit.SECONDS)
-                .untilAsserted(() -> assertThat(failure.get()).isEqualTo("Request timed out"));
+                .untilAsserted(() -> assertThat(timedOut.get()).isTrue());
     }
 
     @Test

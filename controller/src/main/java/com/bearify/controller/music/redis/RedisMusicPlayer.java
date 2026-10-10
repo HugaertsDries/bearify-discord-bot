@@ -267,7 +267,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     serialize(new MusicPlayerInteraction.Clear(playerId, new Request(UUID.randomUUID().toString(), requesterTag), guildId)));
         }
 
-        // a timeout tells timeoutListener the request failed, so no action can leave the user waiting
+        // a timeout tells timeoutListener the request timed out, so no action can leave the user waiting
         private void request(Function<String, MusicPlayerInteraction> interaction,
                              MusicPlayerEventListener timeoutListener,
                              Consumer<MusicPlayerEvent> onReply) {
@@ -277,7 +277,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     .orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS)
                     .whenComplete((event, ex) -> {
                         if (ex != null) {
-                            timeoutListener.onFailed("Request timed out");
+                            timeoutListener.onTimedOut();
                         } else {
                             onReply.accept(event);
                         }
