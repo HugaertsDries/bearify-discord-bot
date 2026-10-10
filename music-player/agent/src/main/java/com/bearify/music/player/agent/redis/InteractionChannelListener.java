@@ -26,6 +26,7 @@ class InteractionChannelListener implements SmartLifecycle {
         container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(onInteraction(objectMapper, dispatcher), new ChannelTopic(PlayerRedisProtocol.Channels.interactions(playerId)));
+        // shortcut: every agent answers a search, route to one agent if the agent count grows
         container.addMessageListener(onInteraction(objectMapper, dispatcher), new ChannelTopic(PlayerRedisProtocol.Channels.SEARCH));
         container.afterPropertiesSet();
     }
