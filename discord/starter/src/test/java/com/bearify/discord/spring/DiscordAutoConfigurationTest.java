@@ -8,9 +8,7 @@ import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.InteractionType;
 import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.model.CommandDefinition;
-import com.bearify.discord.spring.annotation.CommandAdvice;
 import com.bearify.discord.spring.annotation.DiscordController;
-import com.bearify.discord.spring.annotation.HandleException;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.testing.MockAutocompleteInteraction;
@@ -29,6 +27,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class DiscordAutoConfigurationTest {
 
@@ -111,14 +115,6 @@ class DiscordAutoConfigurationTest {
         }
     }
 
-    @CommandAdvice
-    static class TestAdvice {
-        @HandleException(RuntimeException.class)
-        void onError(CommandInteraction interaction, RuntimeException e) {
-            interaction.reply("Error: " + e.getMessage()).ephemeral().send();
-        }
-    }
-
     @DiscordController
     @Lazy
     static class LazyInitCommand {
@@ -145,17 +141,6 @@ class DiscordAutoConfigurationTest {
         }
     }
 
-    @CommandAdvice
-    static class DiscordDependentAdvice {
-        DiscordDependentAdvice(DiscordClient client) {
-        }
-
-        @HandleException(RuntimeException.class)
-        void onError(CommandInteraction interaction, RuntimeException e) {
-            interaction.reply("handled").send();
-        }
-    }
-
     @DiscordController
     static class ButtonController {
         @Interaction(type = InteractionType.BUTTON, value = "player:pause-play")
@@ -177,6 +162,22 @@ class DiscordAutoConfigurationTest {
     static class FailingCommand {
         @Interaction(value = "boom", description = "Always throws")
         void boom(CommandInteraction interaction) {
+            throw new IllegalStateException("boom");
+        }
+    }
+
+    @DiscordController
+    static class FailingButtonController {
+        @Interaction(type = InteractionType.BUTTON, value = "boom:button")
+        void boom(ButtonInteraction interaction) {
+            throw new IllegalStateException("boom");
+        }
+    }
+
+    @DiscordController
+    static class FailingSearchController {
+        @Interaction(type = InteractionType.AUTOCOMPLETE, value = "boom:search")
+        void boom(AutocompleteInteraction interaction) {
             throw new IllegalStateException("boom");
         }
     }
@@ -316,7 +317,7 @@ class DiscordAutoConfigurationTest {
     }
 
     @Test
-    void usesFallbackReplyWhenNoExceptionHandlerMatches() {
+    void repliesWithGenericErrorWhenCommandHandlerThrows() {
         contextRunner
                 .withPropertyValues("discord.token=test-token")
                 .withUserConfiguration(MockClientConfig.class, FailingCommand.class)
@@ -334,11 +335,53 @@ class DiscordAutoConfigurationTest {
     }
 
     @Test
-    void registersCommandAdviceAsExceptionHandler() {
+    void repliesWithGenericErrorWhenButtonHandlerThrows() {
         contextRunner
                 .withPropertyValues("discord.token=test-token")
-                .withUserConfiguration(MockClientConfig.class, TestAdvice.class)
-                .run(ctx -> assertThat(ctx).hasSingleBean(CommandExceptionHandlerRegistry.class));
+                .withUserConfiguration(MockClientConfig.class, FailingButtonController.class)
+                .run(ctx -> {
+                    MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
+                    MockButtonInteraction interaction = MockButtonInteraction.forButton("boom:button").build();
+
+                    client.dispatchButton(interaction);
+
+                    assertThat(interaction.getReplies()).singleElement().satisfies(reply -> {
+                        assertThat(reply.getContent()).isEqualTo("Something went wrong. Please try again later.");
+                        assertThat(reply.isEphemeral()).isTrue();
+                        assertThat(reply.isSent()).isTrue();
+                    });
+                });
+    }
+
+    @Test
+    void repliesWithNoChoicesWhenAutocompleteHandlerThrows() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(CapturingClientConfig.class, FailingSearchController.class)
+                .run(ctx -> {
+                    CapturingDiscordClientFactory factory = ctx.getBean(CapturingDiscordClientFactory.class);
+                    MockAutocompleteInteraction interaction = MockAutocompleteInteraction.forAutocomplete("boom:search", "lofi").build();
+
+                    factory.dispatch(interaction);
+
+                    assertThat(interaction.getReplies()).singleElement().satisfies(choices -> assertThat(choices).isEmpty());
+                });
+    }
+
+    @Test
+    void swallowsFailedErrorReplyWhenHandlerThrows() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(CapturingClientConfig.class, FailingSearchController.class)
+                .run(ctx -> {
+                    CapturingDiscordClientFactory factory = ctx.getBean(CapturingDiscordClientFactory.class);
+                    AutocompleteInteraction interaction = mock(AutocompleteInteraction.class);
+                    when(interaction.getId()).thenReturn("boom:search");
+                    doThrow(new IllegalStateException("already acknowledged")).when(interaction).reply(anyList());
+
+                    assertThatNoException().isThrownBy(() -> factory.dispatch(interaction));
+                    verify(interaction).reply(List.of());
+                });
     }
 
     @Test
@@ -347,14 +390,6 @@ class DiscordAutoConfigurationTest {
                 .withPropertyValues("discord.token=test-token")
                 .withUserConfiguration(MockClientConfig.class, DiscordDependentCommand.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(CommandRegistry.class));
-    }
-
-    @Test
-    void startsContextWhenAdviceDependsOnDiscordClient() {
-        contextRunner
-                .withPropertyValues("discord.token=test-token")
-                .withUserConfiguration(MockClientConfig.class, DiscordDependentAdvice.class)
-                .run(ctx -> assertThat(ctx).hasSingleBean(CommandExceptionHandlerRegistry.class));
     }
 
     @Test

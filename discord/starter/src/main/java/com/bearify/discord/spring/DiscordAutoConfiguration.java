@@ -6,9 +6,7 @@ import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.Interaction;
-import com.bearify.discord.spring.annotation.CommandAdvice;
 import com.bearify.discord.spring.annotation.DiscordController;
-import com.bearify.discord.spring.annotation.HandleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -18,25 +16,21 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
 
+import java.util.List;
+
 @AutoConfiguration
 @ConditionalOnBean(DiscordClientFactory.class)
 @EnableConfigurationProperties(DiscordProperties.class)
 public class DiscordAutoConfiguration {
 
     private static final Logger LOG = LoggerFactory.getLogger(DiscordAutoConfiguration.class);
+    private static final String GENERIC_ERROR = "Something went wrong. Please try again later.";
 
     private final AnnotationScanner scanner = new AnnotationScanner();
 
     @Bean
-    public CommandExceptionHandlerRegistry commandExceptionHandlerRegistry(ApplicationContext context) {
-        CommandExceptionHandlerRegistry registry = new CommandExceptionHandlerRegistry(context);
-        scanner.scan(context, CommandAdvice.class, HandleException.class, registry::register);
-        return registry;
-    }
-
-    @Bean
-    public CommandRegistry commandRegistry(ApplicationContext context, CommandExceptionHandlerRegistry exceptionHandlerRegistry) {
-        CommandRegistry registry = new CommandRegistry(context, exceptionHandlerRegistry);
+    public CommandRegistry commandRegistry(ApplicationContext context) {
+        CommandRegistry registry = new CommandRegistry(context);
         long start = System.currentTimeMillis();
         scanner.scan(context, DiscordController.class, com.bearify.discord.spring.annotation.Interaction.class, registry::register);
         LOG.info("Finished scanning for commands: {} registered in {} ms", registry.getDefinitions().size(), System.currentTimeMillis() - start);
@@ -64,23 +58,42 @@ public class DiscordAutoConfiguration {
                                        AutocompleteRegistry autocompleteRegistry,
                                        DiscordProperties properties) {
         java.util.function.Consumer<Interaction> interactionHandler = interaction -> {
-            if (interaction instanceof CommandInteraction commandInteraction) {
-                registry.handle(commandInteraction);
-                return;
+            try {
+                if (interaction instanceof CommandInteraction commandInteraction) {
+                    registry.handle(commandInteraction);
+                    return;
+                }
+                if (interaction instanceof AutocompleteInteraction autocompleteInteraction) {
+                    autocompleteRegistry.handle(autocompleteInteraction);
+                    return;
+                }
+                if (interaction instanceof ButtonInteraction buttonInteraction) {
+                    buttonRegistry.handle(buttonInteraction);
+                    return;
+                }
+                throw new IllegalStateException("Unsupported interaction type: " + interaction.getClass().getName());
+            } catch (RuntimeException e) {
+                LOG.warn("Unhandled interaction exception", e);
+                replyWithGenericError(interaction);
             }
-            if (interaction instanceof AutocompleteInteraction autocompleteInteraction) {
-                autocompleteRegistry.handle(autocompleteInteraction);
-                return;
-            }
-            if (interaction instanceof ButtonInteraction buttonInteraction) {
-                buttonRegistry.handle(buttonInteraction);
-                return;
-            }
-            throw new IllegalStateException("Unsupported interaction type: " + interaction.getClass().getName());
         };
         return properties.activity()
                 .map(activity -> factory.create(registry.getDefinitions(), interactionHandler, activity))
                 .orElseGet(() -> factory.create(registry.getDefinitions(), interactionHandler));
+    }
+
+    private static void replyWithGenericError(Interaction interaction) {
+        try {
+            switch (interaction) {
+                case CommandInteraction command -> command.reply(GENERIC_ERROR).ephemeral().send();
+                case ButtonInteraction button -> button.reply(GENERIC_ERROR).ephemeral().send();
+                case AutocompleteInteraction autocomplete -> autocomplete.reply(List.of());
+                default -> { }
+            }
+        } catch (RuntimeException e) {
+            // e.g. the handler already acknowledged the interaction before throwing
+            LOG.warn("Could not reply to interaction after unhandled exception", e);
+        }
     }
 
     @Bean

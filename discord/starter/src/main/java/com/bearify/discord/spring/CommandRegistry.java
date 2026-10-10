@@ -46,11 +46,9 @@ public class CommandRegistry {
     private final Map<String, CommandDefinition> definitions = new HashMap<>();
 
     private final ApplicationContext context;
-    private final CommandExceptionHandlerRegistry exceptionHandlerRegistry;
 
-    CommandRegistry(ApplicationContext context, CommandExceptionHandlerRegistry exceptionHandlerRegistry) {
+    CommandRegistry(ApplicationContext context) {
         this.context = context;
-        this.exceptionHandlerRegistry = exceptionHandlerRegistry;
     }
 
     void register(String name, Interaction interaction, Method method) {
@@ -108,11 +106,7 @@ public class CommandRegistry {
             interaction.reply("This command is not supported.").ephemeral().send();
             return;
         }
-        try {
-            handler.invoke(interaction);
-        } catch (RuntimeException e) {
-            exceptionHandlerRegistry.handle(interaction, e);
-        }
+        handler.invoke(interaction);
     }
 
     private List<OptionDefinition> introspectOptions(Method method) {

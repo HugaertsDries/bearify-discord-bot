@@ -1,7 +1,6 @@
 package com.bearify.discord.spring;
 
 import com.bearify.discord.api.interaction.CommandInteraction;
-import com.bearify.discord.spring.annotation.HandleException;
 import com.bearify.discord.spring.annotation.Option;
 import com.bearify.discord.testing.MockCommandInteraction;
 import org.junit.jupiter.api.AfterEach;

@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommandRegistryTest {
@@ -84,7 +83,7 @@ class CommandRegistryTest {
        context.registerBean("buttonController", ButtonController.class, ButtonController::new);
        context.refresh();
 
-       registry = new CommandRegistry(context, new CommandExceptionHandlerRegistry(context));
+       registry = new CommandRegistry(context);
     }
 
     @AfterEach
@@ -175,13 +174,15 @@ class CommandRegistryTest {
     // --- EDGE CASES ---
 
     @Test
-    void doesNotPropagateExceptionThrownByHandler() throws NoSuchMethodException {
+    void propagatesExceptionThrownByHandler() throws NoSuchMethodException {
         Method method = TestController.class.getDeclaredMethod("crash", CommandInteraction.class);
         registry.register("testController", method.getAnnotation(Interaction.class), method);
 
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("crash").build();
 
-        assertThatNoException().isThrownBy(() -> registry.handle(interaction));
+        assertThatThrownBy(() -> registry.handle(interaction))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("boom");
     }
 
     @Test
