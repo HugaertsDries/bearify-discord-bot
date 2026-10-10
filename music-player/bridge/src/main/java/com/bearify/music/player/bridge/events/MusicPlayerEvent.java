@@ -10,7 +10,6 @@ import java.util.List;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackStart.class, name = "track_start"),
-        @JsonSubTypes.Type(value = MusicPlayerEvent.TrackEnd.class, name = "track_end"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackError.class, name = "track_error"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.QueueUpdated.class, name = "queue_updated"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.QueueEmpty.class, name = "queue_empty"),
@@ -33,7 +32,6 @@ import java.util.List;
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
-        MusicPlayerEvent.TrackEnd,
         MusicPlayerEvent.TrackError,
         MusicPlayerEvent.QueueUpdated,
         MusicPlayerEvent.QueueEmpty,
@@ -64,7 +62,6 @@ public sealed interface MusicPlayerEvent permits
         }
         @Override public String requestId() { return request.id(); }
     }
-    record TrackEnd(String playerId, String requestId, String guildId, TrackMetadata track) implements MusicPlayerEvent {}
     record TrackError(String playerId, String requestId, String guildId, TrackMetadata track) implements MusicPlayerEvent {}
     record QueueUpdated(String playerId, String requestId, String guildId, List<TrackMetadata> upNext) implements MusicPlayerEvent {
         public QueueUpdated {
