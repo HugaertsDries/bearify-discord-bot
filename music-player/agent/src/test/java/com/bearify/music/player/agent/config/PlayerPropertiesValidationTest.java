@@ -46,4 +46,10 @@ class PlayerPropertiesValidationTest {
         var violations = validator.validate(voiceSession);
         assertThat(violations).isEmpty();
     }
+
+    @Test
+    void treatsBlankRefreshTokenAsAbsent() {
+        var youtube = new PlayerProperties.Engine.Youtube(" ", null, null);
+        assertThat(youtube.refreshToken()).isEmpty();
+    }
 }
