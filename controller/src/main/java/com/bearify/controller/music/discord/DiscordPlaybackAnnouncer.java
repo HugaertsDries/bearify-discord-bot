@@ -1,6 +1,6 @@
 package com.bearify.controller.music.discord;
 
-import com.bearify.controller.music.domain.PlaybackAnnouncer;
+import com.bearify.controller.music.domain.MusicPlayerEventConsumer;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.message.ComponentMessage;
@@ -18,7 +18,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-public class DiscordPlaybackAnnouncer implements PlaybackAnnouncer {
+public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
 
     private static final Logger LOG = LoggerFactory.getLogger(DiscordPlaybackAnnouncer.class);
     private final ScheduledExecutorService actionTimeouts =

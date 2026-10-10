@@ -6,24 +6,19 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class MusicPlayerAnnouncementRegistry {
 
-    private final ConcurrentHashMap<String, Set<PlaybackAnnouncer>> subscriptions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Key, Set<MusicPlayerEventConsumer>> subscriptions = new ConcurrentHashMap<>();
 
-    public void subscribe(String playerId, PlaybackAnnouncer announcer) {
-        subscriptions.computeIfAbsent(playerId, ignored -> ConcurrentHashMap.newKeySet()).add(announcer);
+    public void subscribe(String playerId, String guildId, MusicPlayerEventConsumer announcer) {
+        subscriptions.computeIfAbsent(new Key(playerId, guildId), ignored -> ConcurrentHashMap.newKeySet()).add(announcer);
     }
 
-    public void unsubscribe(String playerId, PlaybackAnnouncer announcer) {
-        subscriptions.computeIfPresent(playerId, (ignored, announcers) -> {
-            announcers.remove(announcer);
-            return announcers.isEmpty() ? null : announcers;
-        });
+    public Collection<MusicPlayerEventConsumer> findAll(String playerId, String guildId) {
+        return subscriptions.getOrDefault(new Key(playerId, guildId), Set.of());
     }
 
-    public Collection<PlaybackAnnouncer> findAll(String playerId) {
-        return subscriptions.getOrDefault(playerId, Set.of());
+    public void removeAll(String playerId, String guildId) {
+        subscriptions.remove(new Key(playerId, guildId));
     }
 
-    public void removeAll(String playerId) {
-        subscriptions.remove(playerId);
-    }
+    private record Key(String playerId, String guildId) {}
 }

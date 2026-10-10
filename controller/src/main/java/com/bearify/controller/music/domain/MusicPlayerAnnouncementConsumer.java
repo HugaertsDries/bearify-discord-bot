@@ -16,7 +16,7 @@ public class MusicPlayerAnnouncementConsumer implements MusicPlayerEventConsumer
 
     @Override
     public void accept(MusicPlayerEvent event) {
-        for (PlaybackAnnouncer announcer : registry.findAll(event.playerId())) {
+        for (MusicPlayerEventConsumer announcer : registry.findAll(event.playerId(), event.guildId())) {
             try {
                 announcer.accept(event);
             } catch (Exception e) {
@@ -24,7 +24,7 @@ public class MusicPlayerAnnouncementConsumer implements MusicPlayerEventConsumer
             }
         }
         if (event instanceof MusicPlayerEvent.Stopped || event instanceof MusicPlayerEvent.QueueEmpty) {
-            registry.removeAll(event.playerId());
+            registry.removeAll(event.playerId(), event.guildId());
         }
     }
 }

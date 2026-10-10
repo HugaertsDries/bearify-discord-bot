@@ -230,7 +230,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void play(TrackRequest request, MusicPlayerEventListener handler) {
-            announcementRegistry.subscribe(playerId, trackAnnouncerFactory.create(request.textChannelId()));
+            announcementRegistry.subscribe(playerId, guildId, trackAnnouncerFactory.create(request.textChannelId()));
             MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
