@@ -19,7 +19,7 @@ spring-aop = { module = "org.springframework:spring-aop" }
 slf4j-api = { module = "org.slf4j:slf4j-api" }
 jakarta-validation-api = { module = "jakarta.validation:jakarta.validation-api" }
 jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api" }
-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
 jda = { module = "net.dv8tion:JDA", version.ref = "jda" }
 jdave-api = {module = "club.minnced:jdave-api", version.ref = "jdave"}
 jdave-native-win-x86 = {module = "club.minnced:jdave-native-win-x86-64", version.ref = "jdave"}
