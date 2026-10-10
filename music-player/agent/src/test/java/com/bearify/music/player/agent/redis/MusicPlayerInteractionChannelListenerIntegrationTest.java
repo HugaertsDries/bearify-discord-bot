@@ -2,13 +2,18 @@ package com.bearify.music.player.agent.redis;
 
 import com.bearify.music.player.agent.AbstractAgentIntegrationTest;
 import com.bearify.music.player.agent.RecordingVoiceConnectionManager;
+import com.bearify.music.player.agent.config.HealthProbeProperties;
 import com.bearify.music.player.agent.domain.AudioPlayerPool;
 import com.bearify.music.player.agent.domain.AudioTrackLoader;
+import com.bearify.music.player.agent.domain.HealthProbe;
 import com.bearify.music.player.agent.domain.VoiceConnectionManager;
+import com.bearify.music.player.agent.lava.LavaAudioEngine;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.agent.port.RecordingMusicPlayerInteractionDispatcher;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,10 +22,18 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -37,11 +50,21 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
     @Autowired ObjectMapper objectMapper;
     @Autowired RecordingVoiceConnectionManager recordingVoiceConnectionManager;
     @Autowired RecordingMusicPlayerInteractionDispatcher dispatcher;
+    @Autowired RedisConnectionFactory connectionFactory;
+
+    private RedisMessageListenerContainer eventsListener;
 
     @BeforeEach
     void resetStub() {
         recordingVoiceConnectionManager.reset();
         dispatcher.reset();
+    }
+
+    @AfterEach
+    void stopEventsListener() {
+        if (eventsListener != null) {
+            eventsListener.stop();
+        }
     }
 
     // --- HAPPY PATH ---
@@ -84,6 +107,27 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
                 }));
     }
 
+    @Test
+    void answersHealthCheckOnHealthChannel() throws Exception {
+        List<MusicPlayerEvent> events = new CopyOnWriteArrayList<>();
+        listenToEvents(events);
+
+        redis.convertAndSend(PlayerRedisProtocol.Channels.HEALTH, objectMapper.writeValueAsString(new MusicPlayerInteraction.HealthCheck(REQUEST_ID)));
+
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> assertThat(events).contains(
+                new MusicPlayerEvent.HealthCheckResult(PLAYER_ID, REQUEST_ID, false, Optional.of("probe track not found"))));
+    }
+
+    private void listenToEvents(List<MusicPlayerEvent> events) {
+        eventsListener = new RedisMessageListenerContainer();
+        eventsListener.setConnectionFactory(connectionFactory);
+        eventsListener.addMessageListener(
+                (message, pattern) -> events.add(objectMapper.readValue(message.getBody(), MusicPlayerEvent.class)),
+                new ChannelTopic(PlayerRedisProtocol.Channels.EVENTS));
+        eventsListener.afterPropertiesSet();
+        eventsListener.start();
+    }
+
     @TestConfiguration
     static class TestConfig {
         @Bean
@@ -102,15 +146,21 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
         RecordingMusicPlayerInteractionDispatcher recordingMusicPlayerInteractionDispatcher(VoiceConnectionManager manager,
                                                                                             AudioPlayerPool pool,
                                                                                             MusicPlayerEventDispatcher eventDispatcher,
+                                                                                            Supplier<LavaAudioEngine> engines,
+                                                                                            ScheduledExecutorService scheduler,
+                                                                                            HealthProbeProperties healthProperties,
                                                                                             @Value("${player.id}") String playerId) {
-            return new RecordingMusicPlayerInteractionDispatcher(manager, pool, new NoOpTrackLoader(), eventDispatcher, playerId);
+            AudioTrackLoader loader = new NoMatchesTrackLoader();
+            HealthProbe probe = new HealthProbe(loader, engines, eventDispatcher, scheduler, healthProperties, playerId);
+            return new RecordingMusicPlayerInteractionDispatcher(manager, pool, loader, eventDispatcher, probe, playerId);
         }
     }
 
     // keeps these routing tests off the network: the real loader would search YouTube
-    private static final class NoOpTrackLoader implements AudioTrackLoader {
+    private static final class NoMatchesTrackLoader implements AudioTrackLoader {
         @Override
         public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+            callback.noMatches();
         }
 
         @Override

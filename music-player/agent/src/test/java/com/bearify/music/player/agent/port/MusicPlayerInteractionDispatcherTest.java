@@ -45,7 +45,7 @@ class MusicPlayerInteractionDispatcherTest {
     void connectsVoiceManagerWhenConnectInteractionIsHandled() {
         RecordingVoiceConnectionManager voiceConnectionManager = new RecordingVoiceConnectionManager();
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, null, PLAYER_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
@@ -60,7 +60,7 @@ class MusicPlayerInteractionDispatcherTest {
     void disconnectsWhenStopInteractionIsHandled() {
         RecordingVoiceConnectionManager voiceConnectionManager = new RecordingVoiceConnectionManager();
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, null, PLAYER_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Stop(PLAYER_ID, REQUEST_ID, GUILD_ID));
 
@@ -72,7 +72,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         RecordingTrackLoader loader = new RecordingTrackLoader();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, loader, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("bohemian rhapsody", TEXT_CHANNEL_ID, null)));
 
@@ -84,7 +84,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.TogglePause(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
@@ -96,7 +96,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Next(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
@@ -108,7 +108,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Previous(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
@@ -120,7 +120,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Rewind(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 15000));
 
@@ -132,7 +132,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Forward(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 30000));
 
@@ -155,7 +155,7 @@ class MusicPlayerInteractionDispatcherTest {
         };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID,
                 new TrackRequest("https://youtube.com/playlist?list=PLxyz", TEXT_CHANNEL_ID, null)));
@@ -180,7 +180,7 @@ class MusicPlayerInteractionDispatcherTest {
         };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("song a", TEXT_CHANNEL_ID, null)));
 
@@ -203,7 +203,7 @@ class MusicPlayerInteractionDispatcherTest {
         };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("empty list", TEXT_CHANNEL_ID, null)));
 
@@ -215,7 +215,7 @@ class MusicPlayerInteractionDispatcherTest {
     void answersPlayerNotFoundWhenClearingWithoutPlayer() {
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Clear(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
@@ -241,7 +241,7 @@ class MusicPlayerInteractionDispatcherTest {
         };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
 
@@ -281,7 +281,7 @@ class MusicPlayerInteractionDispatcherTest {
         };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
 
@@ -294,7 +294,7 @@ class MusicPlayerInteractionDispatcherTest {
     void searchDoesNotCreateGuildPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, new RecordingTrackLoader(), new RecordingEventDispatcher(), PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, new RecordingTrackLoader(), new RecordingEventDispatcher(), null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
 

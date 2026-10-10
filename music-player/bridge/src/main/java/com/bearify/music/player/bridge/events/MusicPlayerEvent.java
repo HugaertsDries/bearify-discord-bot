@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.util.List;
+import java.util.Optional;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
@@ -32,6 +33,7 @@ import java.util.List;
         @JsonSubTypes.Type(value = MusicPlayerEvent.Restarted.class, name = "restarted"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.NothingPlaying.class, name = "nothing_playing"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackQueued.class, name = "track_queued"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.HealthCheckResult.class, name = "health_check_result"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -56,7 +58,8 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.PlayerNotFound,
         MusicPlayerEvent.Restarted,
         MusicPlayerEvent.NothingPlaying,
-        MusicPlayerEvent.TrackQueued {
+        MusicPlayerEvent.TrackQueued,
+        MusicPlayerEvent.HealthCheckResult {
 
     String playerId();
     String requestId();
@@ -117,4 +120,7 @@ public sealed interface MusicPlayerEvent permits
     }
     record NothingPlaying(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record TrackQueued(String playerId, String requestId, String guildId, TrackMetadata track, int queuedCount) implements MusicPlayerEvent {}
+    record HealthCheckResult(String playerId, String requestId, boolean ok, Optional<String> reason) implements MusicPlayerEvent {
+        @Override public String guildId() { return ""; }
+    }
 }

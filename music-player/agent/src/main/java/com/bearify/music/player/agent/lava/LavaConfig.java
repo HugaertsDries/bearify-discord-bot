@@ -1,7 +1,10 @@
 package com.bearify.music.player.agent.lava;
 
+import com.bearify.music.player.agent.config.HealthProbeProperties;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.domain.AudioTrackLoader;
+import com.bearify.music.player.agent.domain.HealthProbe;
+import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
 import dev.lavalink.youtube.YoutubeAudioSourceManager;
@@ -11,9 +14,11 @@ import dev.lavalink.youtube.clients.Music;
 import dev.lavalink.youtube.clients.Tv;
 import dev.lavalink.youtube.clients.Web;
 import dev.lavalink.youtube.clients.WebEmbedded;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 
 @Configuration
@@ -42,5 +47,15 @@ public class LavaConfig {
     @Bean
     Supplier<LavaAudioEngine> lavaAudioEngineFactory(AudioPlayerManager audioPlayerManager) {
         return () -> new LavaAudioEngine(audioPlayerManager);
+    }
+
+    @Bean
+    HealthProbe healthProbe(AudioTrackLoader audioTrackLoader,
+                            Supplier<LavaAudioEngine> lavaAudioEngineFactory,
+                            MusicPlayerEventDispatcher eventDispatcher,
+                            ScheduledExecutorService scheduler,
+                            HealthProbeProperties properties,
+                            @Value("${player.id}") String playerId) {
+        return new HealthProbe(audioTrackLoader, lavaAudioEngineFactory, eventDispatcher, scheduler, properties, playerId);
     }
 }

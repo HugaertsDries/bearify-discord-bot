@@ -16,3 +16,7 @@ discord:
   activity:
     type: PLAYING
     text: "Playing with Honey"
+
+bearify:
+  health:
+    channel-id: ${BEARIFY_HEALTH_CHANNEL_ID:}  # private status channel for YouTube breakage alerts; blank turns them off

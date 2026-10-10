@@ -29,6 +29,7 @@ public class MockDiscordClient implements DiscordClient {
     private String startedWithToken;
     private String startedWithGuildId;
     private final Map<String, List<ComponentMessage>> sentComponentsByChannel = new ConcurrentHashMap<>();
+    private final Map<String, List<String>> sentMessagesByChannel = new ConcurrentHashMap<>();
 
     private MockDiscordClient(List<CommandDefinition> commands,
                               Consumer<Interaction> handler) {
@@ -87,6 +88,10 @@ public class MockDiscordClient implements DiscordClient {
         return List.copyOf(sentComponentsByChannel.getOrDefault(channelId, List.of()));
     }
 
+    public List<String> sentMessages(String channelId) {
+        return List.copyOf(sentMessagesByChannel.getOrDefault(channelId, List.of()));
+    }
+
     private static final class MockGuild implements Guild {
 
         @Override
@@ -109,6 +114,7 @@ public class MockDiscordClient implements DiscordClient {
 
         @Override
         public void send(String message) {
+            sentMessagesByChannel.computeIfAbsent(channelId, ignored -> new ArrayList<>()).add(message);
         }
 
         @Override

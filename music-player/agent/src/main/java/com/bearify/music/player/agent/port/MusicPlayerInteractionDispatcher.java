@@ -23,17 +23,20 @@ public class MusicPlayerInteractionDispatcher {
     private final AudioPlayerPool pool;
     private final AudioTrackLoader loader;
     private final MusicPlayerEventDispatcher eventDispatcher;
+    private final HealthProbe healthProbe;
 
     MusicPlayerInteractionDispatcher(VoiceConnectionManager manager,
                                      AudioPlayerPool pool,
                                      AudioTrackLoader loader,
                                      MusicPlayerEventDispatcher eventDispatcher,
+                                     HealthProbe healthProbe,
                                      @Value("${player.id}") String playerId) {
         this.playerId = playerId;
         this.manager = manager;
         this.pool = pool;
         this.loader = loader;
         this.eventDispatcher = eventDispatcher;
+        this.healthProbe = healthProbe;
     }
 
     public void handle(MusicPlayerInteraction interaction) {
@@ -70,6 +73,8 @@ public class MusicPlayerInteractionDispatcher {
                             () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, c.requestId(), c.guildId())));
             case MusicPlayerInteraction.Search search ->
                     search(search);
+            case MusicPlayerInteraction.HealthCheck check ->
+                    healthProbe.run(check.requestId());
         }
     }
 

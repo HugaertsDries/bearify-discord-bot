@@ -66,3 +66,4 @@ Posts a playback component preview in the current text channel. Presets: `broadc
 | `spring.data.redis.port` | Yes | Redis port |
 | `spring.data.redis.username` | No | Redis username when the server requires auth |
 | `spring.data.redis.password` | No | Redis password when the server requires auth |
+| `bearify.health.channel-id` | No | Private text channel (env `BEARIFY_HEALTH_CHANNEL_ID`) where the controller posts once when YouTube playback breaks or no bear answers the health check, and once when that clears. The bot needs View Channel and Send Messages there. Blank turns the check off. |

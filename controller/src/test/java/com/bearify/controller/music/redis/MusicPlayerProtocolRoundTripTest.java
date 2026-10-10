@@ -5,6 +5,7 @@ import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.ObjectMapper;
@@ -12,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +50,15 @@ class MusicPlayerProtocolRoundTripTest {
         assertThat(OBJECT_MAPPER.readValue(json, MusicPlayerInteraction.class)).isEqualTo(interaction);
     }
 
+    @Test
+    void roundTripsHealthCheckResultWithoutReason() {
+        MusicPlayerEvent event = new MusicPlayerEvent.HealthCheckResult("player-id", "request-id", true, Optional.empty());
+
+        String json = OBJECT_MAPPER.writerFor(MusicPlayerEvent.class).writeValueAsString(event);
+
+        assertThat(OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class)).isEqualTo(event);
+    }
+
     private static Object sample(Class<?> recordType) {
         RecordComponent[] components = recordType.getRecordComponents();
         Class<?>[] parameterTypes = Arrays.stream(components).map(RecordComponent::getType).toArray(Class<?>[]::new);
@@ -63,6 +74,8 @@ class MusicPlayerProtocolRoundTripTest {
         if (type == String.class) return name + "-value";
         if (type == long.class) return 42L;
         if (type == int.class) return 7;
+        if (type == boolean.class) return true;
+        if (type == Optional.class) return Optional.of(name + "-value");
         if (type == Request.class) return new Request("request-id", "requester#0001");
         if (type == TrackRequest.class) return new TrackRequest("query", "text-channel-id", "requester#0001");
         if (type == TrackMetadata.class) return track();
