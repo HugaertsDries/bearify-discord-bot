@@ -21,7 +21,8 @@ import java.util.concurrent.TimeUnit;
 public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
 
     private static final Logger LOG = LoggerFactory.getLogger(DiscordPlaybackAnnouncer.class);
-    private final ScheduledExecutorService actionTimeouts =
+    // Shared by all announcers: one daemon thread instead of one per announcer that is never shut down
+    private static final ScheduledExecutorService ACTION_TIMEOUTS =
             Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
 
     private final DiscordClient discord;
@@ -110,7 +111,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private void notify(String action) {
         temporaryAction = action;
         cancelClearTask();
-        clearActionTask = actionTimeouts.schedule(this::clearTemporaryActionSafely,
+        clearActionTask = ACTION_TIMEOUTS.schedule(this::clearTemporaryActionSafely,
                 properties.actionTimeout().toMillis(), TimeUnit.MILLISECONDS);
         refreshNowPlayingEmbed();
     }
