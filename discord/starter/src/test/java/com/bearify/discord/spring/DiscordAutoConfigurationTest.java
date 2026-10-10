@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -59,13 +60,7 @@ class DiscordAutoConfigurationTest {
         private Consumer<com.bearify.discord.api.interaction.Interaction> handler;
 
         @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<com.bearify.discord.api.interaction.Interaction> handler) {
-            this.handler = handler;
-            return new NoopDiscordClient();
-        }
-
-        @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<com.bearify.discord.api.interaction.Interaction> handler, Activity activity) {
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<com.bearify.discord.api.interaction.Interaction> handler, Optional<Activity> activity) {
             this.handler = handler;
             return new NoopDiscordClient();
         }

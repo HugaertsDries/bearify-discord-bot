@@ -408,12 +408,7 @@ class VoiceConnectionManagerTest {
         }
 
         @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler) {
-            return client;
-        }
-
-        @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Activity activity) {
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Optional<Activity> activity) {
             return client;
         }
     }

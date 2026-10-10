@@ -4,6 +4,7 @@ import com.bearify.discord.api.interaction.Interaction;
 import com.bearify.discord.api.model.CommandDefinition;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -14,9 +15,6 @@ import java.util.function.Consumer;
 public interface DiscordClientFactory {
 
     DiscordClient create(List<CommandDefinition> commands,
-                         Consumer<Interaction> handler);
-
-    DiscordClient create(List<CommandDefinition> commands,
                          Consumer<Interaction> handler,
-                         Activity activity);
+                         Optional<Activity> activity);
 }

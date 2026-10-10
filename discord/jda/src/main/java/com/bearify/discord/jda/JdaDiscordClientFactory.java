@@ -7,6 +7,7 @@ import com.bearify.discord.api.interaction.Interaction;
 import com.bearify.discord.api.model.CommandDefinition;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -16,14 +17,8 @@ class JdaDiscordClientFactory implements DiscordClientFactory {
 
     @Override
     public DiscordClient create(List<CommandDefinition> commands,
-                                Consumer<Interaction> handler) {
-        return new JdaDiscordClient(commands, handler, null);
-    }
-
-    @Override
-    public DiscordClient create(List<CommandDefinition> commands,
                                 Consumer<Interaction> handler,
-                                Activity activity) {
-        return new JdaDiscordClient(commands, handler, activity);
+                                Optional<Activity> activity) {
+        return new JdaDiscordClient(commands, handler, activity.orElse(null));
     }
 }

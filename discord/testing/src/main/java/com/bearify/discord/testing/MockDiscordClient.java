@@ -133,17 +133,9 @@ public class MockDiscordClient implements DiscordClient {
 
         @Override
         public MockDiscordClient create(List<CommandDefinition> commands,
-                                        Consumer<Interaction> handler) {
-            lastCreatedActivity = Optional.empty();
-            lastCreated = new MockDiscordClient(commands, handler);
-            return lastCreated;
-        }
-
-        @Override
-        public MockDiscordClient create(List<CommandDefinition> commands,
                                         Consumer<Interaction> handler,
-                                        Activity activity) {
-            lastCreatedActivity = Optional.of(activity);
+                                        Optional<Activity> activity) {
+            lastCreatedActivity = activity;
             lastCreated = new MockDiscordClient(commands, handler);
             return lastCreated;
         }

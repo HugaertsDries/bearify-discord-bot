@@ -47,12 +47,7 @@ public abstract class AbstractAgentIntegrationTest {
         DiscordClientFactory discordClientFactory() {
             return new DiscordClientFactory() {
                 @Override
-                public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler) {
-                    return new NoOpDiscordClient();
-                }
-
-                @Override
-                public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Activity activity) {
+                public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Optional<Activity> activity) {
                     return new NoOpDiscordClient();
                 }
             };

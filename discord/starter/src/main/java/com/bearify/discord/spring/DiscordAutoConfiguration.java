@@ -77,9 +77,7 @@ public class DiscordAutoConfiguration {
                 replyWithGenericError(interaction);
             }
         };
-        return properties.activity()
-                .map(activity -> factory.create(registry.getDefinitions(), interactionHandler, activity))
-                .orElseGet(() -> factory.create(registry.getDefinitions(), interactionHandler));
+        return factory.create(registry.getDefinitions(), interactionHandler, properties.activity());
     }
 
     private static void replyWithGenericError(Interaction interaction) {
