@@ -55,9 +55,6 @@ public class CommandRegistry {
         if (interaction.type() != InteractionType.COMMAND) {
             return;
         }
-        if (context == null) {
-            throw new IllegalStateException("Lazy command registration requires an ApplicationContext");
-        }
         DiscordController controller = AnnotationUtils.findAnnotation(method.getDeclaringClass(), DiscordController.class);
         if (controller == null) {
             throw new IllegalStateException("Interaction " + interaction + " has no @DiscordController annotation");
