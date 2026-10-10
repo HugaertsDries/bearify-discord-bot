@@ -9,19 +9,7 @@ allprojects {
     version = '0.1.0-SNAPSHOT'
 }
 
-def loadDotEnv = {
-    def envFile = rootProject.file('.env')
-    if (envFile.exists()) {
-        envFile.readLines().each { line ->
-            if (line && !line.startsWith('#') && line.contains('=')) {
-                def idx = line.indexOf('=')
-                def key = line.substring(0, idx).trim()
-                def value = line.substring(idx + 1).trim()
-                System.setProperty(key, value)
-            }
-        }
-    }
-}
+def catalog = libs
 
 subprojects {
     apply plugin: 'java'
@@ -29,8 +17,7 @@ subprojects {
 
     plugins.withId('org.springframework.boot') {
         tasks.named('bootRun').configure {
-            doFirst { loadDotEnv() }
-            systemProperties System.properties
+            workingDir = rootProject.projectDir
         }
     }
 
@@ -45,7 +32,7 @@ subprojects {
     }
 
     dependencies {
-        testRuntimeOnly libs.junit.platform.launcher
+        testRuntimeOnly catalog.junit.platform.launcher
     }
 
     tasks.named('test') {
@@ -60,7 +47,7 @@ subprojects {
 
     dependencyManagement {
         imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:${libs.versions.spring.boot.get()}"
+            mavenBom "org.springframework.boot:spring-boot-dependencies:${catalog.versions.spring.boot.get()}"
         }
     }
 }
