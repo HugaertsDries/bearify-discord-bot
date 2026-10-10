@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -75,7 +76,7 @@ public class AudioPlayer implements AudioProvider {
     // --- Playback control ---
 
     public synchronized void play(Track track) {
-        if (engine.getPlayingTrack() == null) {
+        if (engine.getPlayingTrack().isEmpty()) {
             engine.play(track);
         } else {
             queue.addLast(track);
@@ -89,7 +90,7 @@ public class AudioPlayer implements AudioProvider {
         for (Track track : tracks) {
             queue.addLast(track);
         }
-        if (engine.getPlayingTrack() == null) {
+        if (engine.getPlayingTrack().isEmpty()) {
             engine.play(queue.pollFirst());
         }
         List<TrackMetadata> upNext = queue.stream().limit(3).map(this::toTrackMetadata).toList();
@@ -111,20 +112,17 @@ public class AudioPlayer implements AudioProvider {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
             return;
         }
-        Track current = engine.getPlayingTrack();
-        if (current != null) {
-            history.addFirst(current.clone());
-        }
+        engine.getPlayingTrack().ifPresent(current -> history.addFirst(current.clone()));
         engine.setPaused(false);
         engine.play(queue.pollFirst());
         eventDispatcher.dispatch(new MusicPlayerEvent.Skipped(playerId, request, guildId));
     }
 
     public synchronized void previous(Request request) {
-        Track current = engine.getPlayingTrack();
+        Optional<Track> current = engine.getPlayingTrack();
         // TODO why is this justRestarted needed? Why is the second validation not enough?
-        if (!justRestarted && current != null && current.position() > properties.previousRestartThreshold().toMillis()) {
-            current.setPosition(0);
+        if (!justRestarted && current.isPresent() && current.get().position() > properties.previousRestartThreshold().toMillis()) {
+            current.get().setPosition(0);
             justRestarted = true;
             return;
         }
@@ -133,17 +131,16 @@ public class AudioPlayer implements AudioProvider {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToGoBack(playerId, request.id(), guildId));
             return;
         }
-        if (current != null) {
-            queue.addFirst(current.clone());
-        }
+        current.ifPresent(track -> queue.addFirst(track.clone()));
         engine.setPaused(false);
         engine.play(history.pollFirst());
         eventDispatcher.dispatch(new MusicPlayerEvent.WentBack(playerId, request, guildId));
     }
 
     public void rewind(Duration seek, Request request) {
-        Track track = engine.getPlayingTrack();
-        if (track == null) return;
+        Optional<Track> playing = engine.getPlayingTrack();
+        if (playing.isEmpty()) return;
+        Track track = playing.get();
         long effectiveSeekMs = seek.isZero() ? defaultSeekMs(track) : seek.toMillis();
         long newPosition = Math.max(0, track.position() - effectiveSeekMs);
         track.setPosition(newPosition);
@@ -151,8 +148,9 @@ public class AudioPlayer implements AudioProvider {
     }
 
     public synchronized void forward(Duration seek, Request request) {
-        Track track = engine.getPlayingTrack();
-        if (track == null) return;
+        Optional<Track> playing = engine.getPlayingTrack();
+        if (playing.isEmpty()) return;
+        Track track = playing.get();
         long effectiveSeekMs = seek.isZero() ? defaultSeekMs(track) : seek.toMillis();
         long newPosition = track.position() + effectiveSeekMs;
         if (newPosition >= track.duration()) {

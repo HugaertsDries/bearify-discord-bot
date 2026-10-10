@@ -1,5 +1,7 @@
 package com.bearify.music.player.agent.domain;
 
+import java.util.Optional;
+
 /**
  * Abstraction over a LavaPlayer audio player. Decouples domain logic from LavaPlayer types.
  */
@@ -9,7 +11,7 @@ public interface AudioEngine {
 
     default void destroy() {}
 
-    Track getPlayingTrack();
+    Optional<Track> getPlayingTrack();
 
     boolean isPaused();
 

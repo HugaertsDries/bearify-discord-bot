@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -46,7 +47,7 @@ class AudioPlayerTest {
 
         player.play(trackA);
 
-        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+        assertThat(engine.getPlayingTrack()).containsSame(trackA);
     }
 
     @Test
@@ -57,7 +58,7 @@ class AudioPlayerTest {
         InMemoryTrack trackB = track("Song B", 180_000);
         player.play(trackB);
 
-        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+        assertThat(engine.getPlayingTrack()).containsSame(trackA);
     }
 
     @Test
@@ -91,7 +92,7 @@ class AudioPlayerTest {
 
         player.next(new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack()).isSameAs(trackB);
+        assertThat(engine.getPlayingTrack()).containsSame(trackB);
         assertThat(eventDispatcher.getEvents())
                 .contains(new MusicPlayerEvent.Skipped(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID));
     }
@@ -106,7 +107,7 @@ class AudioPlayerTest {
 
         player.next(new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack()).isSameAs(trackB);
+        assertThat(engine.getPlayingTrack()).containsSame(trackB);
         assertThat(engine.isPaused()).isFalse();
     }
 
@@ -136,7 +137,7 @@ class AudioPlayerTest {
 
         player.previous(new Request("req-2", "@user"));
 
-        assertThat(engine.getPlayingTrack().title()).isEqualTo("Song A");
+        assertThat(engine.getPlayingTrack().orElseThrow().title()).isEqualTo("Song A");
         assertThat(eventDispatcher.getEvents())
                 .contains(new MusicPlayerEvent.WentBack(PLAYER_ID, new Request("req-2", "@user"), GUILD_ID));
     }
@@ -154,7 +155,7 @@ class AudioPlayerTest {
 
         player.previous(new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack().title()).isEqualTo("Song A");
+        assertThat(engine.getPlayingTrack().orElseThrow().title()).isEqualTo("Song A");
         assertThat(eventDispatcher.getEvents())
                 .contains(new MusicPlayerEvent.WentBack(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID));
     }
@@ -172,7 +173,7 @@ class AudioPlayerTest {
 
         player.previous(new Request("req-2", "@user"));
 
-        assertThat(engine.getPlayingTrack().title()).isEqualTo("Song A");
+        assertThat(engine.getPlayingTrack().orElseThrow().title()).isEqualTo("Song A");
         assertThat(engine.isPaused()).isFalse();
     }
 
@@ -184,7 +185,7 @@ class AudioPlayerTest {
 
         player.forward(Duration.ZERO, new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack().position()).isEqualTo(40_000);
+        assertThat(engine.getPlayingTrack().orElseThrow().position()).isEqualTo(40_000);
         assertThat(eventDispatcher.getLastEvent())
                 .isEqualTo(new MusicPlayerEvent.Forwarded(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 10_000));
     }
@@ -197,7 +198,7 @@ class AudioPlayerTest {
 
         player.forward(Duration.ZERO, new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack().position()).isEqualTo(60_000);
+        assertThat(engine.getPlayingTrack().orElseThrow().position()).isEqualTo(60_000);
         assertThat(eventDispatcher.getLastEvent())
                 .isEqualTo(new MusicPlayerEvent.Forwarded(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 30_000));
     }
@@ -210,7 +211,7 @@ class AudioPlayerTest {
 
         player.forward(Duration.ofMillis(30_000), new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack().position()).isEqualTo(40_000);
+        assertThat(engine.getPlayingTrack().orElseThrow().position()).isEqualTo(40_000);
         assertThat(eventDispatcher.getLastEvent())
                 .isEqualTo(new MusicPlayerEvent.Forwarded(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 30_000));
     }
@@ -235,7 +236,7 @@ class AudioPlayerTest {
 
         player.rewind(Duration.ZERO, new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack().position()).isEqualTo(50_000);
+        assertThat(engine.getPlayingTrack().orElseThrow().position()).isEqualTo(50_000);
         assertThat(eventDispatcher.getLastEvent())
                 .isEqualTo(new MusicPlayerEvent.Rewound(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 10_000));
     }
@@ -248,7 +249,7 @@ class AudioPlayerTest {
 
         player.rewind(Duration.ofMillis(15_000), new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack().position()).isEqualTo(45_000);
+        assertThat(engine.getPlayingTrack().orElseThrow().position()).isEqualTo(45_000);
         assertThat(eventDispatcher.getLastEvent())
                 .isEqualTo(new MusicPlayerEvent.Rewound(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 15_000));
     }
@@ -283,7 +284,7 @@ class AudioPlayerTest {
 
         player.next(new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack()).isSameAs(playing);
+        assertThat(engine.getPlayingTrack()).containsSame(playing);
         assertThat(eventDispatcher.getEvents()).doesNotContain(new MusicPlayerEvent.QueueEmpty(PLAYER_ID, "req-1", GUILD_ID));
     }
 
@@ -306,7 +307,7 @@ class AudioPlayerTest {
 
         player.rewind(Duration.ofMillis(10_000), new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack().position()).isEqualTo(0);
+        assertThat(engine.getPlayingTrack().orElseThrow().position()).isEqualTo(0);
     }
 
     @Test
@@ -320,7 +321,7 @@ class AudioPlayerTest {
 
         player.forward(Duration.ofMillis(10_000), new Request("req-1", "@user"));
 
-        assertThat(engine.getPlayingTrack()).isSameAs(trackB);
+        assertThat(engine.getPlayingTrack()).containsSame(trackB);
         assertThat(eventDispatcher.getEvents())
                 .contains(new MusicPlayerEvent.Forwarded(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 10_000));
     }
@@ -414,7 +415,7 @@ class AudioPlayerTest {
 
         player.play(List.of(trackA, trackB, trackC));
 
-        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+        assertThat(engine.getPlayingTrack()).containsSame(trackA);
     }
 
     @Test
@@ -426,9 +427,9 @@ class AudioPlayerTest {
         player.play(List.of(trackA, trackB, trackC));
 
         player.next(new Request("req-2", "@alice"));
-        assertThat(engine.getPlayingTrack()).isSameAs(trackB);
+        assertThat(engine.getPlayingTrack()).containsSame(trackB);
         player.next(new Request("req-3", "@alice"));
-        assertThat(engine.getPlayingTrack()).isSameAs(trackC);
+        assertThat(engine.getPlayingTrack()).containsSame(trackC);
     }
 
     @Test
@@ -441,9 +442,9 @@ class AudioPlayerTest {
 
         player.play(List.of(trackA, trackB));
 
-        assertThat(engine.getPlayingTrack()).isSameAs(playing);
+        assertThat(engine.getPlayingTrack()).containsSame(playing);
         player.next(new Request("req-2", "@alice"));
-        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+        assertThat(engine.getPlayingTrack()).containsSame(trackA);
     }
 
     @Test
@@ -477,7 +478,7 @@ class AudioPlayerTest {
 
         player.play(List.of(trackA));
 
-        assertThat(engine.getPlayingTrack()).isSameAs(trackA);
+        assertThat(engine.getPlayingTrack()).containsSame(trackA);
         MusicPlayerEvent.QueueUpdated event = eventDispatcher.getEvents().stream()
                 .filter(e -> e instanceof MusicPlayerEvent.QueueUpdated)
                 .map(e -> (MusicPlayerEvent.QueueUpdated) e)
@@ -520,7 +521,7 @@ class AudioPlayerTest {
         private boolean paused;
         private AudioEngineListener listener;
 
-        @Override public Track getPlayingTrack() { return playingTrack; }
+        @Override public Optional<Track> getPlayingTrack() { return Optional.ofNullable(playingTrack); }
 
         @Override
         public void play(Track track) {

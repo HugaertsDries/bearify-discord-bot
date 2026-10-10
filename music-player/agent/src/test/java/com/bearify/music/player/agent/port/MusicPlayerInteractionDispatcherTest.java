@@ -331,7 +331,7 @@ class MusicPlayerInteractionDispatcherTest {
         }
 
         private static final class NoOpEngine implements AudioEngine {
-            @Override public Track getPlayingTrack() { return null; }
+            @Override public Optional<Track> getPlayingTrack() { return Optional.empty(); }
             @Override public void play(Track t) {}
             @Override public boolean isPaused() { return false; }
             @Override public void setPaused(boolean p) {}

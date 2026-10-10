@@ -22,6 +22,7 @@ import dev.lavalink.youtube.clients.Web;
 import dev.lavalink.youtube.clients.WebEmbedded;
 
 import java.nio.ByteBuffer;
+import java.util.Optional;
 
 /**
  * LavaPlayer-backed implementation of {@link AudioEngine} and {@link AudioProvider}.
@@ -57,13 +58,10 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
 
     // --- AudioEngine ---
 
-    // TODO if track is nullable, return an optional
     @Override
-    public Track getPlayingTrack() {
-        AudioTrack track = audioPlayer.getPlayingTrack();
-        if (track == null) return null;
-        String requesterTag = track.getUserData(String.class);
-        return new LavaTrack(track, requesterTag);
+    public Optional<Track> getPlayingTrack() {
+        return Optional.ofNullable(audioPlayer.getPlayingTrack())
+                .map(track -> new LavaTrack(track, track.getUserData(String.class)));
     }
 
     @Override
