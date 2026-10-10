@@ -1,5 +1,6 @@
 package com.bearify.controller.dev;
 
+import com.bearify.controller.music.discord.AnnouncerProperties;
 import com.bearify.controller.music.discord.PlaybackComponent;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.interaction.CommandInteraction;
@@ -14,11 +15,13 @@ import org.springframework.context.annotation.Profile;
 @InteractionGroup("dev")
 public class DevCommand {
     private final DiscordClient discord;
-    private final PlaybackComponent playbackComponent = new PlaybackComponent();
-    private final PlaybackAnnouncerPresets playbackAnnouncerPresets = new PlaybackAnnouncerPresets();
+    private final PlaybackComponent playbackComponent;
+    private final PlaybackAnnouncerPresets playbackAnnouncerPresets;
 
-    public DevCommand(DiscordClient discord) {
+    public DevCommand(DiscordClient discord, AnnouncerProperties properties) {
         this.discord = discord;
+        this.playbackComponent = new PlaybackComponent(properties);
+        this.playbackAnnouncerPresets = new PlaybackAnnouncerPresets(properties.footer());
     }
 
     @SuppressWarnings("unused")

@@ -12,12 +12,6 @@ import static com.bearify.discord.api.message.ButtonStyle.SECONDARY;
 
 public class PlaybackComponent {
 
-    private static final AnnouncerProperties DEFAULT_PROPERTIES = new AnnouncerProperties(
-            "#FDB529",
-            "#CD4631",
-            "Bearify \u2022 Powered by Bearable Software",
-            Duration.ofSeconds(15)
-    );
     public static final String PLAYER_PREVIOUS_LABEL = "❙◀︎◀︎";
     public static final String PLAYER_REWIND_LABEL = "◀︎";
     public static final String PLAYER_PAUSE_LABEL = "❚❚";
@@ -26,10 +20,6 @@ public class PlaybackComponent {
     public static final String PLAYER_NEXT_LABEL = "▶︎▶︎❙";
 
     private final AnnouncerProperties properties;
-
-    public PlaybackComponent() {
-        this(DEFAULT_PROPERTIES);
-    }
 
     public PlaybackComponent(AnnouncerProperties properties) {
         this.properties = properties;

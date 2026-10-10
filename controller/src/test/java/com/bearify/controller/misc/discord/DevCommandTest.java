@@ -1,6 +1,7 @@
 package com.bearify.controller.misc.discord;
 
 import com.bearify.controller.dev.DevCommand;
+import com.bearify.controller.music.discord.AnnouncerProperties;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.SentMessage;
@@ -16,6 +17,7 @@ import com.bearify.discord.api.voice.VoiceSessionListener;
 import com.bearify.discord.testing.MockCommandInteraction;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -24,10 +26,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DevCommandTest {
 
+    private static final String FOOTER = "Test Footer From Config";
+    private static final AnnouncerProperties PROPERTIES = new AnnouncerProperties("#123456", "#654321", FOOTER, Duration.ofSeconds(15));
+
     @Test
     void playbackPreviewPostsNamedPresetThroughSharedAnnouncer() {
         List<ComponentMessage> sent = new ArrayList<>();
-        DevCommand command = new DevCommand(discord(sent));
+        DevCommand command = new DevCommand(discord(sent), PROPERTIES);
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("dev")
                 .subcommand("playback-preview")
                 .textChannelId("text-1")
@@ -40,7 +45,7 @@ class DevCommandTest {
         ComponentMessage broadcast = sent.getFirst();
         assertThat(broadcast.label()).isEqualTo("playback-announcer");
         assertThat(broadcast.containers()).hasSize(4);
-        assertThat(broadcast.containers().get(0).accentColor()).isEqualTo(0xFDB529);
+        assertThat(broadcast.containers().get(0).accentColor()).isEqualTo(0x123456);
         assertThat(allTexts(broadcast))
                 .anyMatch(text -> text.contains("## Up Next"))
                 .anyMatch(text -> text.contains("Hotel California"));
@@ -52,9 +57,24 @@ class DevCommandTest {
     }
 
     @Test
+    void rendersPreviewWithConfiguredFooter() {
+        List<ComponentMessage> sent = new ArrayList<>();
+        DevCommand command = new DevCommand(discord(sent), PROPERTIES);
+        MockCommandInteraction interaction = MockCommandInteraction.forCommand("dev")
+                .subcommand("playback-preview")
+                .textChannelId("text-1")
+                .build();
+
+        command.playbackPreview(interaction, "broadcast");
+
+        assertThat(sent).singleElement()
+                .satisfies(message -> assertThat(message.items()).last().isEqualTo(new TextBlock("-# " + FOOTER)));
+    }
+
+    @Test
     void playbackPreviewFallsBackToBroadcastPresetWhenPresetIsUnknown() {
         List<ComponentMessage> sent = new ArrayList<>();
-        DevCommand command = new DevCommand(discord(sent));
+        DevCommand command = new DevCommand(discord(sent), PROPERTIES);
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("dev")
                 .subcommand("playback-preview")
                 .textChannelId("text-1")
@@ -73,7 +93,7 @@ class DevCommandTest {
 
     @Test
     void playbackPreviewRepliesEphemeralWhenInteractionHasNoTextChannel() {
-        DevCommand command = new DevCommand(discord(new ArrayList<>()));
+        DevCommand command = new DevCommand(discord(new ArrayList<>()), PROPERTIES);
         MockCommandInteraction interaction = MockCommandInteraction.forCommand("dev")
                 .subcommand("playback-preview")
                 .build();
