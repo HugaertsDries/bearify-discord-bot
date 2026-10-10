@@ -39,7 +39,7 @@ public class MusicPlayerInteractionDispatcher {
     public void handle(MusicPlayerInteraction interaction) {
         switch (interaction) {
             case MusicPlayerInteraction.Connect connect ->
-                    manager.connect(new ConnectionRequest(connect.requestId(), connect.voiceChannelId(), connect.guildId()));
+                    manager.connect(connect);
             case MusicPlayerInteraction.Stop stop ->
                     manager.disconnect(stop.guildId());
             case MusicPlayerInteraction.Play play ->

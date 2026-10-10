@@ -7,6 +7,7 @@ import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -58,7 +59,7 @@ public class VoiceConnectionManager implements AutoCloseable {
         }
     }
 
-    public void connect(ConnectionRequest request) {
+    public void connect(MusicPlayerInteraction.Connect request) {
         var guild = client.guild(request.guildId());
         AudioPlayer player = pool.getOrCreate(request.guildId());
         guild.voice().ifPresentOrElse(session -> {

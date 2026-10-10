@@ -1,7 +1,7 @@
 package com.bearify.music.player.agent;
 
-import com.bearify.music.player.agent.domain.ConnectionRequest;
 import com.bearify.music.player.agent.domain.VoiceConnectionManager;
+import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -11,7 +11,7 @@ import java.util.Set;
 
 public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
 
-    private final List<ConnectionRequest> calls = new ArrayList<>();
+    private final List<MusicPlayerInteraction.Connect> calls = new ArrayList<>();
     private final Set<String> disconnectedGuilds = new HashSet<>();
 
     public RecordingVoiceConnectionManager() {
@@ -19,7 +19,7 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
     }
 
     @Override
-    public void connect(ConnectionRequest request) {
+    public void connect(MusicPlayerInteraction.Connect request) {
         calls.add(request);
     }
 
@@ -32,7 +32,7 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
     public void close() {
     }
 
-    public List<ConnectionRequest> getCalls() {
+    public List<MusicPlayerInteraction.Connect> getCalls() {
         return List.copyOf(calls);
     }
 

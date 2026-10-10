@@ -13,6 +13,7 @@ import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -110,7 +111,7 @@ class VoiceConnectionManagerTest {
 
     @Test
     void joinsRequestedVoiceChannelWhenConnecting() {
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
         FakeGuild guild = discordClient.guild(GUILD_ID);
         assertThat(guild.getJoinedChannelId()).isEqualTo(VOICE_CHANNEL_ID);
@@ -122,7 +123,7 @@ class VoiceConnectionManagerTest {
         AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
         startListener(body -> received.set(parseEvent(body)));
 
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         await().atMost(2, TimeUnit.SECONDS)
@@ -135,7 +136,7 @@ class VoiceConnectionManagerTest {
         startListener(body -> received.set(parseEvent(body)));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
         await().atMost(2, TimeUnit.SECONDS)
                 .untilAsserted(() -> assertThat(received.get()).isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID, GUILD_ID)));
@@ -143,8 +144,8 @@ class VoiceConnectionManagerTest {
 
     @Test
     void connectsToMultipleGuildsSimultaneously() {
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
-        voiceConnectionManager.connect(new ConnectionRequest("req-2", "voice-2", GUILD_ID_2));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-2", "voice-2", GUILD_ID_2));
 
         assertThat(discordClient.guild(GUILD_ID).getJoinedChannelId()).isEqualTo(VOICE_CHANNEL_ID);
         assertThat(discordClient.guild(GUILD_ID_2).getJoinedChannelId()).isEqualTo("voice-2");
@@ -154,7 +155,7 @@ class VoiceConnectionManagerTest {
 
     @Test
     void leavesConnectedGuildWhenDisconnecting() {
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
@@ -171,7 +172,7 @@ class VoiceConnectionManagerTest {
 
     @Test
     void disconnectsOnlyOnceForSameGuild() {
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
@@ -182,8 +183,8 @@ class VoiceConnectionManagerTest {
 
     @Test
     void disconnectsOnlyTargetedGuild() {
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
-        voiceConnectionManager.connect(new ConnectionRequest("req-2", "voice-2", GUILD_ID_2));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-2", "voice-2", GUILD_ID_2));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
         discordClient.guild(GUILD_ID_2).simulateJoined("voice-2");
 
@@ -197,7 +198,7 @@ class VoiceConnectionManagerTest {
 
     @Test
     void tracksGuildAsConnectedOnlyAfterJoinCallbackFires() {
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
         voiceConnectionManager.disconnect(GUILD_ID);
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isZero();
@@ -212,7 +213,7 @@ class VoiceConnectionManagerTest {
     void tracksGuildAfterMovingToNewChannel() {
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, "voice-2", GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, "voice-2", GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined("voice-2");
 
         voiceConnectionManager.disconnect(GUILD_ID);
@@ -224,7 +225,7 @@ class VoiceConnectionManagerTest {
     @Test
     void deletesAssignmentKeyOnDisconnect() {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID);
@@ -246,8 +247,8 @@ class VoiceConnectionManagerTest {
     void disconnectsAllActiveGuilds() {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID_2, "voice-2"), "test-player");
-        voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
-        voiceConnectionManager.connect(new ConnectionRequest("req-2", "voice-2", GUILD_ID_2));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-2", "voice-2", GUILD_ID_2));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
         discordClient.guild(GUILD_ID_2).simulateJoined("voice-2");
 
