@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -48,11 +49,24 @@ class RedisTrackCatalogueTest {
                 redis,
                 objectMapper,
                 pendingInteractions,
-                new MusicPlayerPoolProperties(Duration.ofSeconds(5), Duration.ofSeconds(5)));
+                new MusicPlayerPoolProperties(Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofSeconds(5)));
 
         List<TrackMetadata> results = trackCatalogue.find(GUILD_ID, "daft punk", 5);
 
         assertThat(results).containsExactly(
                 new TrackMetadata("One More Time", "Daft Punk", "https://youtube.com/watch?v=1", 320_000));
+    }
+
+    @Test
+    void returnsNoResultsAfterSearchTimeout() {
+        RedisTrackCatalogue trackCatalogue = new RedisTrackCatalogue(
+                mock(StringRedisTemplate.class),
+                new ObjectMapper(),
+                new MusicPlayerPendingInteractions(),
+                new MusicPlayerPoolProperties(Duration.ofSeconds(5), Duration.ofMinutes(1), Duration.ofMillis(100)));
+
+        List<TrackMetadata> results = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> trackCatalogue.find(GUILD_ID, "daft punk", 5));
+
+        assertThat(results).isEmpty();
     }
 }

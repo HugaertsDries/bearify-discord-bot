@@ -37,7 +37,7 @@ class RedisTrackCatalogue implements TrackCatalogue {
                 PlayerRedisProtocol.Channels.SEARCH,
                 serialize(new MusicPlayerInteraction.Search(pending.requestId(), guildId, query, limit)));
         return pending.future()
-                .orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS)
+                .orTimeout(properties.searchTimeout().toMillis(), TimeUnit.MILLISECONDS)
                 .thenApply(event -> event instanceof MusicPlayerEvent.SearchResults results ? results.tracks() : List.<TrackMetadata>of())
                 .exceptionally(ex -> List.<TrackMetadata>of())
                 .join();

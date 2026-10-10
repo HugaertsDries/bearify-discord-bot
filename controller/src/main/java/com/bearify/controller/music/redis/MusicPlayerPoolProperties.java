@@ -8,5 +8,7 @@ import java.time.Duration;
 @ConfigurationProperties("music-player.pool")
 public record MusicPlayerPoolProperties(
         @DefaultValue("5s")  Duration connectRequestTTL,
-        @DefaultValue("30s") Duration interactionTimeout) {
+        @DefaultValue("30s") Duration interactionTimeout,
+        // Discord drops autocomplete answers after 3s, so waiting longer is pointless
+        @DefaultValue("3s")  Duration searchTimeout) {
 }
