@@ -124,6 +124,8 @@ public class YoutubeHealthMonitor implements MusicPlayerEventConsumer {
         state = next;
         brokenReason = reason;
         if (previous == next) {
+            // the channel stays quiet, so the log is the only sign the canary is still checking
+            LOG.info("YouTube health check: still {}{}", next, reason.map(r -> " (" + r + ")").orElse(""));
             return;
         }
         LOG.info("YouTube health check moved from {}{} to {}{}",
