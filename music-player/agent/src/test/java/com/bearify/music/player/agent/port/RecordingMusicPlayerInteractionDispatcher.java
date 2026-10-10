@@ -1,6 +1,7 @@
 package com.bearify.music.player.agent.port;
 
 import com.bearify.music.player.agent.domain.AudioPlayerPool;
+import com.bearify.music.player.agent.domain.AudioTrackLoader;
 import com.bearify.music.player.agent.domain.VoiceConnectionManager;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 
@@ -13,9 +14,10 @@ public class RecordingMusicPlayerInteractionDispatcher extends MusicPlayerIntera
 
     public RecordingMusicPlayerInteractionDispatcher(VoiceConnectionManager manager,
                                                      AudioPlayerPool pool,
+                                                     AudioTrackLoader loader,
                                                      MusicPlayerEventDispatcher eventDispatcher,
                                                      String playerId) {
-        super(manager, pool, eventDispatcher, playerId);
+        super(manager, pool, loader, eventDispatcher, playerId);
     }
 
     @Override

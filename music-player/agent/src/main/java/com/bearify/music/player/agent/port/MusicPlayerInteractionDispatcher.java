@@ -21,15 +21,18 @@ public class MusicPlayerInteractionDispatcher {
 
     private final VoiceConnectionManager manager;
     private final AudioPlayerPool pool;
+    private final AudioTrackLoader loader;
     private final MusicPlayerEventDispatcher eventDispatcher;
 
     MusicPlayerInteractionDispatcher(VoiceConnectionManager manager,
                                      AudioPlayerPool pool,
+                                     AudioTrackLoader loader,
                                      MusicPlayerEventDispatcher eventDispatcher,
                                      @Value("${player.id}") String playerId) {
         this.playerId = playerId;
         this.manager = manager;
         this.pool = pool;
+        this.loader = loader;
         this.eventDispatcher = eventDispatcher;
     }
 
@@ -70,7 +73,6 @@ public class MusicPlayerInteractionDispatcher {
 
     private void loadAndPlay(MusicPlayerInteraction.Play play) {
         var player = pool.getOrCreate(play.guildId());
-        AudioTrackLoader loader = pool.getLoader(play.guildId());
         var trackRequest = play.trackRequest();
         loader.load(trackRequest.query(), trackRequest.requesterTag(), new AudioTrackLoader.AudioTrackLoadCallback() {
             @Override
@@ -99,7 +101,6 @@ public class MusicPlayerInteractionDispatcher {
     }
 
     private void search(MusicPlayerInteraction.Search search) {
-        AudioTrackLoader loader = pool.getLoader(search.guildId());
         loader.search("ytsearch:" + search.query(), search.limit(), new AudioTrackLoader.AudioTrackSearchCallback() {
             @Override
             public void searchResults(List<TrackMetadata> tracks) {

@@ -11,60 +11,51 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Supplier;
 
 @Component
 public class AudioPlayerPool {
 
-    private record GuildEntry(AudioPlayer player, AudioTrackLoader loader) {}
-
-    private final ConcurrentHashMap<String, GuildEntry> entries = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AudioPlayer> entries = new ConcurrentHashMap<>();
     private final MusicPlayerEventDispatcher eventDispatcher;
     private final PlayerProperties properties;
     private final ScheduledExecutorService scheduler;
+    private final Supplier<LavaAudioEngine> engineFactory;
     private final String playerId;
 
     public AudioPlayerPool(MusicPlayerEventDispatcher eventDispatcher,
                            PlayerProperties properties,
                            ScheduledExecutorService scheduler,
+                           Supplier<LavaAudioEngine> engineFactory,
                            @Value("${player.id}") String playerId) {
         this.eventDispatcher = eventDispatcher;
         this.properties = properties;
         this.scheduler = scheduler;
+        this.engineFactory = engineFactory;
         this.playerId = playerId;
     }
 
     public AudioPlayer getOrCreate(String guildId) {
-        return getOrCreateEntry(guildId).player();
-    }
-
-    public AudioTrackLoader getLoader(String guildId) {
-        return getOrCreateEntry(guildId).loader();
+        return entries.computeIfAbsent(guildId, id -> {
+            LavaAudioEngine engine = engineFactory.get();
+            return new AudioPlayer(
+                    engine, engine, eventDispatcher, properties, scheduler, playerId, id,
+                    () -> this.remove(guildId));
+        });
     }
 
     public Optional<AudioPlayer> get(String guildId) {
-        return Optional.ofNullable(entries.get(guildId)).map(GuildEntry::player);
+        return Optional.ofNullable(entries.get(guildId));
     }
 
     public Set<String> activeGuildIds() {
         return new HashSet<>(entries.keySet());
     }
 
-    private GuildEntry getOrCreateEntry(String guildId) {
-        return entries.computeIfAbsent(guildId, id -> {
-            LavaAudioEngine engine = new LavaAudioEngine(properties.engine().youtube());
-            AudioTrackLoader loader = engine.getLoader(properties.playlistMaxTracks());
-            // TODO can't we use a inner-builder pattern here. It's getting a bit to much.
-            AudioPlayer player = new AudioPlayer(
-                    engine, engine, eventDispatcher, properties, scheduler, playerId, id,
-                    () -> this.remove(guildId));
-            return new GuildEntry(player, loader);
-        });
-    }
-
     private void remove(String guildId) {
-        GuildEntry entry = entries.remove(guildId);
-        if (entry != null) {
-            entry.player().close();
+        AudioPlayer player = entries.remove(guildId);
+        if (player != null) {
+            player.close();
         }
     }
 }

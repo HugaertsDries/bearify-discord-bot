@@ -3,6 +3,7 @@ package com.bearify.music.player.agent.redis;
 import com.bearify.music.player.agent.AbstractAgentIntegrationTest;
 import com.bearify.music.player.agent.RecordingVoiceConnectionManager;
 import com.bearify.music.player.agent.domain.AudioPlayerPool;
+import com.bearify.music.player.agent.domain.AudioTrackLoader;
 import com.bearify.music.player.agent.domain.VoiceConnectionManager;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.agent.port.RecordingMusicPlayerInteractionDispatcher;
@@ -100,9 +101,10 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
         @Primary
         RecordingMusicPlayerInteractionDispatcher recordingMusicPlayerInteractionDispatcher(VoiceConnectionManager manager,
                                                                                             AudioPlayerPool pool,
+                                                                                            AudioTrackLoader loader,
                                                                                             MusicPlayerEventDispatcher eventDispatcher,
                                                                                             @Value("${player.id}") String playerId) {
-            return new RecordingMusicPlayerInteractionDispatcher(manager, pool, eventDispatcher, playerId);
+            return new RecordingMusicPlayerInteractionDispatcher(manager, pool, loader, eventDispatcher, playerId);
         }
     }
 }

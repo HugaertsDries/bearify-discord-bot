@@ -45,7 +45,7 @@ class MusicPlayerInteractionDispatcherTest {
     void connectsVoiceManagerWhenConnectInteractionIsHandled() {
         RecordingVoiceConnectionManager voiceConnectionManager = new RecordingVoiceConnectionManager();
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, PLAYER_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
@@ -60,7 +60,7 @@ class MusicPlayerInteractionDispatcherTest {
     void disconnectsWhenStopInteractionIsHandled() {
         RecordingVoiceConnectionManager voiceConnectionManager = new RecordingVoiceConnectionManager();
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, PLAYER_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(voiceConnectionManager, pool, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Stop(PLAYER_ID, REQUEST_ID, GUILD_ID));
 
@@ -70,12 +70,13 @@ class MusicPlayerInteractionDispatcherTest {
     @Test
     void routesPlayQueryToLoader() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        RecordingTrackLoader loader = new RecordingTrackLoader();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("bohemian rhapsody", TEXT_CHANNEL_ID, null)));
 
-        assertThat(pool.loaderCalls).containsExactly("bohemian rhapsody");
+        assertThat(loader.loadCalls).containsExactly("bohemian rhapsody");
     }
 
     @Test
@@ -83,7 +84,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.TogglePause(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
@@ -95,7 +96,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Next(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
@@ -107,7 +108,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Previous(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
@@ -119,7 +120,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Rewind(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 15000));
 
@@ -131,7 +132,7 @@ class MusicPlayerInteractionDispatcherTest {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, null, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Forward(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 30000));
 
@@ -141,7 +142,7 @@ class MusicPlayerInteractionDispatcherTest {
     @Test
     void routesPlaylistToPlayPlaylist() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        pool.useLoader(new AudioTrackLoader() {
+        AudioTrackLoader loader = new AudioTrackLoader() {
             @Override
             public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
                 callback.playlistLoaded(List.of(track("Song A"), track("Song B"), track("Song C")));
@@ -151,9 +152,9 @@ class MusicPlayerInteractionDispatcherTest {
             public void search(String query, int limit, AudioTrackSearchCallback callback) {
                 throw new AssertionError("Search should not be used");
             }
-        });
+        };
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID,
                 new TrackRequest("https://youtube.com/playlist?list=PLxyz", TEXT_CHANNEL_ID, null)));
@@ -164,7 +165,8 @@ class MusicPlayerInteractionDispatcherTest {
     @Test
     void dispatchesSearchInteractionToLoaderAndPublishesSearchResults() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        pool.useLoader(new AudioTrackLoader() {
+        List<String> searchCalls = new ArrayList<>();
+        AudioTrackLoader loader = new AudioTrackLoader() {
             @Override
             public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
                 throw new AssertionError("Search should not use load()");
@@ -172,17 +174,17 @@ class MusicPlayerInteractionDispatcherTest {
 
             @Override
             public void search(String query, int limit, AudioTrackSearchCallback callback) {
-                pool.searchCalls.add(query + "|" + limit);
+                searchCalls.add(query + "|" + limit);
                 callback.searchResults(List.of(metadata("One More Time"), metadata("Digital Love")));
             }
-        });
+        };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
 
-        assertThat(pool.searchCalls).containsExactly("ytsearch:daft punk|5");
+        assertThat(searchCalls).containsExactly("ytsearch:daft punk|5");
         assertThat(eventDispatcher.events).hasSize(1);
         assertThat(eventDispatcher.events.getFirst()).isInstanceOf(MusicPlayerEvent.SearchResults.class);
         MusicPlayerEvent.SearchResults results = (MusicPlayerEvent.SearchResults) eventDispatcher.events.getFirst();
@@ -205,7 +207,7 @@ class MusicPlayerInteractionDispatcherTest {
     @Test
     void dispatchesEmptySearchResultsWhenSearchReturnsNoMatches() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
-        pool.useLoader(new AudioTrackLoader() {
+        AudioTrackLoader loader = new AudioTrackLoader() {
             @Override
             public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
                 throw new AssertionError("Search should not use load()");
@@ -213,13 +215,12 @@ class MusicPlayerInteractionDispatcherTest {
 
             @Override
             public void search(String query, int limit, AudioTrackSearchCallback callback) {
-                pool.searchCalls.add(query + "|" + limit);
                 callback.noMatches();
             }
-        });
+        };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), pool, eventDispatcher, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
 
@@ -228,54 +229,42 @@ class MusicPlayerInteractionDispatcherTest {
         assertThat(((MusicPlayerEvent.SearchResults) eventDispatcher.events.getFirst()).tracks()).isEmpty();
     }
 
+    @Test
+    void searchDoesNotCreateGuildPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, new RecordingTrackLoader(), new RecordingEventDispatcher(), PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
+
+        assertThat(pool.get(GUILD_ID)).isEmpty();
+    }
+
     // --- STUB ---
 
     private final class StubAudioPlayerPool extends AudioPlayerPool {
 
-        final List<String> loaderCalls = new ArrayList<>();
         final List<String> togglePauseCalls = new ArrayList<>();
         final List<String> nextCalls = new ArrayList<>();
         final List<String> previousCalls = new ArrayList<>();
         final List<String> rewindCalls = new ArrayList<>();
         final List<String> forwardCalls = new ArrayList<>();
         final List<String> playPlaylistCalls = new ArrayList<>();
-        final List<String> searchCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
-        private AudioTrackLoader stubLoader = null;
 
         StubAudioPlayerPool() {
-            super(null, null, null, "test");
+            super(null, null, null, null, "test");
         }
 
         void primeGuild(String guildId) {
             primedGuilds.add(guildId);
         }
 
-        void useLoader(AudioTrackLoader loader) {
-            this.stubLoader = loader;
-        }
-
         @Override
         public AudioPlayer getOrCreate(String guildId) {
             primedGuilds.add(guildId);
             return new StubPlayer(guildId);
-        }
-
-        @Override
-        public AudioTrackLoader getLoader(String guildId) {
-            if (stubLoader != null) return stubLoader;
-            return new AudioTrackLoader() {
-                @Override
-                public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
-                    loaderCalls.add(query);
-                }
-
-                @Override
-                public void search(String query, int limit, AudioTrackSearchCallback callback) {
-                    searchCalls.add(query + "|" + limit);
-                }
-            };
         }
 
         @Override
@@ -342,6 +331,20 @@ class MusicPlayerInteractionDispatcherTest {
             @Override public boolean canProvide() { return false; }
             @Override public byte[] provide20MsAudio() { return new byte[0]; }
             @Override public boolean isOpus() { return false; }
+        }
+    }
+
+    private static final class RecordingTrackLoader implements AudioTrackLoader {
+
+        private final List<String> loadCalls = new ArrayList<>();
+
+        @Override
+        public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+            loadCalls.add(query);
+        }
+
+        @Override
+        public void search(String query, int limit, AudioTrackSearchCallback callback) {
         }
     }
 
