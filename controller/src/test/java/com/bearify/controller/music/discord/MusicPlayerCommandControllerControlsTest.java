@@ -1,9 +1,13 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
+import com.bearify.controller.music.domain.MusicPlayer;
+import com.bearify.controller.music.domain.MusicPlayerEventListener;
+import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +16,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -24,6 +30,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String GUILD_ID = "guild-456";
     private static final String TEXT_CHANNEL_ID = "txt-789";
     private static final String PLAYER_ID = "player-1";
+    private static final String FAILURE_REASON = "Request timed out";
 
     @Autowired CommandRegistry commandRegistry;
     @Autowired StringRedisTemplate redis;
@@ -211,6 +218,17 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
     }
 
+    @Test
+    void editsPauseReplyWhenPlayerFails() {
+        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new FailingMusicPlayer()));
+        MockCommandInteraction interaction = buildInteraction("pause");
+
+        controller.pause(interaction);
+
+        assertThat(interaction.getDeferredMessage()).isPresent();
+        assertThat(interaction.getDeferredMessage().get().getLastEdit()).hasValueSatisfying(edit -> assertThat(edit).contains("not even playing songs"));
+    }
+
     // --- HELPERS ---
 
     private MockCommandInteraction buildInteraction(String subcommand) {
@@ -230,5 +248,23 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
                 .textChannelId(TEXT_CHANNEL_ID)
                 .option(optionKey, optionValue)
                 .build();
+    }
+
+    private record SinglePlayerPool(MusicPlayer player) implements MusicPlayerPool {
+        @Override public MusicPlayer acquire(String guildId, String voiceChannelId) { return player; }
+        @Override public Optional<MusicPlayer> find(String guildId, String voiceChannelId) { return Optional.of(player); }
+        @Override public boolean hasActiveSessionFor(String guildId) { return true; }
+    }
+
+    private static final class FailingMusicPlayer implements MusicPlayer {
+        @Override public void join(MusicPlayerEventListener handler) {}
+        @Override public void stop() {}
+        @Override public void play(TrackRequest request, MusicPlayerEventListener handler) {}
+        @Override public void togglePause(String requesterTag, MusicPlayerEventListener handler) { handler.onFailed(FAILURE_REASON); }
+        @Override public void previous(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void next(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void rewind(Duration seek, String requesterTag) {}
+        @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void clear(String requesterTag) {}
     }
 }

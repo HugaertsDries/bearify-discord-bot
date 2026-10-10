@@ -21,6 +21,8 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 class RedisMusicPlayer implements MusicPlayer {
 
@@ -173,23 +175,13 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void join(MusicPlayerEventListener handler) {
-            MusicPlayerPendingInteractions.PendingInteraction pending = pendingInteractions.register();
-            redis.convertAndSend(
-                    PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Connect(playerId, pending.requestId(), voiceChannelId, guildId)));
-            pending.future()
-                    .orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS)
-                    .whenComplete((event, ex) -> {
-                        if (ex != null) {
-                            handler.onFailed("Request timed out");
-                        } else {
-                            switch (event) {
-                                case MusicPlayerEvent.Ready r -> handler.onReady();
-                                case MusicPlayerEvent.ConnectFailed f -> handler.onFailed(f.reason());
-                                default -> LOG.warn("Unexpected event '{}' for connected join", event.getClass().getSimpleName());
-                            }
-                        }
-                    });
+            request(requestId -> new MusicPlayerInteraction.Connect(playerId, requestId, voiceChannelId, guildId), handler, event -> {
+                switch (event) {
+                    case MusicPlayerEvent.Ready ignored -> handler.onReady();
+                    case MusicPlayerEvent.ConnectFailed f -> handler.onFailed(f.reason());
+                    default -> LOG.warn("Unexpected event '{}' for connected join", event.getClass().getSimpleName());
+                }
+            });
         }
 
         @Override
@@ -202,12 +194,8 @@ class RedisMusicPlayer implements MusicPlayer {
         @Override
         public void play(TrackRequest request, MusicPlayerEventListener handler) {
             announcementRegistry.subscribe(playerId, guildId, trackAnnouncerFactory.create(request.textChannelId()));
-            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
-            redis.convertAndSend(
-                    PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Play(playerId, p.requestId(), guildId, request)));
-            p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
-                if (ex != null) return;
+            // no reply on success: the agent only answers play when it fails
+            request(requestId -> new MusicPlayerInteraction.Play(playerId, requestId, guildId, request), new MusicPlayerEventListener() {}, event -> {
                 switch (event) {
                     case MusicPlayerEvent.TrackNotFound t -> handler.onTrackNotFound(t.query());
                     case MusicPlayerEvent.TrackLoadFailed t -> handler.onTrackLoadFailed(t.reason());
@@ -219,12 +207,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void togglePause(String requesterTag, MusicPlayerEventListener handler) {
-            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
-            redis.convertAndSend(
-                    PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.TogglePause(playerId, new Request(p.requestId(), requesterTag), guildId)));
-            p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
-                if (ex != null) return;
+            request(requestId -> new MusicPlayerInteraction.TogglePause(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.Paused ignored -> handler.onPaused();
                     case MusicPlayerEvent.Resumed ignored -> handler.onResumed();
@@ -236,13 +219,9 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void next(String requesterTag, MusicPlayerEventListener handler) {
-            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
-            redis.convertAndSend(
-                    PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Next(playerId, new Request(p.requestId(), requesterTag), guildId)));
-            p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
-                if (ex != null) return;
+            request(requestId -> new MusicPlayerInteraction.Next(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
                 switch (event) {
+                    case MusicPlayerEvent.Skipped ignored -> {}
                     case MusicPlayerEvent.NothingToAdvance ignored -> handler.onNothingToAdvance();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for next request", event.getClass().getSimpleName());
@@ -252,13 +231,9 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void previous(String requesterTag, MusicPlayerEventListener handler) {
-            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
-            redis.convertAndSend(
-                    PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Previous(playerId, new Request(p.requestId(), requesterTag), guildId)));
-            p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
-                if (ex != null) return;
+            request(requestId -> new MusicPlayerInteraction.Previous(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
                 switch (event) {
+                    case MusicPlayerEvent.WentBack ignored -> {}
                     case MusicPlayerEvent.NothingToGoBack ignored -> handler.onNothingToGoBack();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for previous request", event.getClass().getSimpleName());
@@ -275,13 +250,9 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
-            MusicPlayerPendingInteractions.PendingInteraction p = pendingInteractions.register();
-            redis.convertAndSend(
-                    PlayerRedisProtocol.Channels.interactions(playerId),
-                    serialize(new MusicPlayerInteraction.Forward(playerId, new Request(p.requestId(), requesterTag), guildId, seek.toMillis())));
-            p.future().orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS).whenComplete((event, ex) -> {
-                if (ex != null) return;
+            request(requestId -> new MusicPlayerInteraction.Forward(playerId, new Request(requestId, requesterTag), guildId, seek.toMillis()), handler, event -> {
                 switch (event) {
+                    case MusicPlayerEvent.Forwarded ignored -> {}
                     case MusicPlayerEvent.NothingToAdvance ignored -> handler.onNothingToAdvance();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for forward request", event.getClass().getSimpleName());
@@ -294,6 +265,23 @@ class RedisMusicPlayer implements MusicPlayer {
             redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId),
                     serialize(new MusicPlayerInteraction.Clear(playerId, new Request(UUID.randomUUID().toString(), requesterTag), guildId)));
+        }
+
+        // a timeout tells timeoutListener the request failed, so no action can leave the user waiting
+        private void request(Function<String, MusicPlayerInteraction> interaction,
+                             MusicPlayerEventListener timeoutListener,
+                             Consumer<MusicPlayerEvent> onReply) {
+            MusicPlayerPendingInteractions.PendingInteraction pending = pendingInteractions.register();
+            redis.convertAndSend(PlayerRedisProtocol.Channels.interactions(playerId), serialize(interaction.apply(pending.requestId())));
+            pending.future()
+                    .orTimeout(properties.interactionTimeout().toMillis(), TimeUnit.MILLISECONDS)
+                    .whenComplete((event, ex) -> {
+                        if (ex != null) {
+                            timeoutListener.onFailed("Request timed out");
+                        } else {
+                            onReply.accept(event);
+                        }
+                    });
         }
     }
 }

@@ -7,6 +7,7 @@ import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,17 +20,24 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-@SpringBootTest(properties = "music-player.pool.connect-request-ttl=500ms")
+@SpringBootTest(properties = {
+        "music-player.pool.connect-request-ttl=500ms",
+        "music-player.pool.interaction-timeout=500ms"
+})
 class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
 
     private static final String PLAYER_ID = "player-1";
     private static final String GUILD_ID = "guild-1";
     private static final String VOICE_CHANNEL_ID = "voice-1";
+    private static final String TEXT_CHANNEL_ID = "text-1";
+    private static final String REQUESTER_TAG = "<@user-1>";
+    private static final String QUERY = "ytsearch:daft punk";
 
     @Autowired MusicPlayerPool pool;
     @Autowired StringRedisTemplate redis;
@@ -212,5 +220,52 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
         player.stop();
 
         assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo(PLAYER_ID);
+    }
+
+    // --- TIMEOUTS ---
+
+    @Test
+    void reportsFailureWhenTogglePauseTimesOut() {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        AtomicReference<String> failure = new AtomicReference<>();
+
+        MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+        player.togglePause(REQUESTER_TAG, new MusicPlayerEventListener() {
+            @Override public void onFailed(String reason) { failure.set(reason); }
+        });
+
+        await().atMost(3, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertThat(failure.get()).isEqualTo("Request timed out"));
+    }
+
+    @Test
+    void reportsFailureWhenNextTimesOut() {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        AtomicReference<String> failure = new AtomicReference<>();
+
+        MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+        player.next(REQUESTER_TAG, new MusicPlayerEventListener() {
+            @Override public void onFailed(String reason) { failure.set(reason); }
+        });
+
+        await().atMost(3, TimeUnit.SECONDS)
+                .untilAsserted(() -> assertThat(failure.get()).isEqualTo("Request timed out"));
+    }
+
+    @Test
+    void staysSilentWhenPlayTimesOut() {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        AtomicBoolean answered = new AtomicBoolean(false);
+
+        MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+        player.play(new TrackRequest(QUERY, TEXT_CHANNEL_ID, REQUESTER_TAG), new MusicPlayerEventListener() {
+            @Override public void onFailed(String reason) { answered.set(true); }
+            @Override public void onTrackNotFound(String query) { answered.set(true); }
+            @Override public void onTrackLoadFailed(String reason) { answered.set(true); }
+        });
+
+        // outlasts the 500ms interaction timeout
+        await().during(1, TimeUnit.SECONDS).atMost(2, TimeUnit.SECONDS)
+                .until(() -> !answered.get());
     }
 }

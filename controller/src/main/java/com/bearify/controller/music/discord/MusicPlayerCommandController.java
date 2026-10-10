@@ -195,6 +195,11 @@ public class MusicPlayerCommandController {
                                 public void onNothingToGoBack() {
                                     message.edit(NOTHING_TO_GO_BACK_MESSAGE);
                                 }
+
+                                @Override
+                                public void onFailed(String reason) {
+                                    message.edit(NO_PLAYER_MESSAGE);
+                                }
                             });
                             message.edit(previousMessage());
                         },
@@ -214,6 +219,11 @@ public class MusicPlayerCommandController {
                                 @Override
                                 public void onNothingToAdvance() {
                                     message.edit(QUEUE_EMPTY_MESSAGE);
+                                }
+
+                                @Override
+                                public void onFailed(String reason) {
+                                    message.edit(NO_PLAYER_MESSAGE);
                                 }
                             });
                             message.edit(nextMessage());
@@ -250,6 +260,11 @@ public class MusicPlayerCommandController {
                                 @Override
                                 public void onNothingToAdvance() {
                                     message.edit(QUEUE_EMPTY_MESSAGE);
+                                }
+
+                                @Override
+                                public void onFailed(String reason) {
+                                    message.edit(NO_PLAYER_MESSAGE);
                                 }
                             });
                             message.edit(forwardedMessage(seconds));
