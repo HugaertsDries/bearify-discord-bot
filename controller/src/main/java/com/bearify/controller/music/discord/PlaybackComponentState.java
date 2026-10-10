@@ -8,8 +8,6 @@ import java.util.Optional;
 
 public final class PlaybackComponentState {
 
-    private static final String DEFAULT_FOOTER = "Bearify \u2022 Powered by Bearable Software";
-
     public enum NotificationStyle {
         INFO,
         ERROR
@@ -84,8 +82,8 @@ public final class PlaybackComponentState {
         return Optional.ofNullable(artworkUri);
     }
 
-    public String footerText() {
-        return footer;
+    public Optional<String> footerText() {
+        return Optional.ofNullable(footer).filter(text -> !text.isBlank());
     }
 
     public boolean paused() {
@@ -99,7 +97,7 @@ public final class PlaybackComponentState {
         private String requesterTag;
         private List<TrackMetadata> upNext = List.of();
         private URI artworkUri;
-        private String footerText = DEFAULT_FOOTER;
+        private String footerText;
         private boolean paused;
 
         private Builder() {
@@ -141,7 +139,7 @@ public final class PlaybackComponentState {
         }
 
         public Builder footer(String footerText) {
-            this.footerText = footerText == null ? DEFAULT_FOOTER : footerText;
+            this.footerText = footerText;
             return this;
         }
 

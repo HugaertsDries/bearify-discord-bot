@@ -1,6 +1,7 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.discord.api.message.ComponentMessage;
+import com.bearify.discord.api.message.Container;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,15 @@ class PlaybackComponentTest {
         assertThat(message.containers()).hasSize(4);
         assertThat(message.containers().getFirst().accentColor()).isEqualTo(0xAA0000);
         assertThat(texts(message)).anyMatch(text -> text.contains("Something went wrong"));
+    }
+
+    @Test
+    void renderOmitsFooterWhenStateHasNone() {
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+
+        ComponentMessage message = announcer.render(baseState().footer(null).build());
+
+        assertThat(message.items()).last().isInstanceOf(Container.class);
     }
 
     private static PlaybackComponentState.Builder baseState() {

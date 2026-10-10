@@ -41,7 +41,7 @@ public class PlaybackComponent {
         appendHero(builder, state);
         appendActionRow(builder, state);
         appendQueue(builder, state);
-        builder.text("-# " + state.footerText());
+        state.footerText().ifPresent(footer -> builder.text("-# " + footer));
         return builder.build();
     }
 

@@ -32,7 +32,7 @@ class PlaybackComponentStateTest {
         assertThat(state.track()).isEqualTo(currentTrack);
         assertThat(state.upNext()).containsExactly(nextTrack);
         assertThat(state.artworkUri()).contains(URI.create("https://cdn.example/art.png"));
-        assertThat(state.footerText()).isEqualTo("Footer");
+        assertThat(state.footerText()).contains("Footer");
         assertThat(state.paused()).isTrue();
     }
 
@@ -48,7 +48,7 @@ class PlaybackComponentStateTest {
         assertThat(state.notification()).isEmpty();
         assertThat(state.artworkUri()).isEmpty();
         assertThat(state.upNext()).isEmpty();
-        assertThat(state.footerText()).isEqualTo("Bearify • Powered by Bearable Software");
+        assertThat(state.footerText()).isEmpty();
         assertThat(state.paused()).isFalse();
     }
 }
