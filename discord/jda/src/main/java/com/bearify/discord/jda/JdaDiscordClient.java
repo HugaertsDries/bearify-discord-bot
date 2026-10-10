@@ -37,7 +37,7 @@ public class JdaDiscordClient implements DiscordClient {
     private final Consumer<Interaction> interactionHandler;
     private final Activity activity;
 
-    public JDA jda;
+    private JDA jda;
 
     JdaDiscordClient(List<CommandDefinition> commands,
                      Consumer<Interaction> interactionHandler,
