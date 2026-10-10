@@ -1,6 +1,6 @@
 # discord-jda
 
-JDA 5 implementation of the `discord-api` abstractions. Auto-configures itself as a Spring Boot starter.
+JDA 6 implementation of the `discord-api` abstractions. Auto-configures itself as a Spring Boot starter.
 
 ## Purpose
 Provides a JDA-backed `DiscordClientFactory` bean. Activated automatically when JDA is on the classpath and no other `DiscordClientFactory` bean is present.
@@ -25,4 +25,4 @@ Provides a JDA-backed `DiscordClientFactory` bean. Activated automatically when 
 
 ## Dependencies
 - `discord-starter`
-- `net.dv8tion:JDA:5.3.0`
+- `net.dv8tion:JDA:6.7.0`

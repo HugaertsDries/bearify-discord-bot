@@ -26,19 +26,20 @@ flowchart TD
 | Module | Description |
 |---|---|
 | [`discord/api`](discord/api/README.md) | Pure Java interfaces — `DiscordClient`, `Guild`, `TextChannel`, `AudioProvider`, `CommandInteraction` |
-| [`discord/jda`](discord/jda/README.md) | JDA 5 implementation of `discord-api` |
-| [`discord/starter`](discord/starter/README.md) | Spring Boot auto-configuration — `@Command`, `@Interaction`, `@Option`, `@DiscordControllerAdvice` |
+| [`discord/jda`](discord/jda/README.md) | JDA 6 implementation of `discord-api` |
+| [`discord/starter`](discord/starter/README.md) | Spring Boot auto-configuration — `@DiscordController`, `@InteractionGroup`, `@Interaction`, `@Option` |
 | [`discord/testing`](discord/testing) | Test doubles — `MockDiscordClient`, `MockCommandInteraction` |
-| [`music-player/bridge`](music-player/bridge) | Shared protocol — `MusicPlayerInteraction`, `MusicPlayerEvent`, `Track` |
+| [`music-player/bridge`](music-player/bridge) | Shared protocol — `MusicPlayerInteraction`, `MusicPlayerEvent`, `TrackMetadata`, `TrackRequest` |
 | [`controller`](controller/README.md) | Main bot application |
 | [`music-player/agent`](music-player/agent) | Audio player agent |
 
 ## Tech Stack
 
 - Java 25
-- Spring Boot 3.4.3
-- JDA 5.3.0
-- LavaPlayer 2.2.2
+- Spring Boot 4.1.1
+- JDA 6.7.0
+- LavaPlayer 2.2.7
+- youtube-source (pinned snapshot, see `gradle/libs.versions.toml`)
 - Redis (pub/sub + player registry)
 
 ## Prerequisites
@@ -50,13 +51,15 @@ flowchart TD
 
 **1. Start infrastructure:**
 ```bash
-docker-compose -f infra/docker-compose.yml up -d
+docker compose up -d
 ```
 
-**2. Configure environment — copy `.env.example` and fill in your values:**
+**2. Configure environment — copy `.env.example` and fill in your values (unquoted `KEY=value`):**
 ```bash
 cp .env.example .env
 ```
+
+Both apps import `.env` from their working directory, so run them from the repo root. `bootRun` already does; for an IDE run configuration, set the working directory to the repo root.
 
 **3. Run the controller:**
 ```bash
@@ -73,5 +76,7 @@ cp .env.example .env
 ```bash
 ./gradlew build
 ```
+
+Tests need Docker running: they start Redis with Testcontainers.
 
 > On Windows, set `JAVA_HOME` to your JDK 25 installation before running Gradle.

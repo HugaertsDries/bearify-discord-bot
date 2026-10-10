@@ -45,6 +45,15 @@ Rewinds by the given number of seconds (default: 10s for tracks under 5 minutes,
 ### `/player forward [seconds]`
 Fast-forwards by the given number of seconds (default: 10s for tracks under 5 minutes, 30s for longer ones).
 
+### `/player clear`
+Clears the current playlist.
+
+### `/poke [pokes]`
+Pokes the bear a number of times (default: 4) and reports the response latency of each poke.
+
+### `/dev playback-preview [preset]`
+Posts a playback component preview in the current text channel. Presets: `broadcast` (default), `just-skipped`, `heavy-queue`. Only registered when the `dev` profile is active.
+
 ## Configuration
 
 | Property | Required | Description |
