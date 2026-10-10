@@ -229,6 +229,17 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         assertThat(interaction.getDeferredMessage().get().getLastEdit()).hasValueSatisfying(edit -> assertThat(edit).contains("not even playing songs"));
     }
 
+    @Test
+    void editsPauseReplyWithTimeoutMessageWhenPlayerDoesNotAnswer() {
+        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new TimingOutMusicPlayer()));
+        MockCommandInteraction interaction = buildInteraction("pause");
+
+        controller.pause(interaction);
+
+        assertThat(interaction.getDeferredMessage()).isPresent();
+        assertThat(interaction.getDeferredMessage().get().getLastEdit()).hasValueSatisfying(edit -> assertThat(edit).contains("didn't answer in time"));
+    }
+
     // --- HELPERS ---
 
     private MockCommandInteraction buildInteraction(String subcommand) {
@@ -261,6 +272,18 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void stop() {}
         @Override public void play(TrackRequest request, MusicPlayerEventListener handler) {}
         @Override public void togglePause(String requesterTag, MusicPlayerEventListener handler) { handler.onFailed(FAILURE_REASON); }
+        @Override public void previous(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void next(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void rewind(Duration seek, String requesterTag) {}
+        @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void clear(String requesterTag) {}
+    }
+
+    private static final class TimingOutMusicPlayer implements MusicPlayer {
+        @Override public void join(MusicPlayerEventListener handler) {}
+        @Override public void stop() {}
+        @Override public void play(TrackRequest request, MusicPlayerEventListener handler) {}
+        @Override public void togglePause(String requesterTag, MusicPlayerEventListener handler) { handler.onTimedOut(); }
         @Override public void previous(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void next(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void rewind(Duration seek, String requesterTag) {}

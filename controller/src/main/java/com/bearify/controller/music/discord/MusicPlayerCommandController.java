@@ -28,6 +28,7 @@ public class MusicPlayerCommandController {
     private static final String CONNECT_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | The bear couldn't reach your channel. Try again in a moment.";
     private static final String LEAVING_MESSAGE = BearifyEmoji.HONEY + " | Alright, cleaning up after myself. Talk to you later! " + BearifyEmoji.WAVE;
     private static final String NO_PLAYER_MESSAGE = BearifyEmoji.BLOCKED + " | Seems like I'm not even playing songs! If you'd like me to, have you tried the `/player play` command?";
+    private static final String TIMED_OUT_MESSAGE = BearifyEmoji.BLOCKED + " | The bear didn't answer in time. Try again in a moment.";
     private static final String LEAVE_OTHER_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | Bear with me, I can't lumber out of your voice channel when I'm not with you.";
     private static final String TRACK_NOT_FOUND_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that track. Try a different search or link?";
     private static final String TRACK_LOAD_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | Oops! Something went wrong loading this track. This could be due to age-restrictions or region lock. (I'm technically less than 1 year old)";
@@ -176,6 +177,11 @@ public class MusicPlayerCommandController {
                                 public void onFailed(String reason) {
                                     message.edit(NO_PLAYER_MESSAGE);
                                 }
+
+                                @Override
+                                public void onTimedOut() {
+                                    message.edit(TIMED_OUT_MESSAGE);
+                                }
                             });
                         },
                         () -> replyNoPlayer(interaction)
@@ -199,6 +205,11 @@ public class MusicPlayerCommandController {
                                 @Override
                                 public void onFailed(String reason) {
                                     message.edit(NO_PLAYER_MESSAGE);
+                                }
+
+                                @Override
+                                public void onTimedOut() {
+                                    message.edit(TIMED_OUT_MESSAGE);
                                 }
                             });
                             message.edit(previousMessage());
@@ -224,6 +235,11 @@ public class MusicPlayerCommandController {
                                 @Override
                                 public void onFailed(String reason) {
                                     message.edit(NO_PLAYER_MESSAGE);
+                                }
+
+                                @Override
+                                public void onTimedOut() {
+                                    message.edit(TIMED_OUT_MESSAGE);
                                 }
                             });
                             message.edit(nextMessage());
@@ -265,6 +281,11 @@ public class MusicPlayerCommandController {
                                 @Override
                                 public void onFailed(String reason) {
                                     message.edit(NO_PLAYER_MESSAGE);
+                                }
+
+                                @Override
+                                public void onTimedOut() {
+                                    message.edit(TIMED_OUT_MESSAGE);
                                 }
                             });
                             message.edit(forwardedMessage(seconds));
