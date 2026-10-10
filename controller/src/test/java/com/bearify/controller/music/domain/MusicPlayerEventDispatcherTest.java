@@ -29,7 +29,7 @@ class MusicPlayerEventDispatcherTest {
         MusicPlayerPendingInteractions.PendingInteraction pending = interactions.register();
         AtomicReference<MusicPlayerEvent> announced = new AtomicReference<>();
         MusicPlayerEventDispatcher dispatcher = new MusicPlayerEventDispatcher(List.of(interactions, announced::set));
-        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", pending.requestId());
+        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", pending.requestId(), "guild-1");
 
         dispatcher.dispatch(event);
 

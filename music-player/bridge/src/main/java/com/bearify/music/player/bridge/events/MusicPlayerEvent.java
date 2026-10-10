@@ -56,6 +56,7 @@ public sealed interface MusicPlayerEvent permits
 
     String playerId();
     String requestId();
+    String guildId();
 
     record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext) implements MusicPlayerEvent {
         public TrackStart {
@@ -104,8 +105,8 @@ public sealed interface MusicPlayerEvent permits
             tracks = tracks != null ? List.copyOf(tracks) : List.of();
         }
     }
-    record Ready(String playerId, String requestId) implements MusicPlayerEvent {}
+    record Ready(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record Stopped(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
-    record ConnectFailed(String playerId, String requestId, String reason) implements MusicPlayerEvent {}
+    record ConnectFailed(String playerId, String requestId, String guildId, String reason) implements MusicPlayerEvent {}
     record PlayerNotFound(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
 }

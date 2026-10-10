@@ -118,7 +118,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
             JoinRequest request = objectMapper.readValue(json, JoinRequest.class);
 
             String failedEvent = objectMapper.writeValueAsString(
-                    new MusicPlayerEvent.ConnectFailed(PLAYER_ID, request.requestId(), "connection refused"));
+                    new MusicPlayerEvent.ConnectFailed(PLAYER_ID, request.requestId(), GUILD_ID, "connection refused"));
             redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, failedEvent);
 
             Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->

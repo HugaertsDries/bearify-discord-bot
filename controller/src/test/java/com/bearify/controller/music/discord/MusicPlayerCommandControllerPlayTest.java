@@ -138,7 +138,7 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
             try {
                 // Simulate player claiming and becoming ready
                 String readyEvent = objectMapper.writeValueAsString(
-                        new MusicPlayerEvent.Ready(PLAYER_ID, request.requestId()));
+                        new MusicPlayerEvent.Ready(PLAYER_ID, request.requestId(), GUILD_ID));
                 redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, readyEvent);
 
                 // After ready: play interaction sent and deferred message updated
@@ -217,7 +217,7 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
             JoinRequest request = objectMapper.readValue(json, JoinRequest.class);
 
             String failedEvent = objectMapper.writeValueAsString(
-                    new MusicPlayerEvent.ConnectFailed(PLAYER_ID, request.requestId(), "connection refused"));
+                    new MusicPlayerEvent.ConnectFailed(PLAYER_ID, request.requestId(), GUILD_ID, "connection refused"));
             redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, failedEvent);
 
             Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->

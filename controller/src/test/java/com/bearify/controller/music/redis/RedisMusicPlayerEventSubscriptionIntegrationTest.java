@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RedisMusicPlayerEventSubscriptionIntegrationTest extends AbstractControllerIntegrationTest {
 
     private static final String PLAYER_ID = "player-1";
+    private static final String GUILD_ID = "guild-1";
 
     @Autowired StringRedisTemplate redis;
     @Autowired ObjectMapper objectMapper;
@@ -28,7 +29,7 @@ class RedisMusicPlayerEventSubscriptionIntegrationTest extends AbstractControlle
     void routesPlayerReadyEventsToPendingRequests() throws Exception {
         MusicPlayerPendingInteractions.PendingInteraction pending = pendingInteractions.register();
 
-        MusicPlayerEvent event = new MusicPlayerEvent.Ready(PLAYER_ID, pending.requestId());
+        MusicPlayerEvent event = new MusicPlayerEvent.Ready(PLAYER_ID, pending.requestId(), GUILD_ID);
         redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS, objectMapper.writeValueAsString(event));
 
         MusicPlayerEvent result = pending.future().get(2, TimeUnit.SECONDS);

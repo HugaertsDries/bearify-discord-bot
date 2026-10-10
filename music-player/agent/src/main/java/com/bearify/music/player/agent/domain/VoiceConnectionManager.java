@@ -63,16 +63,16 @@ public class VoiceConnectionManager implements AutoCloseable {
         AudioPlayer player = pool.getOrCreate(request.guildId());
         guild.voice().ifPresentOrElse(session -> {
             if (session.getChannelId().equals(request.voiceChannelId())) {
-                eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
+                eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
             } else if (session.isLonely()) {
                 guild.join(request.voiceChannelId(), player, _ -> {
-                    eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
+                    eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
                 });
             } else {
-                eventDispatcher.dispatch(new MusicPlayerEvent.ConnectFailed(playerId, request.requestId(), "already connected to a different channel"));
+                eventDispatcher.dispatch(new MusicPlayerEvent.ConnectFailed(playerId, request.requestId(), request.guildId(), "already connected to a different channel"));
             }
         }, () -> guild.join(request.voiceChannelId(), player, _ -> {
-            eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
+            eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
         }));
     }
 
@@ -93,7 +93,7 @@ public class VoiceConnectionManager implements AutoCloseable {
                     PlayerRedisProtocol.Keys.assignment(request.guildId(), request.voiceChannelId()),
                     playerId,
                     properties.assignment().ttl());
-            eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
+            eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
         } else if (session.isLonely()) {
             // CASE B: different channel, alone — attempt to claim and migrate
             boolean claimed = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(
@@ -107,7 +107,7 @@ public class VoiceConnectionManager implements AutoCloseable {
             guild.join(request.voiceChannelId(), player, _ -> {
                 joiningGuilds.remove(request.guildId());
                 redis.delete(PlayerRedisProtocol.Keys.assignment(request.guildId(), oldChannelId));
-                eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
+                eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
             });
         }
         // CASE C: different channel, not alone — skip silently
@@ -124,7 +124,7 @@ public class VoiceConnectionManager implements AutoCloseable {
         joiningGuilds.add(request.guildId());
         guild.join(request.voiceChannelId(), player, _ -> {
             joiningGuilds.remove(request.guildId());
-            eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId()));
+            eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
         });
     }
 

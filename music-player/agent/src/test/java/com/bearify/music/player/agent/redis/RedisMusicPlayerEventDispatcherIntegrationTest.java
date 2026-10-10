@@ -45,7 +45,7 @@ class RedisMusicPlayerEventDispatcherIntegrationTest extends AbstractAgentIntegr
             }
         });
 
-        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", "req-1");
+        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", "req-1", "guild-1");
         dispatcher.dispatch(event);
 
         await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> assertThat(received.get()).isEqualTo(event));

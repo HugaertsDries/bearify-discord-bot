@@ -21,7 +21,7 @@ class MusicPlayerPendingInteractionsTest {
     void acceptCompletesFutureForMatchingRequestId() {
         MusicPlayerPendingInteractions interactions = new MusicPlayerPendingInteractions();
         MusicPlayerPendingInteractions.PendingInteraction pending = interactions.register();
-        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", pending.requestId());
+        MusicPlayerEvent event = new MusicPlayerEvent.Ready("player-1", pending.requestId(), "guild-1");
 
         interactions.accept(event);
 
@@ -34,7 +34,7 @@ class MusicPlayerPendingInteractionsTest {
         MusicPlayerPendingInteractions interactions = new MusicPlayerPendingInteractions();
         MusicPlayerPendingInteractions.PendingInteraction pending = interactions.register();
 
-        interactions.accept(new MusicPlayerEvent.Ready("player-1", "unknown"));
+        interactions.accept(new MusicPlayerEvent.Ready("player-1", "unknown", "guild-1"));
 
         assertThat(pending.future().isDone()).isFalse();
     }

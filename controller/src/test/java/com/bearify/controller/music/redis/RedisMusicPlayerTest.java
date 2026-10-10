@@ -99,7 +99,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             JoinRequest request = objectMapper.readValue(json, JoinRequest.class);
 
             redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS,
-                    objectMapper.writeValueAsString(new MusicPlayerEvent.Ready(PLAYER_ID, request.requestId())));
+                    objectMapper.writeValueAsString(new MusicPlayerEvent.Ready(PLAYER_ID, request.requestId(), GUILD_ID)));
 
             await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(readyCalled.get()).isTrue());
         } finally {
@@ -125,7 +125,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             assertThat(json).isNotNull();
             JoinRequest request = objectMapper.readValue(json, JoinRequest.class);
             redis.convertAndSend(PlayerRedisProtocol.Channels.EVENTS,
-                    objectMapper.writeValueAsString(new MusicPlayerEvent.Ready(PLAYER_ID, request.requestId())));
+                    objectMapper.writeValueAsString(new MusicPlayerEvent.Ready(PLAYER_ID, request.requestId(), GUILD_ID)));
 
             await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(readyCalled.get()).isTrue());
 

@@ -126,7 +126,7 @@ class VoiceConnectionManagerTest {
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
         await().atMost(2, TimeUnit.SECONDS)
-                .untilAsserted(() -> assertThat(received.get()).isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID)));
+                .untilAsserted(() -> assertThat(received.get()).isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID, GUILD_ID)));
     }
 
     @Test
@@ -138,7 +138,7 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.connect(new ConnectionRequest(REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
         await().atMost(2, TimeUnit.SECONDS)
-                .untilAsserted(() -> assertThat(received.get()).isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID)));
+                .untilAsserted(() -> assertThat(received.get()).isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID, GUILD_ID)));
     }
 
     @Test
@@ -307,7 +307,7 @@ class VoiceConnectionManagerTest {
 
         await().atMost(2, TimeUnit.SECONDS)
                 .untilAsserted(() -> assertThat(received.get())
-                        .isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID)));
+                        .isEqualTo(new MusicPlayerEvent.Ready(PLAYER_ID, REQUEST_ID, GUILD_ID)));
     }
 
     @Test
