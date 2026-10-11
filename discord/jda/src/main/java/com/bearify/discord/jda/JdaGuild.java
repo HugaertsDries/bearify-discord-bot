@@ -30,6 +30,13 @@ class JdaGuild implements Guild {
     }
 
     @Override
+    public boolean isInVoice(String userId) {
+        // createDefault's member cache keeps everyone in voice, so a member missing from the cache is not in voice
+        var member = requireGuild().getMemberById(userId);
+        return member != null && member.getVoiceState() != null && member.getVoiceState().inAudioChannel();
+    }
+
+    @Override
     public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
         var guild = requireGuild();
         AudioChannel channel = guild.getChannelById(AudioChannel.class, channelId);

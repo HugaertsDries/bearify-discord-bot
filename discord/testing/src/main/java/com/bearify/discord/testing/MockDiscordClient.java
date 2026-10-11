@@ -19,7 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 public class MockDiscordClient implements DiscordClient {
@@ -30,6 +32,10 @@ public class MockDiscordClient implements DiscordClient {
     private String startedWithGuildId;
     private final Map<String, List<ComponentMessage>> sentComponentsByChannel = new ConcurrentHashMap<>();
     private final Map<String, List<String>> sentMessagesByChannel = new ConcurrentHashMap<>();
+    private final Map<String, List<String>> deletedMessageIdsByChannel = new ConcurrentHashMap<>();
+    private final AtomicLong nextMessageId = new AtomicLong(1);
+    private final Set<String> membersInVoice = ConcurrentHashMap.newKeySet();
+    private volatile String selfUserId = "mock-bot-user";
 
     private MockDiscordClient(List<CommandDefinition> commands,
                               Consumer<Interaction> handler) {
@@ -51,7 +57,25 @@ public class MockDiscordClient implements DiscordClient {
 
     @Override
     public Guild guild(String guildId) {
-        return new MockGuild();
+        return new MockGuild(guildId);
+    }
+
+    @Override
+    public String selfUserId() {
+        return selfUserId;
+    }
+
+    public void setSelfUserId(String userId) {
+        this.selfUserId = userId;
+    }
+
+    /** Puts the member in, or takes them out of, a voice channel of this guild as {@link Guild#isInVoice} sees it. */
+    public void setInVoice(String guildId, String userId, boolean inVoice) {
+        if (inVoice) {
+            membersInVoice.add(guildId + ":" + userId);
+        } else {
+            membersInVoice.remove(guildId + ":" + userId);
+        }
     }
 
     @Override
@@ -92,11 +116,27 @@ public class MockDiscordClient implements DiscordClient {
         return List.copyOf(sentMessagesByChannel.getOrDefault(channelId, List.of()));
     }
 
-    private static final class MockGuild implements Guild {
+    /** IDs of the messages deleted in this channel, through a {@link SentMessage} handle or by ID. */
+    public List<String> deletedMessageIds(String channelId) {
+        return List.copyOf(deletedMessageIdsByChannel.getOrDefault(channelId, List.of()));
+    }
+
+    private final class MockGuild implements Guild {
+
+        private final String guildId;
+
+        private MockGuild(String guildId) {
+            this.guildId = guildId;
+        }
 
         @Override
         public Optional<VoiceSession> voice() {
             return Optional.empty();
+        }
+
+        @Override
+        public boolean isInVoice(String userId) {
+            return membersInVoice.contains(guildId + ":" + userId);
         }
 
         @Override
@@ -120,8 +160,17 @@ public class MockDiscordClient implements DiscordClient {
         @Override
         public SentMessage send(ComponentMessage message) {
             sentComponentsByChannel.computeIfAbsent(channelId, ignored -> new ArrayList<>()).add(message);
+            String messageId = "message-" + nextMessageId.getAndIncrement();
             return new SentMessage() {
-                @Override public void delete() {}
+                @Override
+                public String id() {
+                    return messageId;
+                }
+
+                @Override
+                public void delete() {
+                    MockTextChannel.this.delete(messageId);
+                }
 
                 @Override
                 public void update(ComponentMessage updated) {
@@ -129,6 +178,11 @@ public class MockDiscordClient implements DiscordClient {
                     messages.set(messages.size() - 1, updated);
                 }
             };
+        }
+
+        @Override
+        public void delete(String messageId) {
+            deletedMessageIdsByChannel.computeIfAbsent(channelId, ignored -> new ArrayList<>()).add(messageId);
         }
     }
 

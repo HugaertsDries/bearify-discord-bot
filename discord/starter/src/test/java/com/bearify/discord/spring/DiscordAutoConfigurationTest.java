@@ -85,6 +85,11 @@ class DiscordAutoConfigurationTest {
         }
 
         @Override
+        public String selfUserId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public com.bearify.discord.api.gateway.TextChannel textChannel(String channelId) {
             throw new UnsupportedOperationException();
         }

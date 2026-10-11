@@ -647,6 +647,11 @@ class VoiceSessionHeartbeatTest {
         }
 
         @Override
+        public String selfUserId() {
+            return "test-bot-user";
+        }
+
+        @Override
         public TextChannel textChannel(String channelId) {
             return new TextChannel() {
                 @Override
@@ -656,6 +661,10 @@ class VoiceSessionHeartbeatTest {
                 @Override
                 public SentMessage send(ComponentMessage message) {
                     return null;
+                }
+
+                @Override
+                public void delete(String messageId) {
                 }
             };
         }
@@ -702,6 +711,11 @@ class VoiceSessionHeartbeatTest {
                     connectedChannelId = null;
                 }
             });
+        }
+
+        @Override
+        public boolean isInVoice(String userId) {
+            return false;
         }
 
         @Override

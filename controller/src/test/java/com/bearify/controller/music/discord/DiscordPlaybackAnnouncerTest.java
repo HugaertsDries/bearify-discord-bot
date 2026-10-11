@@ -2,6 +2,9 @@ package com.bearify.controller.music.discord;
 
 import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.MusicPlayerEventConsumer;
+import com.bearify.controller.music.domain.RecordingPlayerMessageStore;
+import com.bearify.controller.music.domain.PlayerMessageStore.PlayerMessage;
+import com.bearify.controller.music.domain.PlayerMessageStore;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.SentMessage;
@@ -35,6 +38,11 @@ import static com.bearify.controller.music.discord.PlaybackComponent.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DiscordPlaybackAnnouncerTest {
+
+    private static final String PLAYER_ID = "player-1";
+    private static final String GUILD_ID = "guild-1";
+    private static final String TEXT_CHANNEL_ID = "text-1";
+    private static final String MESSAGE_ID = "message-1";
 
 
     @Test
@@ -193,7 +201,7 @@ class DiscordPlaybackAnnouncerTest {
         MusicPlayerEventConsumer announcer = new DiscordPlaybackAnnouncer(
                 discordClient(new AtomicReference<>(), new AtomicInteger(), updated, new AtomicInteger(), updatingThread),
                 new AnnouncerProperties("#FFA500", "#FF4444", "Bearify", Duration.ofMillis(50)),
-                "text-1");
+                new RecordingPlayerMessageStore(), PLAYER_ID, GUILD_ID, TEXT_CHANNEL_ID);
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Forwarded("player-1", new Request("req-2", "@user"), "guild-1", 30_000));
@@ -372,7 +380,7 @@ class DiscordPlaybackAnnouncerTest {
         return new DiscordPlaybackAnnouncer(
                 discordClient(sent, sends, updated, deletes, new AtomicReference<>()),
                 new AnnouncerProperties("#FFA500", "#FF4444", "Bearify", timeout),
-                "text-1");
+                new RecordingPlayerMessageStore(), PLAYER_ID, GUILD_ID, TEXT_CHANNEL_ID);
     }
 
     @Test
@@ -475,10 +483,48 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     private static MusicPlayerEventConsumer announcerWithTexts(AtomicInteger deletes, List<String> texts) {
+        return announcerWithStore(deletes, texts, new RecordingPlayerMessageStore());
+    }
+
+    private static MusicPlayerEventConsumer announcerWithStore(AtomicInteger deletes, List<String> texts, PlayerMessageStore store) {
         return new DiscordPlaybackAnnouncer(
                 discordClient(new AtomicReference<>(), new AtomicInteger(), new AtomicReference<>(), deletes, new AtomicReference<>(), texts),
                 new AnnouncerProperties("#FFA500", "#FF4444", "Bearify", Duration.ofSeconds(15)),
-                "text-1");
+                store, PLAYER_ID, GUILD_ID, TEXT_CHANNEL_ID);
+    }
+
+    @Test
+    void remembersMessageWhenPosting() {
+        RecordingPlayerMessageStore store = new RecordingPlayerMessageStore();
+        MusicPlayerEventConsumer announcer = announcerWithStore(new AtomicInteger(), new ArrayList<>(), store);
+
+        announcer.accept(trackStart(PLAYER_ID));
+
+        assertThat(store.all()).containsExactly(new PlayerMessage(PLAYER_ID, GUILD_ID, TEXT_CHANNEL_ID, MESSAGE_ID));
+    }
+
+    @Test
+    void forgetsMessageWhenDeleting() {
+        RecordingPlayerMessageStore store = new RecordingPlayerMessageStore();
+        MusicPlayerEventConsumer announcer = announcerWithStore(new AtomicInteger(), new ArrayList<>(), store);
+
+        announcer.accept(trackStart(PLAYER_ID));
+        announcer.accept(new MusicPlayerEvent.QueueEmpty(PLAYER_ID, "req-2", GUILD_ID));
+
+        assertThat(store.all()).isEmpty();
+    }
+
+    @Test
+    void postsLostNoteAndDeletesMessageWhenBearIsLost() {
+        AtomicInteger deletes = new AtomicInteger();
+        List<String> texts = new ArrayList<>();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(deletes, texts);
+
+        announcer.accept(trackStart(PLAYER_ID));
+        announcer.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, "req-2", GUILD_ID, StopReason.LOST));
+
+        assertThat(deletes.get()).isEqualTo(1);
+        assertThat(texts).containsExactly(DiscordPlaybackAnnouncer.LOST_LEAVE_NOTE);
     }
 
     private static MusicPlayerEvent.TrackStart trackStart(String playerId) {
@@ -532,9 +578,19 @@ class DiscordPlaybackAnnouncerTest {
                     }
 
                     @Override
+                    public boolean isInVoice(String userId) {
+                        return false;
+                    }
+
+                    @Override
                     public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
                     }
                 };
+            }
+
+            @Override
+            public String selfUserId() {
+                return "test-bot-user";
             }
 
             @Override
@@ -551,6 +607,11 @@ class DiscordPlaybackAnnouncerTest {
                         sends.incrementAndGet();
                         return new SentMessage() {
                             @Override
+                            public String id() {
+                                return MESSAGE_ID;
+                            }
+
+                            @Override
                             public void delete() {
                                 deletes.incrementAndGet();
                             }
@@ -561,6 +622,10 @@ class DiscordPlaybackAnnouncerTest {
                                 updated.set(updatedMessage);
                             }
                         };
+                    }
+
+                    @Override
+                    public void delete(String messageId) {
                     }
                 };
             }
@@ -595,5 +660,17 @@ class DiscordPlaybackAnnouncerTest {
             }
         }
         return List.of();
+    }
+
+
+    @Test
+    void forgetsMessageWhenStopped() {
+        RecordingPlayerMessageStore store = new RecordingPlayerMessageStore();
+        MusicPlayerEventConsumer announcer = announcerWithStore(new AtomicInteger(), new ArrayList<>(), store);
+
+        announcer.accept(trackStart(PLAYER_ID));
+        announcer.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, "req-2", GUILD_ID, StopReason.LOST));
+
+        assertThat(store.all()).isEmpty();
     }
 }

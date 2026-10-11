@@ -92,3 +92,9 @@ The Docker images skip tests (`-x test`), so let Railway wait for that check bef
 - The toggle only appears once a workflow runs on `push` to the deploy branch.
 - A manual Redeploy bypasses the check.
 - If a deploy gets stuck in WAITING, use **Deploy latest commit**.
+
+### Stopping the agent
+
+A stopping agent deletes its player messages on the way out, which needs a few seconds between Railway's stop signal and the kill. Give the agent service a draining window, e.g. the service variable `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=15` (check the name in Railway's deployment docs). Without it the controller still cleans up once it notices the bear is gone, but up to a minute later and with a "lost my connection" note.
+
+`bearify.liveness.interval` (default `5s`) sets how often the controller checks that the bears behind its player messages are still there. A bear counts as lost once its Redis assignment has been missing on two checks in a row and Discord no longer shows it in a voice channel.

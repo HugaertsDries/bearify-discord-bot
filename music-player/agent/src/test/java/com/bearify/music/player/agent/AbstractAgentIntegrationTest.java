@@ -73,9 +73,19 @@ public abstract class AbstractAgentIntegrationTest {
                 }
 
                 @Override
+                public boolean isInVoice(String userId) {
+                    return false;
+                }
+
+                @Override
                 public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
                 }
             };
+        }
+
+        @Override
+        public String selfUserId() {
+            return "test-bot-user";
         }
 
         @Override
@@ -86,6 +96,10 @@ public abstract class AbstractAgentIntegrationTest {
                 @Override
                 public SentMessage send(ComponentMessage message) {
                     return null;
+                }
+
+                @Override
+                public void delete(String messageId) {
                 }
             };
         }

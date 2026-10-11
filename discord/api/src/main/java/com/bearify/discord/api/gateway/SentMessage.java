@@ -7,6 +7,9 @@ import com.bearify.discord.api.message.ComponentMessage;
  */
 public interface SentMessage {
 
+    /** Discord's ID of this message, so it can be deleted later through {@link TextChannel#delete(String)}. */
+    String id();
+
     /** Deletes this message from the channel. */
     void delete();
 

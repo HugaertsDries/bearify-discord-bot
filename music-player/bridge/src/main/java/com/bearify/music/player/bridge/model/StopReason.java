@@ -5,5 +5,7 @@ public enum StopReason {
     REQUESTED,
     NOBODY_LISTENING,
     IDLE,
-    DISCONNECTED
+    DISCONNECTED,
+    /** Set by the controller, never by a bear: the bear vanished without saying goodbye (killed or crashed). */
+    LOST
 }

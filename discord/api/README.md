@@ -8,10 +8,11 @@ Defines the interfaces and models that the rest of the project depends on. By de
 ## Contents
 
 ### Gateway
-- `DiscordClient` — bot client interface: `start(token)`, `start(token, guildId)`, `guild(guildId)`, `textChannel(channelId)`, `shutdown()`
+- `DiscordClient` — bot client interface: `start(token)`, `start(token, guildId)`, `guild(guildId)`, `selfUserId()`, `textChannel(channelId)`, `shutdown()`
 - `DiscordClientFactory` — creates a fully configured `DiscordClient` given commands and an interaction handler
 - `Guild` — guild-scoped operations:
   - `voice()` — returns the bot's current `VoiceSession` for this guild, or empty if not connected
+  - `isInVoice(userId)` — whether that member is in one of the guild's voice channels right now
   - `join(channelId, provider, onJoined)` — joins a voice channel with the given `AudioProvider` and invokes the listener once connected
 - `TextChannel` — sends a plain-text message to a Discord text channel via `send(String message)`
 

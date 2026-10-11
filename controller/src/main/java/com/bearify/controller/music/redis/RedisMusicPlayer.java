@@ -224,7 +224,7 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void play(TrackRequest request, MusicPlayerEventListener handler) {
-            var announcer = trackAnnouncerFactory.create(request.textChannelId());
+            var announcer = trackAnnouncerFactory.create(playerId, guildId, request.textChannelId());
             announcementRegistry.subscribe(playerId, guildId, announcer);
             request(requestId -> new MusicPlayerInteraction.Play(playerId, requestId, guildId, request), handler, event -> {
                 switch (event) {

@@ -633,6 +633,11 @@ class VoiceConnectionManagerTest {
         }
 
         @Override
+        public String selfUserId() {
+            return "test-bot-user";
+        }
+
+        @Override
         public TextChannel textChannel(String channelId) {
             return new TextChannel() {
                 @Override public void send(String message) {}
@@ -640,6 +645,10 @@ class VoiceConnectionManagerTest {
                 @Override
                 public SentMessage send(ComponentMessage message) {
                     return null;
+                }
+
+                @Override
+                public void delete(String messageId) {
                 }
             };
         }
@@ -680,6 +689,11 @@ class VoiceConnectionManagerTest {
                 });
             }
             return Optional.empty();
+        }
+
+        @Override
+        public boolean isInVoice(String userId) {
+            return false;
         }
 
         @Override

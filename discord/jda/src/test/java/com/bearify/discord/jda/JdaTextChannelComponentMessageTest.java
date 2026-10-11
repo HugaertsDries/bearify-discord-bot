@@ -1,5 +1,9 @@
 package com.bearify.discord.jda;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.bearify.discord.api.message.ButtonStyle;
 import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.message.InteractiveButton;
@@ -12,14 +16,19 @@ import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.components.thumbnail.Thumbnail;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import net.dv8tion.jda.api.requests.ErrorResponse;
+import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
 import net.dv8tion.jda.api.requests.restaction.MessageEditAction;
 import net.dv8tion.jda.api.utils.FileUpload;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -277,4 +286,64 @@ class JdaTextChannelComponentMessageTest {
         assertThat(files.getValue()).extracting(FileUpload::getName).containsExactly("spacer.png");
     }
 
+    @Test
+    void exposesSentMessageId() {
+        MessageChannel channel = mock(MessageChannel.class);
+        MessageCreateAction action = mock(MessageCreateAction.class);
+        Message message = mock(Message.class);
+        when(channel.sendMessageComponents(anyTopLevelComponents())).thenReturn(action);
+        when(action.useComponentsV2()).thenReturn(action);
+        when(action.complete()).thenReturn(message);
+        when(message.getId()).thenReturn("1234");
+
+        String id = new JdaTextChannel(channel).send(ComponentMessage.builder("player")
+                .container(container -> container.text("Now playing"))
+                .build()).id();
+
+        assertThat(id).isEqualTo("1234");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void deletesMessageById() {
+        MessageChannel channel = mock(MessageChannel.class);
+        AuditableRestAction<Void> delete = mock(AuditableRestAction.class);
+        when(channel.deleteMessageById("1234")).thenReturn(delete);
+
+        new JdaTextChannel(channel).delete("1234");
+
+        verify(delete).queue(any(), any());
+    }
+
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void logsAlreadyDeletedMessageAtDebugAndOtherDeleteFailuresAtWarn() {
+        MessageChannel channel = mock(MessageChannel.class);
+        AuditableRestAction<Void> delete = mock(AuditableRestAction.class);
+        when(channel.deleteMessageById("1234")).thenReturn(delete);
+        new JdaTextChannel(channel).delete("1234");
+        ArgumentCaptor<Consumer<? super Throwable>> onFailure = ArgumentCaptor.forClass(Consumer.class);
+        verify(delete).queue(any(), onFailure.capture());
+        Logger logger = (Logger) LoggerFactory.getLogger(JdaTextChannel.class);
+        Level previousLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        logger.setLevel(Level.DEBUG);
+        try {
+            ErrorResponseException alreadyDeleted = mock(ErrorResponseException.class);
+            when(alreadyDeleted.getErrorResponse()).thenReturn(ErrorResponse.UNKNOWN_MESSAGE);
+            ErrorResponseException missingPermission = mock(ErrorResponseException.class);
+            when(missingPermission.getErrorResponse()).thenReturn(ErrorResponse.MISSING_PERMISSIONS);
+
+            onFailure.getValue().accept(alreadyDeleted);
+            onFailure.getValue().accept(missingPermission);
+
+            assertThat(logs.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.DEBUG, Level.WARN);
+        } finally {
+            logger.detachAppender(logs);
+            logger.setLevel(previousLevel);
+        }
+    }
 }

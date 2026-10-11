@@ -13,4 +13,7 @@ public interface TextChannel {
 
     /** Send a Components V2 message and return a handle to delete it later. */
     SentMessage send(ComponentMessage message);
+
+    /** Deletes a message by its ID, for when the {@link SentMessage} handle is gone; a message that no longer exists is ignored. */
+    void delete(String messageId);
 }

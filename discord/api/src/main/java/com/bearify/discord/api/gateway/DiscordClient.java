@@ -18,6 +18,9 @@ public interface DiscordClient {
     /** Access guild-scoped capabilities. */
     Guild guild(String guildId);
 
+    /** The Discord user ID of the bot this client is logged in as. */
+    String selfUserId();
+
     /** Access a text channel by ID for sending messages. */
     TextChannel textChannel(String channelId);
 

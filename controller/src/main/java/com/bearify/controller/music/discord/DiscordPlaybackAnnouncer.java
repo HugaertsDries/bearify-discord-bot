@@ -2,6 +2,7 @@ package com.bearify.controller.music.discord;
 
 import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.MusicPlayerEventConsumer;
+import com.bearify.controller.music.domain.PlayerMessageStore;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.message.ComponentMessage;
@@ -27,12 +28,16 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     static final String NOBODY_LISTENING_LEAVE_NOTE = BearifyEmoji.BEAR + " | Nobody was listening, so I wandered back to my cave.";
     static final String IDLE_LEAVE_NOTE = BearifyEmoji.BEAR + " | Nothing left to play, so I went for a nap.";
     static final String DISCONNECTED_LEAVE_NOTE = BearifyEmoji.BEAR + " | I got disconnected from the voice channel, so I packed up.";
+    static final String LOST_LEAVE_NOTE = BearifyEmoji.BEAR + " | I lost my connection and had to leave the voice channel.";
     // Shared by all announcers: one daemon thread instead of one per announcer that is never shut down
     private static final ScheduledExecutorService ACTION_TIMEOUTS =
             Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
 
     private final DiscordClient discord;
     private final AnnouncerProperties properties;
+    private final PlayerMessageStore store;
+    private final String playerId;
+    private final String guildId;
     private final PlaybackComponent playbackComponent;
     private final YoutubeThumbnailResolver artworkUrlResolver = new YoutubeThumbnailResolver();
     private final String textChannelId;
@@ -50,9 +55,15 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
 
     public DiscordPlaybackAnnouncer(DiscordClient discord,
                                     AnnouncerProperties properties,
+                                    PlayerMessageStore store,
+                                    String playerId,
+                                    String guildId,
                                     String textChannelId) {
         this.discord = discord;
         this.properties = properties;
+        this.store = store;
+        this.playerId = playerId;
+        this.guildId = guildId;
         this.playbackComponent = new PlaybackComponent(properties);
         this.textChannelId = textChannelId;
     }
@@ -135,6 +146,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case NOBODY_LISTENING -> Optional.of(NOBODY_LISTENING_LEAVE_NOTE);
             case IDLE -> Optional.of(IDLE_LEAVE_NOTE);
             case DISCONNECTED -> Optional.of(DISCONNECTED_LEAVE_NOTE);
+            case LOST -> Optional.of(LOST_LEAVE_NOTE);
             case REQUESTED -> Optional.empty();
         };
         note.ifPresent(text -> {
@@ -191,7 +203,14 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
                 activeMessage = null;
             }
         }
-        activeMessage = discord.textChannel(textChannelId).send(message);
+        SentMessage posted = discord.textChannel(textChannelId).send(message);
+        activeMessage = posted;
+        // remembered so a restarted controller, or the liveness check, can still delete it
+        try {
+            store.remember(playerId, guildId, textChannelId, posted.id());
+        } catch (Exception e) {
+            LOG.warn("Failed to remember component message for channel {}", textChannelId, e);
+        }
     }
 
     private void deleteEmbed() {
@@ -210,6 +229,11 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
                 existing.delete();
             } catch (Exception e) {
                 LOG.warn("Failed to delete component message for channel {}", textChannelId, e);
+            }
+            try {
+                store.forget(playerId, guildId, textChannelId, existing.id());
+            } catch (Exception e) {
+                LOG.warn("Failed to forget component message for channel {}", textChannelId, e);
             }
         }
     }

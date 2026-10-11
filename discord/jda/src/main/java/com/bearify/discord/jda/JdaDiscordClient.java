@@ -73,6 +73,14 @@ public class JdaDiscordClient implements DiscordClient {
     }
 
     @Override
+    public String selfUserId() {
+        if (jda == null) {
+            throw new IllegalStateException("Discord client has not been started");
+        }
+        return jda.getSelfUser().getId();
+    }
+
+    @Override
     public TextChannel textChannel(String channelId) {
         if (jda == null) {
             throw new IllegalStateException("Discord client has not been started");
@@ -106,7 +114,9 @@ public class JdaDiscordClient implements DiscordClient {
             audio = audio.withDaveSessionFactory(new JDaveSessionFactory());
             JDABuilder builder = JDABuilder.createDefault(token)
                     .addEventListeners(new JdaEventListener(interactionExecutor, interactionHandler))
-                    .setAudioModuleConfig(audio);
+                    .setAudioModuleConfig(audio)
+                    // Spring's lifecycle shuts JDA down after the app has cleaned up; JDA's own hook would race it
+                    .setEnableShutdownHook(false);
             net.dv8tion.jda.api.entities.Activity startupActivity = toActivity(activity);
             if (startupActivity != null) {
                 builder = builder.setActivity(startupActivity);

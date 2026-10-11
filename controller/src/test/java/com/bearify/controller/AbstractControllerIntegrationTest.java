@@ -22,7 +22,9 @@ import java.util.concurrent.BlockingQueue;
 
 @SpringBootTest(properties = {
         "discord.token=test-token",
-        "spring.autoconfigure.exclude=com.bearify.discord.jda.JdaAutoConfiguration"
+        "spring.autoconfigure.exclude=com.bearify.discord.jda.JdaAutoConfiguration",
+        // the liveness tick would end sessions that tests set up without an assignment key; tests call tick() themselves
+        "bearify.liveness.interval=1h"
 })
 @Import(AbstractControllerIntegrationTest.DiscordTestConfig.class)
 public abstract class AbstractControllerIntegrationTest {

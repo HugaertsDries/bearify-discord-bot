@@ -8,6 +8,7 @@ import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
 import com.bearify.controller.music.domain.MusicPlayerEventDispatcher;
 import com.bearify.controller.music.domain.MusicPlayerPendingInteractions;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.domain.PlayerMessageStore;
 import com.bearify.controller.music.domain.TrackCatalogue;
 import com.bearify.controller.music.discord.DiscordPlaybackAnnouncerFactory;
 import com.bearify.discord.api.gateway.DiscordClient;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.TaskScheduler;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
@@ -34,8 +36,38 @@ public class RedisConfig {
     }
 
     @Bean
+    PlayerMessageStore playerMessageStore(StringRedisTemplate redis) {
+        return new RedisPlayerMessageStore(redis);
+    }
+
+    @Bean
+    RedisPlayerAssignments playerAssignments(StringRedisTemplate redis) {
+        return new RedisPlayerAssignments(redis);
+    }
+
+    @Bean
     MusicPlayerAnnouncementConsumer announcementConsumer(MusicPlayerAnnouncementRegistry announcementRegistry) {
         return new MusicPlayerAnnouncementConsumer(announcementRegistry);
+    }
+
+    @Bean
+    PlayerLivenessMonitor playerLivenessMonitor(MusicPlayerAnnouncementRegistry announcementRegistry,
+                                                RedisPlayerAssignments playerAssignments,
+                                                MusicPlayerAnnouncementConsumer announcementConsumer,
+                                                DiscordClient discord,
+                                                TaskScheduler taskScheduler,
+                                                LivenessProperties properties,
+                                                Clock clock) {
+        return new PlayerLivenessMonitor(announcementRegistry, playerAssignments, announcementConsumer, discord, taskScheduler, properties, clock);
+    }
+
+    @Bean
+    PlayerMessageRecovery playerMessageRecovery(PlayerMessageStore playerMessageStore,
+                                                RedisPlayerAssignments playerAssignments,
+                                                MusicPlayerAnnouncementRegistry announcementRegistry,
+                                                DiscordPlaybackAnnouncerFactory trackAnnouncerFactory,
+                                                DiscordClient discord) {
+        return new PlayerMessageRecovery(playerMessageStore, playerAssignments, announcementRegistry, trackAnnouncerFactory, discord);
     }
 
     @Bean

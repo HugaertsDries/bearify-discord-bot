@@ -18,6 +18,10 @@ public final class PlayerRedisProtocol {
         public static String assignment(String guildId, String voiceChannelId) {
             return "players:assignment:" + guildId + ":" + voiceChannelId;
         }
+
+        public static String bot(String playerId) {
+            return "players:bot:" + playerId;
+        }
     }
 
     public static final class Channels {

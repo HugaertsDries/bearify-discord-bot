@@ -126,9 +126,19 @@ class DevCommandTest {
                     }
 
                     @Override
+                    public boolean isInVoice(String userId) {
+                        return false;
+                    }
+
+                    @Override
                     public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
                     }
                 };
+            }
+
+            @Override
+            public String selfUserId() {
+                return "test-bot-user";
             }
 
             @Override
@@ -143,6 +153,11 @@ class DevCommandTest {
                         sentComponents.add(message);
                         return new SentMessage() {
                             @Override
+                            public String id() {
+                                return "message-1";
+                            }
+
+                            @Override
                             public void delete() {
                             }
 
@@ -150,6 +165,10 @@ class DevCommandTest {
                             public void update(ComponentMessage updated) {
                             }
                         };
+                    }
+
+                    @Override
+                    public void delete(String messageId) {
                     }
                 };
             }

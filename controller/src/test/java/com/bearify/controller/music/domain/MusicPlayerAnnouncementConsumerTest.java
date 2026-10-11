@@ -104,4 +104,18 @@ class MusicPlayerAnnouncementConsumerTest {
         assertThat(registry.findAll(PLAYER_ID, GUILD_A)).isEmpty();
         assertThat(guildB).containsExactly(guildBEvent);
     }
+
+    @Test
+    void endsLostSessionAsStoppedWithLostReason() {
+        MusicPlayerAnnouncementRegistry registry = new MusicPlayerAnnouncementRegistry();
+        List<MusicPlayerEvent> delivered = new ArrayList<>();
+        registry.subscribe(PLAYER_ID, GUILD_A, delivered::add);
+        MusicPlayerAnnouncementConsumer consumer = new MusicPlayerAnnouncementConsumer(registry);
+
+        consumer.lost(PLAYER_ID, GUILD_A);
+
+        assertThat(delivered).singleElement().isInstanceOfSatisfying(MusicPlayerEvent.Stopped.class,
+                stopped -> assertThat(stopped.reason()).isEqualTo(StopReason.LOST));
+        assertThat(registry.findAll(PLAYER_ID, GUILD_A)).isEmpty();
+    }
 }
