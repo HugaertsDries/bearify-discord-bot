@@ -29,6 +29,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     static final String IDLE_LEAVE_NOTE = BearifyEmoji.BEAR + " | Nothing left to play, so I went for a nap.";
     static final String DISCONNECTED_LEAVE_NOTE = BearifyEmoji.BEAR + " | I got disconnected from the voice channel, so I packed up.";
     static final String LOST_LEAVE_NOTE = BearifyEmoji.BEAR + " | I lost my connection and had to leave the voice channel.";
+    static final String LIVE_STREAM_FAILED_NOTE = BearifyEmoji.BLOCKED + " | I couldn't tune in to that live stream.";
+    static final String TRACK_FAILED_NOTE = BearifyEmoji.BLOCKED + " | I couldn't play that track.";
     // Shared by all announcers: one daemon thread instead of one per announcer that is never shut down
     private static final ScheduledExecutorService ACTION_TIMEOUTS =
             Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
@@ -45,6 +47,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private volatile PlaybackComponentState.PlaybackState playbackState = PlaybackComponentState.PlaybackState.PLAYING;
     private volatile String temporaryAction;
     private volatile boolean autoPaused;
+    // a failed last track would otherwise vanish with the player message, so the queue's end says what happened
+    private volatile Optional<String> failedNote = Optional.empty();
     private volatile ScheduledFuture<?> clearActionTask;
     private long labelVersion;
     private volatile TrackMetadata currentTrack;
@@ -84,7 +88,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
             case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
             case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
-            case MusicPlayerEvent.QueueEmpty ignored -> deleteEmbed();
+            case MusicPlayerEvent.QueueEmpty ignored -> onQueueEmpty();
             case MusicPlayerEvent.Stopped stopped -> onStopped(stopped);
             default -> {
             }
@@ -95,6 +99,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         cancelClearTask();
         temporaryAction = null;
         autoPaused = false;
+        failedNote = Optional.empty();
         try {
             currentTrack = event.track();
             currentUpNext = event.upNext();
@@ -109,6 +114,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     }
 
     private void onTrackError(MusicPlayerEvent.TrackError event) {
+        failedNote = Optional.of(event.track().isLive() ? LIVE_STREAM_FAILED_NOTE : TRACK_FAILED_NOTE);
         currentTrack = event.track();
         currentRequesterTag = null;
         cancelClearTask();
@@ -149,13 +155,21 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case LOST -> Optional.of(LOST_LEAVE_NOTE);
             case REQUESTED -> Optional.empty();
         };
-        note.ifPresent(text -> {
-            try {
-                discord.textChannel(textChannelId).send(text);
-            } catch (Exception e) {
-                LOG.warn("Failed to post leave note for channel {}", textChannelId, e);
-            }
-        });
+        note.ifPresent(this::postNote);
+    }
+
+    private void onQueueEmpty() {
+        deleteEmbed();
+        failedNote.ifPresent(this::postNote);
+        failedNote = Optional.empty();
+    }
+
+    private void postNote(String text) {
+        try {
+            discord.textChannel(textChannelId).send(text);
+        } catch (Exception e) {
+            LOG.warn("Failed to post note for channel {}", textChannelId, e);
+        }
     }
 
     private void notify(String action) {

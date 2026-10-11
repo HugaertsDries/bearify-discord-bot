@@ -285,6 +285,7 @@ class RedisMusicPlayer implements MusicPlayer {
                 switch (event) {
                     case MusicPlayerEvent.Rewound r -> handler.onRewound(Duration.ofMillis(r.seekMs()));
                     case MusicPlayerEvent.NothingPlaying ignored -> handler.onNothingPlaying();
+                    case MusicPlayerEvent.NotSeekable ignored -> handler.onNotSeekable();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for rewind request", event.getClass().getSimpleName());
                 }
@@ -299,6 +300,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.Skipped ignored -> handler.onSkipped();
                     case MusicPlayerEvent.NothingToAdvance ignored -> handler.onNothingToAdvance();
                     case MusicPlayerEvent.NothingPlaying ignored -> handler.onNothingPlaying();
+                    case MusicPlayerEvent.NotSeekable ignored -> handler.onNotSeekable();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for forward request", event.getClass().getSimpleName());
                 }

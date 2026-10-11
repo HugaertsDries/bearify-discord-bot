@@ -9,7 +9,11 @@ import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Adapts LavaPlayer's {@link AudioPlayerManager#loadItem} to the domain {@link AudioTrackLoader}.
@@ -24,6 +28,11 @@ import java.util.List;
  */
 class LavaAudioTrackLoader implements AudioTrackLoader {
 
+    // shortcut: the hosts the sources in LavaConfig serve, subdomains included; add one here when adding a source
+    private static final List<String> TRUSTED_HOSTS = List.of("youtube.com", "youtu.be", "soundcloud.com", "bandcamp.com", "vimeo.com", "twitch.tv");
+    // anything that starts like scheme://, as opposed to a search such as ytsearch:
+    private static final Pattern LINK = Pattern.compile("[A-Za-z][A-Za-z0-9+.-]*://");
+
     private final AudioPlayerManager playerManager;
     private final int maxTracks;
 
@@ -34,6 +43,10 @@ class LavaAudioTrackLoader implements AudioTrackLoader {
 
     @Override
     public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
+        if (!isTrusted(query)) {
+            callback.noMatches();
+            return;
+        }
         playerManager.loadItem(query, new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack track) {
@@ -80,6 +93,10 @@ class LavaAudioTrackLoader implements AudioTrackLoader {
 
     @Override
     public void search(String query, int limit, AudioTrackSearchCallback callback) {
+        if (!isTrusted(query)) {
+            callback.noMatches();
+            return;
+        }
         playerManager.loadItem(query, new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack track) {
@@ -105,6 +122,29 @@ class LavaAudioTrackLoader implements AudioTrackLoader {
                 callback.loadFailed(exception.getMessage());
             }
         });
+    }
+
+    /**
+     * A search ({@code ytsearch:…}) or an http(s) link to a host one of our sources serves. The sources' own link
+     * patterns are loose (Bandcamp's accepts {@code http://redis:6379/#.bandcamp.com/track/x}), so without this a
+     * pasted link could make the bear fetch an internal address.
+     */
+    static boolean isTrusted(String query) {
+        if (!LINK.matcher(query).lookingAt()) {
+            return true;
+        }
+        try {
+            URI uri = new URI(query);
+            String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!(scheme.equals("http") || scheme.equals("https"))
+                    || uri.getRawUserInfo() != null || uri.getRawFragment() != null || uri.getHost() == null) {
+                return false;
+            }
+            String host = uri.getHost().toLowerCase(Locale.ROOT);
+            return TRUSTED_HOSTS.stream().anyMatch(trusted -> host.equals(trusted) || host.endsWith("." + trusted));
+        } catch (URISyntaxException e) {
+            return false;
+        }
     }
 
     private static TrackMetadata toTrackMetadata(AudioTrack track) {

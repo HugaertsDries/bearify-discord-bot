@@ -32,6 +32,11 @@ class LavaTrack implements Track {
     }
 
     @Override
+    public boolean isSeekable() {
+        return track.isSeekable();
+    }
+
+    @Override
     public String requesterTag() {
         return requesterTag;
     }

@@ -26,4 +26,6 @@ public interface MusicPlayerEventListener {
     default void onNothingPlaying() {}
     default void onNothingToAdvance() {}
     default void onNothingToGoBack() {}
+    /** A rewind or forward on a track that can't seek, such as a live stream. */
+    default void onNotSeekable() {}
 }

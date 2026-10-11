@@ -13,7 +13,6 @@ import java.util.regex.Pattern;
 
 import static com.bearify.controller.music.discord.AnsweringListener.NO_PLAYER_MESSAGE;
 import static com.bearify.controller.music.discord.AnsweringListener.TIMED_OUT_MESSAGE;
-import static com.bearify.controller.music.discord.PlaybackComponent.LIVE_DURATION;
 import static com.bearify.controller.music.discord.PlaybackComponent.truncate;
 
 /** The queue as a private card in the player's Up Next style; what isn't a list stays plain text. */
@@ -96,7 +95,7 @@ final class QueueCard {
 
     private static String footer(List<TrackMetadata> tracks) {
         String count = tracks.size() == 1 ? "1 track" : tracks.size() + " tracks";
-        List<Long> known = tracks.stream().map(TrackMetadata::durationMs).filter(ms -> ms != LIVE_DURATION).toList();
+        List<Long> known = tracks.stream().filter(track -> !track.isLive()).map(TrackMetadata::durationMs).toList();
         // live streams have no length to add up
         String total = known.isEmpty() ? "" : " · " + PlaybackComponent.total(Duration.ofMillis(known.stream().mapToLong(Long::longValue).sum()));
         return "-# " + count + total;

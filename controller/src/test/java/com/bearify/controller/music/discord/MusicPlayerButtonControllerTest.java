@@ -130,6 +130,19 @@ class MusicPlayerButtonControllerTest {
     }
 
     @Test
+    void repliesEphemerallyWhenForwardingALiveStream() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        player.answerWith(MusicPlayerEventListener::onNotSeekable);
+        MockButtonInteraction interaction = buttonInteraction();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).forward(interaction);
+
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("live stream");
+    }
+
+    @Test
     void repliesEphemerallyWhenThereIsNothingToSkipTo() {
         RecordingMusicPlayer player = new RecordingMusicPlayer();
         player.answerWith(MusicPlayerEventListener::onNothingToAdvance);

@@ -8,7 +8,6 @@ import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
-import java.time.Duration;
 import java.util.List;
 
 import static com.bearify.discord.api.interaction.InteractionType.AUTOCOMPLETE;
@@ -50,8 +49,7 @@ public class MusicPlayerAutocompleteController {
     }
 
     private static String formatLabel(TrackMetadata track) {
-        String duration = PlaybackComponent.humanReadable(Duration.ofMillis(track.durationMs()));
-        String suffix = SEPARATOR + duration;
+        String suffix = SEPARATOR + PlaybackComponent.length(track);
         int maxTitleLength = Math.max(0, MAX_LABEL_LENGTH - suffix.length());
         String title = track.title() == null ? "" : track.title();
         if (title.length() > maxTitleLength) {

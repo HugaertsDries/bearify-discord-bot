@@ -434,6 +434,48 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void postsLiveStreamNoteWhenFailedLiveStreamEndsTheQueue() {
+        List<String> texts = new ArrayList<>();
+        AtomicInteger deletes = new AtomicInteger();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(deletes, texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.TrackError("player-1", "req-2", "guild-1",
+                new TrackMetadata("Live", "Streamer", "https://www.twitch.tv/streamer", Long.MAX_VALUE)));
+        announcer.accept(new MusicPlayerEvent.QueueEmpty("player-1", "req-3", "guild-1"));
+
+        assertThat(deletes.get()).isEqualTo(1);
+        assertThat(texts).containsExactly(DiscordPlaybackAnnouncer.LIVE_STREAM_FAILED_NOTE);
+    }
+
+    @Test
+    void postsTrackNoteWhenFailedTrackEndsTheQueue() {
+        List<String> texts = new ArrayList<>();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(new AtomicInteger(), texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.TrackError("player-1", "req-2", "guild-1",
+                new TrackMetadata("Song", "Artist", "https://example.com/song", 60_000)));
+        announcer.accept(new MusicPlayerEvent.QueueEmpty("player-1", "req-3", "guild-1"));
+
+        assertThat(texts).containsExactly(DiscordPlaybackAnnouncer.TRACK_FAILED_NOTE);
+    }
+
+    @Test
+    void postsNoNoteWhenQueueEndsAfterTheNextTrackPlayed() {
+        List<String> texts = new ArrayList<>();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(new AtomicInteger(), texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.TrackError("player-1", "req-2", "guild-1",
+                new TrackMetadata("Song", "Artist", "https://example.com/song", 60_000)));
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.QueueEmpty("player-1", "req-3", "guild-1"));
+
+        assertThat(texts).isEmpty();
+    }
+
+    @Test
     void postsLeaveNoteWhenStoppedForIdle() {
         List<String> texts = new ArrayList<>();
         MusicPlayerEventConsumer announcer = announcerWithTexts(new AtomicInteger(), texts);

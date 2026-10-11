@@ -1,5 +1,6 @@
 package com.bearify.controller.music.discord;
 
+import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.message.ComponentMessageBuilder;
 import com.bearify.discord.api.message.ContainerBuilder;
@@ -23,8 +24,7 @@ public class PlaybackComponent {
     public static final String PLAYER_FORWARD_LABEL = "▶︎";
     public static final String PLAYER_NEXT_LABEL = "▶︎▶︎❙";
     public static final String PLAYER_SHOW_QUEUE_LABEL = "Show";
-    // LavaPlayer reports a stream's length as Long.MAX_VALUE
-    static final long LIVE_DURATION = Long.MAX_VALUE;
+    static final String LIVE_LABEL = BearifyEmoji.RED + " LIVE";
 
     private final AnnouncerProperties properties;
 
@@ -127,7 +127,7 @@ public class PlaybackComponent {
 
     // the queue's length minus what Up Next already shows; unknown when the bear didn't say
     private static Optional<String> moreLength(PlaybackComponentState state) {
-        long shownMs = state.upNext().stream().mapToLong(TrackMetadata::durationMs).filter(ms -> ms != LIVE_DURATION).sum();
+        long shownMs = state.upNext().stream().filter(track -> !track.isLive()).mapToLong(TrackMetadata::durationMs).sum();
         Duration more = state.queueDuration().minusMillis(shownMs);
         return more.isPositive() ? Optional.of(total(more)) : Optional.empty();
     }
@@ -148,7 +148,7 @@ public class PlaybackComponent {
     }
 
     static String length(TrackMetadata track) {
-        return track.durationMs() == LIVE_DURATION ? "LIVE" : humanReadable(Duration.ofMillis(track.durationMs()));
+        return track.isLive() ? LIVE_LABEL : humanReadable(Duration.ofMillis(track.durationMs()));
     }
 
     /** A queue's length: hours once it passes one, unlike a single track's. */

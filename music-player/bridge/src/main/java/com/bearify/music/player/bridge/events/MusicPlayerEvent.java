@@ -38,6 +38,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.AutoPaused.class, name = "auto_paused"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.AutoResumed.class, name = "auto_resumed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.QueueSnapshot.class, name = "queue_snapshot"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.NotSeekable.class, name = "not_seekable"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -66,7 +67,8 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.HealthCheckResult,
         MusicPlayerEvent.AutoPaused,
         MusicPlayerEvent.AutoResumed,
-        MusicPlayerEvent.QueueSnapshot {
+        MusicPlayerEvent.QueueSnapshot,
+        MusicPlayerEvent.NotSeekable {
 
     String playerId();
     String requestId();
@@ -152,4 +154,6 @@ public sealed interface MusicPlayerEvent permits
             upcoming = upcoming != null ? List.copyOf(upcoming) : List.of();
         }
     }
+    /** A rewind or forward on a track that can't seek, such as a live stream. */
+    record NotSeekable(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
 }

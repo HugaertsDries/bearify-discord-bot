@@ -57,6 +57,12 @@ public final class TrackMetadata {
         return durationMs;
     }
 
+    /** LavaPlayer reports a stream's unknown length as {@code Long.MAX_VALUE}. */
+    @JsonIgnore
+    public boolean isLive() {
+        return durationMs == Long.MAX_VALUE;
+    }
+
     @JsonIgnore
     public Optional<String> artworkUrl() {
         return Optional.ofNullable(artworkUrl);

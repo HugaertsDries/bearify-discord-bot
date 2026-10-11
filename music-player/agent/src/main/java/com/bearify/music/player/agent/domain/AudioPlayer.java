@@ -129,7 +129,9 @@ public class AudioPlayer implements AudioProvider {
     public synchronized void previous(Request request) {
         Optional<Track> current = engine.getPlayingTrack();
         // TODO why is this justRestarted needed? Why is the second validation not enough?
-        if (!justRestarted && current.isPresent() && current.get().position() > properties.previousRestartThreshold().toMillis()) {
+        // a live stream can't seek, so restarting it would only claim a restart that never happened
+        if (!justRestarted && current.isPresent() && current.get().isSeekable()
+                && current.get().position() > properties.previousRestartThreshold().toMillis()) {
             current.get().setPosition(0);
             justRestarted = true;
             eventDispatcher.dispatch(new MusicPlayerEvent.Restarted(playerId, request, guildId));
@@ -147,9 +149,8 @@ public class AudioPlayer implements AudioProvider {
     }
 
     public synchronized void rewind(Duration seek, Request request) {
-        Optional<Track> playing = engine.getPlayingTrack();
+        Optional<Track> playing = seekableTrack(request);
         if (playing.isEmpty()) {
-            eventDispatcher.dispatch(new MusicPlayerEvent.NothingPlaying(playerId, request.id(), guildId));
             return;
         }
         Track track = playing.get();
@@ -162,9 +163,8 @@ public class AudioPlayer implements AudioProvider {
     }
 
     public synchronized void forward(Duration seek, Request request) {
-        Optional<Track> playing = engine.getPlayingTrack();
+        Optional<Track> playing = seekableTrack(request);
         if (playing.isEmpty()) {
-            eventDispatcher.dispatch(new MusicPlayerEvent.NothingPlaying(playerId, request.id(), guildId));
             return;
         }
         Track track = playing.get();
@@ -191,6 +191,20 @@ public class AudioPlayer implements AudioProvider {
                     : new MusicPlayerEvent.Paused(playerId, new Request(randomId(), request.requesterTag()), guildId));
         }
         eventDispatcher.dispatch(new MusicPlayerEvent.Skipped(playerId, request, guildId));
+    }
+
+    // the playing track if it can seek; otherwise answers the request with why not
+    private Optional<Track> seekableTrack(Request request) {
+        Optional<Track> playing = engine.getPlayingTrack();
+        if (playing.isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.NothingPlaying(playerId, request.id(), guildId));
+            return Optional.empty();
+        }
+        if (!playing.get().isSeekable()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.NotSeekable(playerId, request.id(), guildId));
+            return Optional.empty();
+        }
+        return playing;
     }
 
     public synchronized void clear(Request request) {
@@ -295,6 +309,10 @@ public class AudioPlayer implements AudioProvider {
         @Override
         public void onTrackEnd(Track track, boolean mayStartNext) {
             if (!mayStartNext) return;
+            // shortcut: LavaPlayer can't decode some Twitch streams and reports them finished before any sound, so say so instead of ending silently
+            if (track.toMetadata().isLive() && track.position() == 0) {
+                onTrackError(track, "live stream ended before any sound");
+            }
             boolean wasError = lastTrackWasError;
             lastTrackWasError = false;
             synchronized (AudioPlayer.this) {

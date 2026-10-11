@@ -45,6 +45,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String RESTARTED_MESSAGE = "\u23EE\uFE0F | Back to the start of this track.";
     private static final String NOTHING_PLAYING_MESSAGE = "\uD83C\uDF6F | Nothing's playing right now. Queue something with `/player play`!";
     private static final String QUEUE_EMPTY_MESSAGE = "\uD83C\uDF6F | This is where the trail ends. Try adding more using `/player play` command!";
+    private static final String NOT_SEEKABLE_MESSAGE = "\uD83D\uDED1\uFE0F | I can't paw back and forth through a live stream.";
     private static final SpotifyLinkResolver NO_SPOTIFY = new SpotifyLinkResolver(uri -> Optional.empty());
 
     @Autowired CommandRegistry commandRegistry;
@@ -200,6 +201,22 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
             await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
                     assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(NOTHING_PLAYING_MESSAGE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void explainsThatLiveStreamsCannotBeRewound() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.NotSeekable(PLAYER_ID, interaction.requestId(), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("rewind");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(NOT_SEEKABLE_MESSAGE));
         } finally {
             bear.stop();
         }

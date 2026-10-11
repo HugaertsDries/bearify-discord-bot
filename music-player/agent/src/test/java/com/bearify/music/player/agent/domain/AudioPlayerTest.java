@@ -313,6 +313,84 @@ class AudioPlayerTest {
     }
 
     @Test
+    void reportsLiveStreamThatEndsBeforeAnySoundAsTrackError() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        engine.play(stream);
+
+        engine.triggerOnTrackEnd(stream);
+
+        assertThat(eventDispatcher.getEvents()).filteredOn(MusicPlayerEvent.TrackError.class::isInstance)
+                .singleElement()
+                .satisfies(event -> assertThat(((MusicPlayerEvent.TrackError) event).track().title()).isEqualTo("Stream"));
+        assertThat(eventDispatcher.getEvents()).hasAtLeastOneElementOfType(MusicPlayerEvent.QueueEmpty.class);
+    }
+
+    @Test
+    void endsLiveStreamThatPlayedAWhileWithoutError() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        engine.play(stream);
+        stream.setPosition(60_000);
+
+        engine.triggerOnTrackEnd(stream);
+
+        assertThat(eventDispatcher.getEvents()).noneMatch(MusicPlayerEvent.TrackError.class::isInstance);
+    }
+
+    @Test
+    void rejectsRewindOnLiveStream() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        stream.setPosition(60_000);
+        engine.play(stream);
+
+        player.rewind(Duration.ofMillis(15_000), new Request("req-1", "@user"));
+
+        assertThat(stream.position()).isEqualTo(60_000);
+        assertThat(eventDispatcher.getLastEvent()).isEqualTo(new MusicPlayerEvent.NotSeekable(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
+    void rejectsForwardOnLiveStream() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        stream.setPosition(60_000);
+        engine.play(stream);
+        player.play(track("Queued", 120_000));
+
+        player.forward(Duration.ofMillis(15_000), new Request("req-1", "@user"));
+
+        assertThat(engine.getPlayingTrack()).containsSame(stream);
+        assertThat(stream.position()).isEqualTo(60_000);
+        assertThat(eventDispatcher.getLastEvent()).isEqualTo(new MusicPlayerEvent.NotSeekable(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
+    void goesBackInsteadOfRestartingLiveStream() {
+        InMemoryTrack earlier = track("Earlier", 120_000);
+        engine.play(earlier);
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        player.play(stream);
+        player.next(new Request("req-1", "@user"));
+        stream.setPosition(60_000);
+
+        player.previous(new Request("req-2", "@user"));
+
+        assertThat(engine.getPlayingTrack()).map(Track::title).contains("Earlier");
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.WentBack(PLAYER_ID, new Request("req-2", "@user"), GUILD_ID));
+    }
+
+    @Test
+    void answersNothingToGoBackOnLiveStreamWithoutHistory() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        stream.setPosition(60_000);
+        engine.play(stream);
+
+        player.previous(new Request("req-1", "@user"));
+
+        assertThat(stream.position()).isEqualTo(60_000);
+        assertThat(eventDispatcher.getLastEvent()).isEqualTo(new MusicPlayerEvent.NothingToGoBack(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
     void clearsQueueAndEmitsClearedEvent() {
         engine.play(track("Playing", 120_000, "@alice"));
         player.play(track("Queued", 120_000, "@alice"));
@@ -712,6 +790,8 @@ class AudioPlayerTest {
         @Override public long duration() { return duration; }
         @Override public long position() { return position; }
         @Override public void setPosition(long positionMs) { this.position = positionMs; }
+        // like LavaPlayer: a stream reports an unknown length and can't seek
+        @Override public boolean isSeekable() { return duration != Long.MAX_VALUE; }
         @Override public Track clone() { InMemoryTrack c = new InMemoryTrack(title, duration, requesterTag); c.position = position; return c; }
         @Override public String title() { return title; }
         @Override public String author() { return "Author"; }

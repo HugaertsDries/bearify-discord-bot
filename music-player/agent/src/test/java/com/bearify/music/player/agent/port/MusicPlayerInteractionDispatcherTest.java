@@ -483,6 +483,7 @@ class MusicPlayerInteractionDispatcherTest {
             @Override public long duration() { return 120_000; }
             @Override public long position() { return 0; }
             @Override public void setPosition(long positionMs) {}
+            @Override public boolean isSeekable() { return true; }
             @Override public Track clone() { return this; }
         };
     }

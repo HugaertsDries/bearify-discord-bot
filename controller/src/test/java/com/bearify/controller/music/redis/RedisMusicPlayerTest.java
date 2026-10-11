@@ -393,6 +393,26 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
     }
 
     @Test
+    void reportsNotSeekableWhenAgentCannotForwardALiveStream() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicBoolean notSeekable = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.forward(Duration.ZERO, REQUESTER_TAG, new MusicPlayerEventListener() {
+                @Override public void onNotSeekable() { notSeekable.set(true); }
+            });
+            publish(new MusicPlayerEvent.NotSeekable(PLAYER_ID, nextInteraction(received).requestId(), GUILD_ID));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(notSeekable.get()).isTrue());
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
     void reportsClearedWhenAgentConfirmsClear() throws Exception {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
         BlockingQueue<String> received = new LinkedBlockingQueue<>();

@@ -47,6 +47,23 @@ class MusicPlayerAutocompleteControllerTest {
     }
 
     @Test
+    void labelsLiveResultsAsLive() {
+        TrackCatalogue trackCatalogue = mock(TrackCatalogue.class);
+        when(trackCatalogue.find("guild-456", "lofi radio", 5)).thenReturn(List.of(
+                new TrackMetadata("Lofi Radio", "Lofi Girl", "https://youtube.com/watch?v=3", Long.MAX_VALUE)
+        ));
+        MusicPlayerAutocompleteController controller = new MusicPlayerAutocompleteController(trackCatalogue);
+        MockAutocompleteInteraction interaction = MockAutocompleteInteraction.forAutocomplete("player:play:search", "lofi radio")
+                .guildId("guild-456")
+                .build();
+
+        controller.play(interaction);
+
+        assertThat(interaction.getReplies()).containsExactly(List.of(
+                new Option("Lofi Radio • 🔴 LIVE", "https://youtube.com/watch?v=3")));
+    }
+
+    @Test
     void truncatesLongTitlesToKeepChoiceNameWithinJdaLimit() {
         String longTitle = "A Cup of Liber-tea (Helldivers 2 Main Theme) | Helldivers 2 (Original Game Soundtrack)";
         TrackCatalogue trackCatalogue = mock(TrackCatalogue.class);

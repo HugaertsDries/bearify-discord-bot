@@ -8,18 +8,92 @@ import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LavaAudioTrackLoaderTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "http://redis:6379/#.bandcamp.com/track/x",
+            "http://[::1]:8080/#.bandcamp.com/track/x",
+            "https://[::1]/watch?v=abc",
+            "https://evil.example@youtube.com/watch?v=abc",
+            "https://on-soundcloud.com/abc",
+            "https://bandcamp.com.evil.example/track/x",
+            "https://youtube.com/watch?v=abc#.evil.example",
+            "ftp://youtube.com/watch?v=abc",
+            "https://not a link"
+    })
+    void rejectsLinksOutsideTheSourcesHostsWithoutFetchingThem(String link) {
+        AudioPlayerManager playerManager = mock(AudioPlayerManager.class);
+        AtomicBoolean noMatches = new AtomicBoolean();
+
+        new LavaAudioTrackLoader(playerManager, 3).load(link, "@user", new AudioTrackLoader.AudioTrackLoadCallback() {
+            @Override public void trackLoaded(com.bearify.music.player.agent.domain.Track track) {}
+            @Override public void playlistLoaded(List<com.bearify.music.player.agent.domain.Track> tracks) {}
+            @Override public void noMatches() { noMatches.set(true); }
+            @Override public void loadFailed(String message) {}
+        });
+
+        verify(playerManager, never()).loadItem(anyString(), any(AudioLoadResultHandler.class));
+        assertThat(noMatches).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://www.youtube.com/watch?v=abc",
+            "https://m.youtube.com/watch?v=abc",
+            "https://music.youtube.com/watch?v=abc",
+            "https://youtu.be/abc",
+            "https://soundcloud.com/artist/song",
+            "https://on.soundcloud.com/abc",
+            "https://artist.bandcamp.com/track/song",
+            "https://vimeo.com/123",
+            "https://www.twitch.tv/channel",
+            "ytsearch:lofi beats https://example.com"
+    })
+    void loadsSearchesAndLinksToTheSourcesHosts(String query) {
+        AudioPlayerManager playerManager = mock(AudioPlayerManager.class);
+
+        new LavaAudioTrackLoader(playerManager, 3).load(query, "@user", new AudioTrackLoader.AudioTrackLoadCallback() {
+            @Override public void trackLoaded(com.bearify.music.player.agent.domain.Track track) {}
+            @Override public void playlistLoaded(List<com.bearify.music.player.agent.domain.Track> tracks) {}
+            @Override public void noMatches() {}
+            @Override public void loadFailed(String message) {}
+        });
+
+        verify(playerManager).loadItem(eq(query), any(AudioLoadResultHandler.class));
+    }
+
+    @Test
+    void rejectsSearchingAnUntrustedLink() {
+        AudioPlayerManager playerManager = mock(AudioPlayerManager.class);
+        AtomicBoolean noMatches = new AtomicBoolean();
+
+        new LavaAudioTrackLoader(playerManager, 3).search("http://redis:6379/#.bandcamp.com/track/x", 5, new AudioTrackLoader.AudioTrackSearchCallback() {
+            @Override public void searchResults(List<TrackMetadata> tracks) {}
+            @Override public void noMatches() { noMatches.set(true); }
+            @Override public void loadFailed(String message) {}
+        });
+
+        verify(playerManager, never()).loadItem(anyString(), any(AudioLoadResultHandler.class));
+        assertThat(noMatches).isTrue();
+    }
 
     @Test
     void searchReturnsTrackMetadataForSearchResults() {

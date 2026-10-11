@@ -14,6 +14,7 @@ class AnsweringListener implements MusicPlayerEventListener {
     static final String NOTHING_PLAYING_MESSAGE = BearifyEmoji.HONEY + " | Nothing's playing right now. Queue something with `/player play`!";
     static final String QUEUE_EMPTY_MESSAGE = BearifyEmoji.HONEY + " | This is where the trail ends. Try adding more using `/player play` command!";
     static final String NOTHING_TO_GO_BACK_MESSAGE = BearifyEmoji.HONEY + " | This is where the trail begins. Nothing to go back to!";
+    static final String NOT_SEEKABLE_MESSAGE = BearifyEmoji.BLOCKED + " | I can't paw back and forth through a live stream.";
 
     private final Answer answer;
 
@@ -48,6 +49,11 @@ class AnsweringListener implements MusicPlayerEventListener {
     @Override
     public void onNothingToGoBack() {
         answer(NOTHING_TO_GO_BACK_MESSAGE);
+    }
+
+    @Override
+    public void onNotSeekable() {
+        answer(NOT_SEEKABLE_MESSAGE);
     }
 
     /** Where an answer goes: the deferred command message, or an ephemeral follow-up to a button presser. */

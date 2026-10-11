@@ -115,7 +115,18 @@ class PlaybackComponentTest {
                 .upNext(List.of(new TrackMetadata("Radio", "Station", "https://example.com/radio", Long.MAX_VALUE)))
                 .build());
 
-        assertThat(texts(message)).anyMatch(text -> text.contains("Station • LIVE"));
+        assertThat(texts(message)).anyMatch(text -> text.contains("Station • 🔴 LIVE"));
+    }
+
+    @Test
+    void rendersLiveBadgeInsteadOfDurationForPlayingStream() {
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+
+        ComponentMessage message = announcer.render(baseState()
+                .track(new TrackMetadata("Radio", "Station", "https://example.com/radio", Long.MAX_VALUE))
+                .build());
+
+        assertThat(texts(message)).contains("### Station • 🔴 LIVE");
     }
 
     @Test

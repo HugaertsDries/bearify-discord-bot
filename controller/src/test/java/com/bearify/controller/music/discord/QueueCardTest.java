@@ -90,7 +90,7 @@ class QueueCardTest {
 
         List<String> texts = texts(QueueCard.wholeQueue(snapshot(Optional.of(CURRENT), upcoming)));
 
-        assertThat(texts).contains("Radio\n-# Station • LIVE\n");
+        assertThat(texts).contains("Radio\n-# Station • 🔴 LIVE\n");
         assertThat(texts.getLast()).isEqualTo("-# 2 tracks · 1m 30s");
     }
 

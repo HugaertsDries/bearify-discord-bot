@@ -16,6 +16,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import com.bearify.music.player.agent.lava.LavaConfig;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -43,6 +45,13 @@ public abstract class AbstractAgentIntegrationTest {
 
     @TestConfiguration
     static class AgentTestConfig {
+        // the real link sources call out (Twitch fetches twitch.tv headers when built); tests stay offline
+        @Bean
+        @Primary
+        LavaConfig.LinkSources offlineLinkSources() {
+            return List::of;
+        }
+
         @Bean
         DiscordClientFactory discordClientFactory() {
             return new DiscordClientFactory() {
