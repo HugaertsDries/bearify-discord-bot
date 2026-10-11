@@ -161,6 +161,8 @@ public class VoiceConnectionManager implements AutoCloseable {
             joiningGuilds.remove(guildId);
             client.guild(guildId).voice().ifPresent(session -> {
                 redis.delete(PlayerRedisProtocol.Keys.assignment(guildId, session.getChannelId()));
+                // once out of the channel, clearing would need Manage Channels
+                session.setStatus("");
                 session.leave();
             });
             pool.get(guildId).ifPresent(AudioPlayer::close);

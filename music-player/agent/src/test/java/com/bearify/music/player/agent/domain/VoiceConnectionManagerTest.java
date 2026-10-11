@@ -42,6 +42,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -172,6 +173,16 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
+    }
+
+    @Test
+    void clearsStatusBeforeLeaving() {
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
+
+        assertThat(discordClient.guild(GUILD_ID).getVoiceCalls()).containsExactly("setStatus()", "leave()");
     }
 
     @Test
@@ -667,6 +678,7 @@ class VoiceConnectionManagerTest {
         private String joinedChannelId;
         private String connectedChannelId;
         private int leaveCount;
+        private final List<String> voiceCalls = new ArrayList<>();
         private VoiceSessionListener joinListener;
         private boolean lonely = true;
         private boolean joinFails;
@@ -685,7 +697,8 @@ class VoiceConnectionManagerTest {
                     @Override public String getChannelId() { return connectedChannelId; }
                     @Override public boolean isLonely() { return lonely; }
                     @Override public boolean hasListeners() { return !lonely; }
-                    @Override public void leave() { leaveCount++; connectedChannelId = null; }
+                    @Override public boolean setStatus(String status) { voiceCalls.add("setStatus(" + status + ")"); return true; }
+                    @Override public void leave() { leaveCount++; voiceCalls.add("leave()"); connectedChannelId = null; }
                 });
             }
             return Optional.empty();
@@ -723,6 +736,10 @@ class VoiceConnectionManagerTest {
 
         int getLeaveCount() {
             return leaveCount;
+        }
+
+        List<String> getVoiceCalls() {
+            return List.copyOf(voiceCalls);
         }
     }
 

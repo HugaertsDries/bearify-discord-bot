@@ -16,6 +16,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 class AudioPlayerTest {
 
@@ -32,13 +35,15 @@ class AudioPlayerTest {
 
     private InMemoryAudioEngine engine;
     private RecordingEventDispatcher eventDispatcher;
+    private VoiceChannelStatus status;
     private AudioPlayer player;
 
     @BeforeEach
     void setUp() {
         engine = new InMemoryAudioEngine();
         eventDispatcher = new RecordingEventDispatcher();
-        player = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, () -> {});
+        status = mock(VoiceChannelStatus.class);
+        player = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, status, () -> {});
     }
 
     @Test
@@ -482,11 +487,42 @@ class AudioPlayerTest {
     @Test
     void runnsOnCloseCallbackWhenClosed() {
         boolean[] closed = {false};
-        AudioPlayer closeable = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, () -> closed[0] = true);
+        AudioPlayer closeable = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, status, () -> closed[0] = true);
 
         closeable.close();
 
         assertThat(closed[0]).isTrue();
+    }
+
+    @Test
+    void showsStatusOnTrackStart() {
+        InMemoryTrack trackA = track("Song A", 120_000);
+
+        player.play(trackA);
+
+        verify(status).show(trackA);
+    }
+
+    @Test
+    void clearsStatusWhenQueueRunsOut() {
+        InMemoryTrack trackA = track("Song A", 120_000);
+        engine.play(trackA);
+
+        engine.triggerOnTrackEnd(trackA);
+
+        verify(status).clear();
+    }
+
+    @Test
+    void keepsStatusWhenPausing() {
+        engine.play(track("Song A", 120_000));
+
+        player.togglePause(new Request("req-1", "@user"));
+        player.togglePause(new Request("req-2", "@user"));
+        player.autoPause();
+        player.autoResume();
+
+        verify(status, never()).clear();
     }
 
     @Test

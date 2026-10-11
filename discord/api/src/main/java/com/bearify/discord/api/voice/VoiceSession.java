@@ -15,6 +15,12 @@ public interface VoiceSession {
     /** Whether at least one non-bot member who is not deafened (self or server) is in the current channel. */
     boolean hasListeners();
 
+    /**
+     * Sets the connected voice channel's status; an empty string clears it.
+     * Returns {@code false} when the channel has no status or the bot may not set it, so the caller can stop trying.
+     */
+    boolean setStatus(String status);
+
     /** Leave the current voice channel. */
     void leave();
 }

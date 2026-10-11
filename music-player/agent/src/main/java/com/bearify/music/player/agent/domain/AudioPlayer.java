@@ -32,6 +32,7 @@ public class AudioPlayer implements AudioProvider {
     private final ScheduledExecutorService scheduler;
     private final String playerId;
     private final String guildId;
+    private final VoiceChannelStatus status;
     private final Runnable onClose;
 
     private final Deque<Track> queue = new ArrayDeque<>();
@@ -48,6 +49,7 @@ public class AudioPlayer implements AudioProvider {
                           ScheduledExecutorService scheduler,
                           String playerId,
                           String guildId,
+                          VoiceChannelStatus status,
                           Runnable onClose) {
         this.engine = engine;
         this.audioProvider = audioProvider;
@@ -56,6 +58,7 @@ public class AudioPlayer implements AudioProvider {
         this.scheduler = scheduler;
         this.playerId = playerId;
         this.guildId = guildId;
+        this.status = status;
         this.onClose = onClose;
         engine.addListener(new TrackEventHandler());
     }
@@ -296,6 +299,7 @@ public class AudioPlayer implements AudioProvider {
                 queueDurationMs = queueDurationMs();
             }
             LOG.info("Now playing: {} by {}", track.title(), track.author());
+            status.show(track);
             eventDispatcher.dispatch(new MusicPlayerEvent.TrackStart(
                     playerId,
                     new Request(randomId(), track.requesterTag()),
@@ -326,6 +330,7 @@ public class AudioPlayer implements AudioProvider {
                         engine.play(next);
                     }
                 } else {
+                    status.clear();
                     eventDispatcher.dispatch(new MusicPlayerEvent.QueueEmpty(playerId, randomId(), guildId));
                 }
             }

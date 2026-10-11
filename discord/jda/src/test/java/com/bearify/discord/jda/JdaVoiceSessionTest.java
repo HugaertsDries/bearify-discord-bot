@@ -3,17 +3,25 @@ package com.bearify.discord.jda;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.concrete.StageChannel;
+import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
+import net.dv8tion.jda.api.exceptions.PermissionException;
 import net.dv8tion.jda.api.managers.AudioManager;
+import net.dv8tion.jda.api.requests.restaction.AuditableRestAction;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class JdaVoiceSessionTest {
+
+    private static final String STATUS = "🎶 Never Gonna Give You Up — Rick Astley";
 
     @Test
     void hasListenersWhenMutedHumanIsNotDeafened() {
@@ -37,6 +45,43 @@ class JdaVoiceSessionTest {
     @Test
     void treatsHumanWithoutCachedVoiceStateAsListening() {
         assertThat(session(member(false, null)).hasListeners()).isTrue();
+    }
+
+    @Test
+    void setsStatusOfVoiceChannel() {
+        VoiceChannel channel = voiceChannel();
+
+        assertThat(new JdaVoiceSession(channel, mock(AudioManager.class)).setStatus(STATUS)).isTrue();
+        verify(channel).modifyStatus(STATUS);
+    }
+
+    @Test
+    void truncatesStatusToDiscordLimit() {
+        VoiceChannel channel = voiceChannel();
+
+        new JdaVoiceSession(channel, mock(AudioManager.class)).setStatus("a".repeat(600));
+
+        verify(channel).modifyStatus("a".repeat(500));
+    }
+
+    @Test
+    void refusesStatusInStageChannel() {
+        assertThat(new JdaVoiceSession(mock(StageChannel.class), mock(AudioManager.class)).setStatus(STATUS)).isFalse();
+    }
+
+    @Test
+    void refusesStatusWithoutPermission() {
+        VoiceChannel channel = mock(VoiceChannel.class);
+        when(channel.modifyStatus(STATUS)).thenThrow(new PermissionException("Missing permission VOICE_SET_STATUS"));
+
+        assertThat(new JdaVoiceSession(channel, mock(AudioManager.class)).setStatus(STATUS)).isFalse();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static VoiceChannel voiceChannel() {
+        VoiceChannel channel = mock(VoiceChannel.class);
+        when(channel.modifyStatus(anyString())).thenReturn(mock(AuditableRestAction.class));
+        return channel;
     }
 
     private static JdaVoiceSession session(Member... members) {

@@ -365,7 +365,7 @@ class MusicPlayerInteractionDispatcherTest {
         private final Set<String> primedGuilds = new HashSet<>();
 
         StubAudioPlayerPool() {
-            super(null, null, null, null, "test");
+            super(null, null, null, null, null, "test");
         }
 
         void primeGuild(String guildId) {
@@ -391,7 +391,7 @@ class MusicPlayerInteractionDispatcherTest {
             private final String guildId;
 
             StubPlayer(String guildId) {
-                super(new NoOpEngine(), new NoOpAudioProvider(), null, PROPS, null, "test", guildId, () -> {});
+                super(new NoOpEngine(), new NoOpAudioProvider(), null, PROPS, null, "test", guildId, null, () -> {});
                 this.guildId = guildId;
             }
 

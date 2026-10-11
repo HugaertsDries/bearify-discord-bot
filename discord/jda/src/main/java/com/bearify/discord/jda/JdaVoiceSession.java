@@ -2,7 +2,9 @@ package com.bearify.discord.jda;
 
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
+import net.dv8tion.jda.api.entities.channel.attribute.IVoiceStatusChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
+import net.dv8tion.jda.api.exceptions.PermissionException;
 import net.dv8tion.jda.api.managers.AudioManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +43,25 @@ class JdaVoiceSession implements VoiceSession {
         return channel.getMembers().stream()
                 .filter(m -> !m.getUser().isBot())
                 .anyMatch(m -> m.getVoiceState() == null || !m.getVoiceState().isDeafened());
+    }
+
+    @Override
+    public boolean setStatus(String status) {
+        // a stage channel has no status
+        if (!(channel instanceof IVoiceStatusChannel statusChannel)) {
+            return false;
+        }
+        String truncated = status.length() > IVoiceStatusChannel.MAX_STATUS_LENGTH
+                ? status.substring(0, IVoiceStatusChannel.MAX_STATUS_LENGTH)
+                : status;
+        try {
+            statusChannel.modifyStatus(truncated).queue(null, error ->
+                    LOG.warn("Failed to set the status of voice channel {}: {}", channel.getId(), error.getMessage()));
+            return true;
+        } catch (PermissionException e) {
+            // JDA checks Set Voice Channel Status up front, and Manage Channels once the bot has left the channel
+            return false;
+        }
     }
 
     @Override

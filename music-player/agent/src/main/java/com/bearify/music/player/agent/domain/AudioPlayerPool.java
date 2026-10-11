@@ -1,5 +1,6 @@
 package com.bearify.music.player.agent.domain;
 
+import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.lava.LavaAudioEngine;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
@@ -17,17 +18,20 @@ import java.util.function.Supplier;
 public class AudioPlayerPool {
 
     private final ConcurrentHashMap<String, AudioPlayer> entries = new ConcurrentHashMap<>();
+    private final DiscordClient client;
     private final MusicPlayerEventDispatcher eventDispatcher;
     private final PlayerProperties properties;
     private final ScheduledExecutorService scheduler;
     private final Supplier<LavaAudioEngine> engineFactory;
     private final String playerId;
 
-    public AudioPlayerPool(MusicPlayerEventDispatcher eventDispatcher,
+    public AudioPlayerPool(DiscordClient client,
+                           MusicPlayerEventDispatcher eventDispatcher,
                            PlayerProperties properties,
                            ScheduledExecutorService scheduler,
                            Supplier<LavaAudioEngine> engineFactory,
                            @Value("${player.id}") String playerId) {
+        this.client = client;
         this.eventDispatcher = eventDispatcher;
         this.properties = properties;
         this.scheduler = scheduler;
@@ -40,6 +44,7 @@ public class AudioPlayerPool {
             LavaAudioEngine engine = engineFactory.get();
             return new AudioPlayer(
                     engine, engine, eventDispatcher, properties, scheduler, playerId, id,
+                    new VoiceChannelStatus(client, id),
                     () -> this.remove(guildId));
         });
     }

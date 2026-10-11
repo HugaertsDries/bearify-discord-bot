@@ -1,5 +1,6 @@
 package com.bearify.music.player.agent.domain;
 
+import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.lava.LavaAudioEngine;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
@@ -41,6 +42,7 @@ class AudioPlayerPoolTest {
     @Test
     void returnsSnapshotOfActiveGuildIds() {
         var pool = new AudioPlayerPool(
+                mock(DiscordClient.class),
                 mock(MusicPlayerEventDispatcher.class),
                 PROPERTIES,
                 Executors.newScheduledThreadPool(1),
@@ -61,6 +63,7 @@ class AudioPlayerPoolTest {
     @Test
     void returnsEmptySetWhenNoActiveGuilds() {
         var pool = new AudioPlayerPool(
+                mock(DiscordClient.class),
                 mock(MusicPlayerEventDispatcher.class),
                 PROPERTIES,
                 Executors.newScheduledThreadPool(1),
