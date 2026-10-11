@@ -1,6 +1,7 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
+import com.bearify.controller.music.spotify.FixtureSpotifyPageFetcher;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.JoinRequest;
@@ -35,6 +36,9 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
     private static final String RESOLVED_QUERY = "ytsearch:" + QUERY;
     private static final TrackMetadata TRACK = new TrackMetadata("Never Gonna Give You Up", "Rick Astley", "https://youtu.be/dQw4w9WgXcQ", 213_000);
     private static final String QUEUED_MESSAGE = "Queued **Never Gonna Give You Up**.";
+    private static final String SPOTIFY_TRACK_LINK = FixtureSpotifyPageFetcher.TRACK_LINK;
+    private static final String SPOTIFY_PLAYLIST_LINK = FixtureSpotifyPageFetcher.PLAYLIST_LINK;
+    private static final String SPOTIFY_UNREADABLE_LINK = FixtureSpotifyPageFetcher.UNREADABLE_LINK;
 
     @Autowired CommandRegistry commandRegistry;
     @Autowired StringRedisTemplate redis;
@@ -168,7 +172,66 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
         }
     }
 
+    @Test
+    void playsSpotifyTrackLinkAsYoutubeSearch() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = playInteraction(SPOTIFY_TRACK_LINK);
+
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            MusicPlayerInteraction.Play play = (MusicPlayerInteraction.Play) objectMapper.readValue(received.poll(2, TimeUnit.SECONDS), MusicPlayerInteraction.class);
+            assertThat(play.trackRequest().query()).isEqualTo("ytsearch:Rick Astley Never Gonna Give You Up");
+        } finally {
+            container.stop();
+        }
+    }
+
     // --- EDGE CASES ---
+
+    @Test
+    void rejectsSpotifyPlaylistLinkWithoutContactingTheBear() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = playInteraction(SPOTIFY_PLAYLIST_LINK);
+
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                    .contains("I can only sniff out single Spotify songs");
+            assertThat(received.poll(500, TimeUnit.MILLISECONDS)).isNull();
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void explainsUnreadableSpotifyLink() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = playInteraction(SPOTIFY_UNREADABLE_LINK);
+
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                    .contains("I couldn't sniff out that Spotify song");
+            assertThat(received.poll(500, TimeUnit.MILLISECONDS)).isNull();
+        } finally {
+            container.stop();
+        }
+    }
 
     @Test
     void rejectsPlayWhenUserNotInVoiceChannel() {
@@ -237,4 +300,15 @@ class MusicPlayerCommandControllerPlayTest extends AbstractControllerIntegration
         }
     }
 
+    // --- HELPERS ---
+
+    private static MockCommandInteraction playInteraction(String query) {
+        return MockCommandInteraction.forCommand("player")
+                .subcommand("play")
+                .voiceChannelId(VOICE_CHANNEL_ID)
+                .guildId(GUILD_ID)
+                .textChannelId(TEXT_CHANNEL_ID)
+                .option("search", query)
+                .build();
+    }
 }

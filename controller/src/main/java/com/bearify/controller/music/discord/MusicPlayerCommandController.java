@@ -3,6 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.spotify.SpotifyLinkResolver;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;
 import com.bearify.discord.spring.annotation.DiscordController;
@@ -35,6 +36,8 @@ public class MusicPlayerCommandController {
     private static final String NEGATIVE_REWIND_MESSAGE = BearifyEmoji.REWIND + " | Use a positive number of seconds, bear with me.";
     private static final String NEGATIVE_FORWARD_MESSAGE = BearifyEmoji.FORWARD + " | Use a positive number of seconds, bear with me.";
     private static final String TRACK_LOAD_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | Oops! Something went wrong loading this track. This could be due to age-restrictions or region lock. (I'm technically less than 1 year old)";
+    private static final String SPOTIFY_NOT_A_SONG_MESSAGE = BearifyEmoji.BLOCKED + " | I can only sniff out single Spotify songs. Paste a track link instead!";
+    private static final String SPOTIFY_UNREADABLE_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that Spotify song. Try a YouTube link or a search instead?";
 
     private static final List<String> JOIN_ENDINGS = List.of(
             "Let's just chill for a bit?",
@@ -51,9 +54,11 @@ public class MusicPlayerCommandController {
     private static final Random RANDOM = new Random();
 
     private final MusicPlayerPool pool;
+    private final SpotifyLinkResolver spotify;
 
-    public MusicPlayerCommandController(MusicPlayerPool pool) {
+    public MusicPlayerCommandController(MusicPlayerPool pool, SpotifyLinkResolver spotify) {
         this.pool = pool;
+        this.spotify = spotify;
     }
 
     @SuppressWarnings("unused")
@@ -105,17 +110,18 @@ public class MusicPlayerCommandController {
         requireVoiceSession(interaction).ifPresent(ctx -> {
             String textChannelId = interaction.getTextChannelId()
                     .orElseThrow(() -> new IllegalStateException("No text channel ID on interaction"));
-            String resolvedQuery = query.startsWith("http://") || query.startsWith("https://") ? query : "ytsearch:" + query;
-            var trackRequest = new TrackRequest(resolvedQuery, textChannelId, interaction.getUserMention());
+            // before resolving: reading a Spotify page can outlast Discord's 3s acknowledgement window
+            EditableMessage message = interaction.defer(true);
+            Optional<String> resolvedQuery = resolveQuery(query, message);
+            if (resolvedQuery.isEmpty()) {
+                return;
+            }
+            var trackRequest = new TrackRequest(resolvedQuery.get(), textChannelId, interaction.getUserMention());
 
             pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                    player -> {
-                        EditableMessage message = interaction.defer(true);
-                        player.play(trackRequest, queueing(message));
-                    },
+                    player -> player.play(trackRequest, queueing(message)),
                     () -> {
                         var player = pool.acquire(ctx.guildId(), ctx.voiceChannelId());
-                        EditableMessage message = interaction.defer(true);
                         message.edit(JOINING_MESSAGE);
                         player.join(new MusicPlayerEventListener() {
                             @Override
@@ -298,6 +304,22 @@ public class MusicPlayerCommandController {
         return Optional.of(new ChannelContext(
                 interaction.getGuildId().orElseThrow(),
                 interaction.getVoiceChannelId().orElseThrow()));
+    }
+
+    private Optional<String> resolveQuery(String query, EditableMessage message) {
+        return switch (spotify.resolve(query)) {
+            case SpotifyLinkResolver.NotSpotify() ->
+                    Optional.of(query.startsWith("http://") || query.startsWith("https://") ? query : "ytsearch:" + query);
+            case SpotifyLinkResolver.Resolved(String searchQuery) -> Optional.of("ytsearch:" + searchQuery);
+            case SpotifyLinkResolver.NotASong() -> {
+                message.edit(SPOTIFY_NOT_A_SONG_MESSAGE);
+                yield Optional.empty();
+            }
+            case SpotifyLinkResolver.Unreadable() -> {
+                message.edit(SPOTIFY_UNREADABLE_MESSAGE);
+                yield Optional.empty();
+            }
+        };
     }
 
     private static String joinedMessage(String channelId) {

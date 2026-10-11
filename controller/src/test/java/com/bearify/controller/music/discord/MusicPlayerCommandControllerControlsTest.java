@@ -4,6 +4,7 @@ import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.spotify.SpotifyLinkResolver;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
@@ -41,6 +42,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String RESTARTED_MESSAGE = "\u23EE\uFE0F | Back to the start of this track.";
     private static final String NOTHING_PLAYING_MESSAGE = "\uD83C\uDF6F | Nothing's playing right now. Queue something with `/player play`!";
     private static final String QUEUE_EMPTY_MESSAGE = "\uD83C\uDF6F | This is where the trail ends. Try adding more using `/player play` command!";
+    private static final SpotifyLinkResolver NO_SPOTIFY = new SpotifyLinkResolver(uri -> Optional.empty());
 
     @Autowired CommandRegistry commandRegistry;
     @Autowired StringRedisTemplate redis;
@@ -333,7 +335,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
     @Test
     void editsPauseReplyWhenPlayerFails() {
-        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new FailingMusicPlayer()));
+        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new FailingMusicPlayer()), NO_SPOTIFY);
         MockCommandInteraction interaction = buildInteraction("pause");
 
         controller.pause(interaction);
@@ -344,7 +346,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
     @Test
     void editsPauseReplyWithTimeoutMessageWhenPlayerDoesNotAnswer() {
-        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new TimingOutMusicPlayer()));
+        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new TimingOutMusicPlayer()), NO_SPOTIFY);
         MockCommandInteraction interaction = buildInteraction("pause");
 
         controller.pause(interaction);

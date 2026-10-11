@@ -1,5 +1,7 @@
 package com.bearify.controller;
 
+import com.bearify.controller.music.spotify.FixtureSpotifyPageFetcher;
+import com.bearify.controller.music.spotify.SpotifyPageFetcher;
 import com.bearify.discord.api.gateway.DiscordClientFactory;
 import com.bearify.discord.testing.MockDiscordClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
@@ -56,6 +59,12 @@ public abstract class AbstractControllerIntegrationTest {
         @Bean
         DiscordClientFactory discordClientFactory() {
             return new MockDiscordClient.Factory();
+        }
+
+        @Bean
+        @Primary
+        SpotifyPageFetcher fixtureSpotifyPageFetcher() {
+            return new FixtureSpotifyPageFetcher();
         }
     }
 }
