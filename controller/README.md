@@ -50,6 +50,12 @@ Fast-forwards by the given number of seconds (default: 10s for tracks under 5 mi
 ### `/player clear`
 Clears the current playlist.
 
+### `/player remove <track>`
+Drops one upcoming track. While you type, it suggests the queued tracks matching your text; a bare number removes the track at that position. If the queue moved since you picked, the bear still removes the track you picked, or says it's gone.
+
+### `/player shuffle`
+Mixes up the upcoming tracks once. The track playing now stays.
+
 ### `/player queue`
 Shows you, privately, the whole queue as a card in the player's Up Next style: the track playing now, up to 10 rows, then "…and N more", and the track count and total time. When more than 3 tracks are queued, the player's Up Next ends with "+N more on the trail" and a **Show** button that privately lists the tracks the player doesn't show.
 

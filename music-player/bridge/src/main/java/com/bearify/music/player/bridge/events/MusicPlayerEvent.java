@@ -39,6 +39,9 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.AutoResumed.class, name = "auto_resumed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.QueueSnapshot.class, name = "queue_snapshot"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.NotSeekable.class, name = "not_seekable"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.Removed.class, name = "removed"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.TrackNotInQueue.class, name = "track_not_in_queue"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.Shuffled.class, name = "shuffled"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.VolumeChanged.class, name = "volume_changed"),
 })
 public sealed interface MusicPlayerEvent permits
@@ -70,6 +73,9 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.AutoResumed,
         MusicPlayerEvent.QueueSnapshot,
         MusicPlayerEvent.NotSeekable,
+        MusicPlayerEvent.Removed,
+        MusicPlayerEvent.TrackNotInQueue,
+        MusicPlayerEvent.Shuffled,
         MusicPlayerEvent.VolumeChanged {
 
     String playerId();
@@ -160,6 +166,26 @@ public sealed interface MusicPlayerEvent permits
     }
     /** A rewind or forward on a track that can't seek, such as a live stream. */
     record NotSeekable(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    /** Same queue fields as {@link QueueUpdated}, so the player message keeps counting what's further up the trail. */
+    record Removed(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, int queueSize, long queueDurationMs) implements MusicPlayerEvent {
+        public Removed {
+            upNext = upNext != null ? List.copyOf(upNext) : List.of();
+        }
+        @Override public String requestId() { return request.id(); }
+    }
+    /** A remove whose track already left the queue. */
+    record TrackNotInQueue(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    /**
+     * {@code count} is the whole queue, 0 when there was nothing to shuffle (not {@link QueueEmpty}: that removes the player message).
+     * A shuffle leaves the queue's duration as it was.
+     */
+    record Shuffled(String playerId, Request request, String guildId, int count, List<TrackMetadata> upNext) implements MusicPlayerEvent {
+        public Shuffled {
+            upNext = upNext != null ? List.copyOf(upNext) : List.of();
+        }
+        @Override public String requestId() { return request.id(); }
+    }
+
     record VolumeChanged(String playerId, Request request, String guildId, int volume) implements MusicPlayerEvent {
         @Override public String requestId() { return request.id(); }
     }

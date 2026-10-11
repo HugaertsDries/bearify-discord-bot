@@ -88,6 +88,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
             case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
             case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
+            case MusicPlayerEvent.Removed removed -> onRemoved(removed);
+            case MusicPlayerEvent.Shuffled shuffled -> onShuffled(shuffled);
             case MusicPlayerEvent.VolumeChanged volumeChanged -> onVolumeChanged(volumeChanged);
             case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
             case MusicPlayerEvent.QueueEmpty ignored -> onQueueEmpty();
@@ -141,6 +143,23 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         currentQueueSize = event.upNext().size();
         currentQueueDuration = Duration.ZERO;
         notify("Queue cleared by " + event.request().requesterTag());
+    }
+
+    private void onRemoved(MusicPlayerEvent.Removed event) {
+        currentUpNext = event.upNext();
+        currentQueueSize = event.queueSize();
+        currentQueueDuration = Duration.ofMillis(event.queueDurationMs());
+        notify("Removed by " + event.request().requesterTag());
+    }
+
+    private void onShuffled(MusicPlayerEvent.Shuffled event) {
+        if (event.count() == 0) {
+            return;
+        }
+        currentUpNext = event.upNext();
+        currentQueueSize = event.count();
+        // same tracks in a new order, so the queue's duration stays as it was
+        notify("Shuffled by " + event.request().requesterTag());
     }
 
     private void onVolumeChanged(MusicPlayerEvent.VolumeChanged event) {

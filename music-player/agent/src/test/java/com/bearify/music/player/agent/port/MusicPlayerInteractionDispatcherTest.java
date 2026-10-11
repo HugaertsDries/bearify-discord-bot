@@ -268,6 +268,54 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
+    void routesRemoveToPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Remove(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 3, "https://example.com/africa"));
+
+        assertThat(pool.removeCalls).containsExactly("3|https://example.com/africa|" + GUILD_ID + "|@user");
+    }
+
+    @Test
+    void routesShuffleToPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Shuffle(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
+
+        assertThat(pool.shuffleCalls).containsExactly(GUILD_ID + "|@user");
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenRemovingWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Remove(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 1, ""));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenShufflingWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Shuffle(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    @Test
     void routesSetVolumeToPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
@@ -386,6 +434,8 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> forwardCalls = new ArrayList<>();
         final List<String> playPlaylistCalls = new ArrayList<>();
         final List<String> snapshotCalls = new ArrayList<>();
+        final List<String> removeCalls = new ArrayList<>();
+        final List<String> shuffleCalls = new ArrayList<>();
         final List<String> setVolumeCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
@@ -458,6 +508,16 @@ class MusicPlayerInteractionDispatcherTest {
             @Override
             public void snapshot(String requestId) {
                 snapshotCalls.add(guildId + "|" + requestId);
+            }
+
+            @Override
+            public void remove(int position, String uriPrefix, Request request) {
+                removeCalls.add(position + "|" + uriPrefix + "|" + guildId + "|" + request.requesterTag());
+            }
+
+            @Override
+            public void shuffle(Request request) {
+                shuffleCalls.add(guildId + "|" + request.requesterTag());
             }
 
             @Override

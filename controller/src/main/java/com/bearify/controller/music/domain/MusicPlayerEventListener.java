@@ -22,6 +22,10 @@ public interface MusicPlayerEventListener {
     /** {@code seek} is what the player actually applied, also when its default was requested. */
     default void onForwarded(Duration seek) {}
     default void onCleared() {}
+    default void onRemoved(TrackMetadata track) {}
+    default void onTrackNotInQueue() {}
+    /** {@code count} is 0 when the queue was empty. */
+    default void onShuffled(int count) {}
     default void onVolumeChanged(int volume) {}
     default void onStopped() {}
     default void onNothingPlaying() {}

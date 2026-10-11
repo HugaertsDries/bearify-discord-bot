@@ -45,7 +45,7 @@ public class PlaybackComponent {
     private void appendNotification(ComponentMessageBuilder builder, PlaybackComponentState state) {
         state.notification().ifPresent(notification -> builder.container(container -> container
                 .accentColor(toDiscordColor(colorFor(notification.style())))
-                .text("\uD83D\uDD14 " + notification.text())));
+                .text(notification.text())));
     }
 
     private static void appendHero(ComponentMessageBuilder builder, PlaybackComponentState state) {

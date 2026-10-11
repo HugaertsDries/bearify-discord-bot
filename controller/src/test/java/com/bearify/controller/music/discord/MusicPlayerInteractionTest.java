@@ -772,5 +772,13 @@ class MusicPlayerInteractionTest {
         public Optional<MusicPlayerEvent> queue() {
             return Optional.empty();
         }
+
+        @Override
+        public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {
+        }
+
+        @Override
+        public void shuffle(String requesterTag, MusicPlayerEventListener handler) {
+        }
     }
 }

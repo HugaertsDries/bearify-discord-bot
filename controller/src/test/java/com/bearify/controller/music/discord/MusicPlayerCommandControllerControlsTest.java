@@ -46,6 +46,12 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String NOTHING_PLAYING_MESSAGE = "\uD83C\uDF6F | Nothing's playing right now. Queue something with `/player play`!";
     private static final String QUEUE_EMPTY_MESSAGE = "\uD83C\uDF6F | This is where the trail ends. Try adding more using `/player play` command!";
     private static final String NOT_SEEKABLE_MESSAGE = "\uD83D\uDED1\uFE0F | I can't paw back and forth through a live stream.";
+    private static final TrackMetadata AFRICA = new TrackMetadata("Africa", "TOTO", "https://example.com/africa", 295_000);
+    private static final String REMOVED_MESSAGE = "🗑️ | Removed **Africa** from the queue.";
+    private static final String TRACK_NOT_IN_QUEUE_MESSAGE = "🛑️ | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
+    private static final String PICK_A_TRACK_MESSAGE = "🛑️ | Pick a track from the list so I know which one to drop.";
+    private static final String SHUFFLED_MESSAGE = "🔀 | Shuffled 12 tracks. Chaos, bear-style.";
+    private static final String NOTHING_TO_SHUFFLE_MESSAGE = "🍯 | The queue is empty, nothing to shuffle.";
     private static final String VOLUME_SET_MESSAGE = "🔊 | Volume set to 40%. Only too loud for you? Right-click the bear → User Volume.";
     private static final String VOLUME_OUT_OF_RANGE_MESSAGE = "🛑️ | Volume goes from 0 to 100, bear with me.";
     private static final SpotifyLinkResolver NO_SPOTIFY = new SpotifyLinkResolver(uri -> Optional.empty());
@@ -327,6 +333,67 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void removesPickedTrack() throws Exception {
+        BlockingQueue<MusicPlayerInteraction> sent = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer bear = answerAs(interaction -> {
+            sent.add(interaction);
+            return new MusicPlayerEvent.Removed(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID,
+                    AFRICA, List.of(), 0, 0L);
+        });
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("remove", "track", "3|" + AFRICA.uri());
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(REMOVED_MESSAGE));
+            assertThat(sent.poll(2, TimeUnit.SECONDS)).isInstanceOfSatisfying(MusicPlayerInteraction.Remove.class, remove -> {
+                assertThat(remove.position()).isEqualTo(3);
+                assertThat(remove.uriPrefix()).isEqualTo(AFRICA.uri());
+            });
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void removesTypedPosition() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            commandRegistry.handle(buildInteractionWithOption("remove", "track", "2"));
+
+            String json = received.poll(2, TimeUnit.SECONDS);
+            assertThat(json).isNotNull();
+            assertThat(objectMapper.readValue(json, MusicPlayerInteraction.class))
+                    .isInstanceOfSatisfying(MusicPlayerInteraction.Remove.class, remove -> {
+                        assertThat(remove.position()).isEqualTo(2);
+                        assertThat(remove.uriPrefix()).isEmpty();
+                    });
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void answersRemoveWhenTrackLeftTheQueue() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.TrackNotInQueue(PLAYER_ID, interaction.requestId(), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("remove", "track", "3|" + AFRICA.uri());
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(TRACK_NOT_IN_QUEUE_MESSAGE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
     void setsVolumeAndRepliesWithUserVolumeTip() {
         BlockingQueue<MusicPlayerInteraction> sent = new LinkedBlockingQueue<>();
         RedisMessageListenerContainer bear = answerAs(interaction -> {
@@ -347,6 +414,23 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
                         assertThat(setVolume.volume()).isEqualTo(40);
                         assertThat(setVolume.guildId()).isEqualTo(GUILD_ID);
                     });
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void shufflesQueue() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, 12, List.of(AFRICA)));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("shuffle");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(SHUFFLED_MESSAGE));
         } finally {
             bear.stop();
         }
@@ -443,6 +527,24 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void rejectsFreeTextRemoveWithoutContactingBear() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("remove", "track", "africa");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.getReplies()).hasSize(1);
+            assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+            assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo(PICK_A_TRACK_MESSAGE);
+            assertThat(received.poll(500, TimeUnit.MILLISECONDS)).isNull();
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
     void rejectsVolumeOutOfRangeWithoutContactingBear() throws Exception {
         BlockingQueue<String> received = new LinkedBlockingQueue<>();
         RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
@@ -463,6 +565,22 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
             assertThat(received.poll(500, TimeUnit.MILLISECONDS)).isNull();
         } finally {
             container.stop();
+        }
+    }
+
+    @Test
+    void saysNothingToShuffleOnEmptyQueue() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, 0, List.of()));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("shuffle");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(NOTHING_TO_SHUFFLE_MESSAGE));
+        } finally {
+            bear.stop();
         }
     }
 
@@ -540,6 +658,8 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
+        @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
     }
 
     private static final class TimingOutMusicPlayer implements MusicPlayer {
@@ -554,5 +674,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { handler.onTimedOut(); }
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
+        @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
     }
 }

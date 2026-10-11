@@ -408,6 +408,104 @@ class AudioPlayerTest {
     }
 
     @Test
+    void removesTrackAtPositionWhenUriMatches() {
+        engine.play(track("Playing", 120_000));
+        InMemoryTrack one = track("One", 60_000);
+        InMemoryTrack two = track("Two", 70_000);
+        InMemoryTrack three = track("Three", 80_000);
+        player.play(List.of(one, two, three));
+
+        player.remove(2, two.uri(), new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getLastEvent()).isEqualTo(new MusicPlayerEvent.Removed(
+                PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, two.toMetadata(),
+                List.of(one.toMetadata(), three.toMetadata()), 2, 140_000L));
+    }
+
+    @Test
+    void removesShiftedTrackByUriWhenPositionMoved() {
+        engine.play(track("Playing", 120_000));
+        InMemoryTrack one = track("One", 60_000);
+        InMemoryTrack two = track("Two", 60_000);
+        player.play(List.of(one, two));
+
+        // picked as the 3rd track, but one before it left the queue since
+        player.remove(3, two.uri(), new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getLastEvent())
+                .isInstanceOfSatisfying(MusicPlayerEvent.Removed.class, removed -> {
+                    assertThat(removed.track()).isEqualTo(two.toMetadata());
+                    assertThat(removed.upNext()).containsExactly(one.toMetadata());
+                });
+    }
+
+    @Test
+    void removesByPositionWhenNoUriGiven() {
+        engine.play(track("Playing", 120_000));
+        InMemoryTrack one = track("One", 60_000);
+        InMemoryTrack two = track("Two", 60_000);
+        player.play(List.of(one, two));
+
+        player.remove(2, "", new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getLastEvent())
+                .isInstanceOfSatisfying(MusicPlayerEvent.Removed.class, removed -> {
+                    assertThat(removed.track()).isEqualTo(two.toMetadata());
+                    assertThat(removed.upNext()).containsExactly(one.toMetadata());
+                });
+    }
+
+    @Test
+    void answersTrackNotInQueueWhenNothingMatches() {
+        InMemoryTrack playing = track("Playing", 120_000);
+        engine.play(playing);
+        InMemoryTrack one = track("One", 60_000);
+        player.play(List.of(one));
+
+        player.remove(1, "https://example.com/Gone", new Request("req-1", "@user"));
+        player.snapshot("req-2");
+
+        assertThat(eventDispatcher.getEvents()).endsWith(
+                new MusicPlayerEvent.TrackNotInQueue(PLAYER_ID, "req-1", GUILD_ID),
+                new MusicPlayerEvent.QueueSnapshot(PLAYER_ID, "req-2", GUILD_ID, Optional.of(playing.toMetadata()), List.of(one.toMetadata())));
+    }
+
+    @Test
+    void shufflesUpcomingTracksAndKeepsCurrent() {
+        InMemoryTrack playing = track("Playing", 120_000);
+        engine.play(playing);
+        List<Track> queued = new ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            queued.add(track("Song " + i, 60_000));
+        }
+        player.play(queued);
+
+        player.shuffle(new Request("req-1", "@user"));
+        player.snapshot("req-2");
+
+        List<MusicPlayerEvent> events = eventDispatcher.getEvents();
+        assertThat(events.get(events.size() - 2))
+                .isInstanceOfSatisfying(MusicPlayerEvent.Shuffled.class, shuffled -> {
+                    assertThat(shuffled.count()).isEqualTo(12);
+                    assertThat(shuffled.upNext()).hasSize(3);
+                });
+        assertThat(events.getLast()).isInstanceOfSatisfying(MusicPlayerEvent.QueueSnapshot.class, snapshot -> {
+            assertThat(snapshot.current()).contains(playing.toMetadata());
+            assertThat(snapshot.upcoming()).containsExactlyInAnyOrderElementsOf(queued.stream().map(Track::toMetadata).toList());
+        });
+    }
+
+    @Test
+    void answersShuffledZeroWhenQueueEmpty() {
+        engine.play(track("Playing", 120_000));
+
+        player.shuffle(new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 0, List.of()));
+    }
+
+    @Test
     void setsVolumeOnEngineAndAnnouncesIt() {
         player.setVolume(40, new Request("req-1", "@user"));
 

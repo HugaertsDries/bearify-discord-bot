@@ -38,6 +38,9 @@ public class MusicPlayerCommandController {
     private static final String TRACK_LOAD_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | Oops! Something went wrong loading this track. This could be due to age-restrictions or region lock. (I'm technically less than 1 year old)";
     private static final String SPOTIFY_NOT_A_SONG_MESSAGE = BearifyEmoji.BLOCKED + " | I can only sniff out single Spotify songs. Paste a track link instead!";
     private static final String SPOTIFY_UNREADABLE_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that Spotify song. Try a YouTube link or a search instead?";
+    private static final String PICK_A_TRACK_MESSAGE = BearifyEmoji.BLOCKED + " | Pick a track from the list so I know which one to drop.";
+    private static final String TRACK_NOT_IN_QUEUE_MESSAGE = BearifyEmoji.BLOCKED + " | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
+    private static final String NOTHING_TO_SHUFFLE_MESSAGE = BearifyEmoji.HONEY + " | The queue is empty, nothing to shuffle.";
 
     private static final List<String> JOIN_ENDINGS = List.of(
             "Let's just chill for a bit?",
@@ -284,6 +287,55 @@ public class MusicPlayerCommandController {
     }
 
     @SuppressWarnings("unused")
+    @Interaction(value = "remove", description = "I'll drop one track from the queue")
+    public void remove(CommandInteraction interaction,
+                       @Option(name = "track", description = "The queued track to drop", required = true, autocomplete = true) String track) {
+        Optional<PickedTrack> picked = PickedTrack.parse(track);
+        if (picked.isEmpty()) {
+            interaction.reply(PICK_A_TRACK_MESSAGE).ephemeral().send();
+            return;
+        }
+        requireVoiceSession(interaction).ifPresent(ctx ->
+                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
+                        player -> {
+                            EditableMessage message = interaction.defer(true);
+                            player.remove(picked.get().position(), picked.get().uriPrefix(), interaction.getUserMention(), new AnsweringListener(message::edit) {
+                                @Override
+                                public void onRemoved(TrackMetadata removed) {
+                                    answer(removedMessage(removed));
+                                }
+
+                                @Override
+                                public void onTrackNotInQueue() {
+                                    answer(TRACK_NOT_IN_QUEUE_MESSAGE);
+                                }
+                            });
+                        },
+                        () -> replyNoPlayer(interaction)
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
+    @Interaction(value = "shuffle", description = "I'll mix up the queue")
+    public void shuffle(CommandInteraction interaction) {
+        requireVoiceSession(interaction).ifPresent(ctx ->
+                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
+                        player -> {
+                            EditableMessage message = interaction.defer(true);
+                            player.shuffle(interaction.getUserMention(), new AnsweringListener(message::edit) {
+                                @Override
+                                public void onShuffled(int count) {
+                                    answer(count == 0 ? NOTHING_TO_SHUFFLE_MESSAGE : shuffledMessage(count));
+                                }
+                            });
+                        },
+                        () -> replyNoPlayer(interaction)
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
     @Interaction(value = "volume", description = "I'll turn the music up or down for everyone")
     public void volume(CommandInteraction interaction,
                        @Option(name = "level", description = "The volume from 0 to 100", required = true) int level) {
@@ -425,9 +477,32 @@ public class MusicPlayerCommandController {
         return BearifyEmoji.TRASH + " | Cleared the playlist. Fresh paws.";
     }
 
+    private static String removedMessage(TrackMetadata track) {
+        return BearifyEmoji.TRASH + " | Removed **" + track.title() + "** from the queue.";
+    }
+
+    private static String shuffledMessage(int count) {
+        return BearifyEmoji.SHUFFLE + " | Shuffled " + count + (count == 1 ? " track" : " tracks") + ". Chaos, bear-style.";
+    }
+
     private static String volumeMessage(int volume) {
         return BearifyEmoji.SPEAKER + " | Volume set to " + volume + "%. Only too loud for you? Right-click the bear → User Volume.";
     }
 
     private record ChannelContext(String guildId, String voiceChannelId) {}
+
+    /** The {@code /player remove} option: a suggestion's {@code <position>|<uri prefix>}, or a position typed by hand. */
+    private record PickedTrack(int position, String uriPrefix) {
+        static Optional<PickedTrack> parse(String value) {
+            int separator = value.indexOf(MusicPlayerAutocompleteController.REMOVE_VALUE_SEPARATOR);
+            String position = separator < 0 ? value.trim() : value.substring(0, separator);
+            String uriPrefix = separator < 0 ? "" : value.substring(separator + 1);
+            try {
+                int parsed = Integer.parseInt(position);
+                return parsed > 0 ? Optional.of(new PickedTrack(parsed, uriPrefix)) : Optional.empty();
+            } catch (NumberFormatException e) {
+                return Optional.empty();
+            }
+        }
+    }
 }

@@ -80,6 +80,14 @@ public class MusicPlayerInteractionDispatcher {
                     pool.get(q.guildId()).ifPresentOrElse(
                             player -> player.snapshot(q.requestId()),
                             () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, q.requestId(), q.guildId())));
+            case MusicPlayerInteraction.Remove r ->
+                    pool.get(r.guildId()).ifPresentOrElse(
+                            player -> player.remove(r.position(), r.uriPrefix(), r.request()),
+                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, r.requestId(), r.guildId())));
+            case MusicPlayerInteraction.Shuffle s ->
+                    pool.get(s.guildId()).ifPresentOrElse(
+                            player -> player.shuffle(s.request()),
+                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, s.requestId(), s.guildId())));
             case MusicPlayerInteraction.SetVolume v ->
                     pool.get(v.guildId()).ifPresentOrElse(
                             player -> player.setVolume(v.volume(), v.request()),

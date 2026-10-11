@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
@@ -221,6 +223,32 @@ public class AudioPlayer implements AudioProvider {
         eventDispatcher.dispatch(new MusicPlayerEvent.Cleared(playerId, request, guildId, List.of()));
     }
 
+    /** {@code position} is 1-based over the upcoming tracks; an empty {@code uriPrefix} removes by position alone. */
+    public synchronized void remove(int position, String uriPrefix, Request request) {
+        List<Track> tracks = new ArrayList<>(queue);
+        int index = position - 1;
+        if (index < 0 || index >= tracks.size() || !hasUriPrefix(tracks.get(index), uriPrefix)) {
+            // the queue moved since the track was picked, so look for it by its uri
+            index = uriPrefix.isEmpty() ? -1 : indexOfUriPrefix(tracks, uriPrefix);
+        }
+        if (index < 0) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.TrackNotInQueue(playerId, request.id(), guildId));
+            return;
+        }
+        Track removed = tracks.remove(index);
+        queue.clear();
+        queue.addAll(tracks);
+        eventDispatcher.dispatch(new MusicPlayerEvent.Removed(playerId, request, guildId, removed.toMetadata(), upNext(), queue.size(), queueDurationMs()));
+    }
+
+    public synchronized void shuffle(Request request) {
+        List<Track> tracks = new ArrayList<>(queue);
+        Collections.shuffle(tracks);
+        queue.clear();
+        queue.addAll(tracks);
+        eventDispatcher.dispatch(new MusicPlayerEvent.Shuffled(playerId, request, guildId, queue.size(), upNext()));
+    }
+
     /** Pauses because nobody is listening; only a playing, unpaused track is paused. */
     public synchronized void autoPause() {
         if (engine.getPlayingTrack().isEmpty() || engine.isPaused()) {
@@ -276,6 +304,19 @@ public class AudioPlayer implements AudioProvider {
 
     private static String randomId() {
         return UUID.randomUUID().toString();
+    }
+
+    private static boolean hasUriPrefix(Track track, String uriPrefix) {
+        return uriPrefix.isEmpty() || (track.uri() != null && track.uri().startsWith(uriPrefix));
+    }
+
+    private static int indexOfUriPrefix(List<Track> tracks, String uriPrefix) {
+        for (int index = 0; index < tracks.size(); index++) {
+            if (hasUriPrefix(tracks.get(index), uriPrefix)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private void dispatchQueueUpdated() {

@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Search.class, name = "search"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.HealthCheck.class, name = "health_check"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.QueueRequest.class, name = "queue_request"),
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.Remove.class, name = "remove"),
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.Shuffle.class, name = "shuffle"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.SetVolume.class, name = "set_volume")
 })
 public sealed interface MusicPlayerInteraction permits
@@ -34,6 +36,8 @@ public sealed interface MusicPlayerInteraction permits
         MusicPlayerInteraction.Search,
         MusicPlayerInteraction.HealthCheck,
         MusicPlayerInteraction.QueueRequest,
+        MusicPlayerInteraction.Remove,
+        MusicPlayerInteraction.Shuffle,
         MusicPlayerInteraction.SetVolume {
 
     String playerId();
@@ -69,6 +73,17 @@ public sealed interface MusicPlayerInteraction permits
         @Override public String playerId() { return ""; }
     }
     record QueueRequest(String playerId, String requestId, String guildId) implements MusicPlayerInteraction {}
+    /**
+     * {@code position} is 1-based over the upcoming tracks. {@code uriPrefix} is the start of the picked track's uri,
+     * so the bear still finds it when the queue moved; it is empty when only a position was given.
+     */
+    record Remove(String playerId, Request request, String guildId, int position, String uriPrefix) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
+    record Shuffle(String playerId, Request request, String guildId) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
+
     record SetVolume(String playerId, Request request, String guildId, int volume) implements MusicPlayerInteraction {
         @Override public String requestId() { return request.id(); }
     }

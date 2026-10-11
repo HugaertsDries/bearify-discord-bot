@@ -97,6 +97,11 @@ class RedisMusicPlayer implements MusicPlayer {
     public void clear(String requesterTag, MusicPlayerEventListener handler) { state.clear(requesterTag, handler); }
 
     @Override
+    public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) { state.remove(position, uriPrefix, requesterTag, handler); }
+
+    @Override
+    public void shuffle(String requesterTag, MusicPlayerEventListener handler) { state.shuffle(requesterTag, handler); }
+    @Override
     public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { state.setVolume(volume, requesterTag, handler); }
 
     @Override
@@ -181,6 +186,16 @@ class RedisMusicPlayer implements MusicPlayer {
         @Override
         public void clear(String requesterTag, MusicPlayerEventListener handler) {
             refuse("clear", handler);
+        }
+
+        @Override
+        public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {
+            refuse("remove", handler);
+        }
+
+        @Override
+        public void shuffle(String requesterTag, MusicPlayerEventListener handler) {
+            refuse("shuffle", handler);
         }
 
         @Override
@@ -322,6 +337,29 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.Cleared ignored -> handler.onCleared();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for clear request", event.getClass().getSimpleName());
+                }
+            });
+        }
+
+        @Override
+        public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {
+            request(requestId -> new MusicPlayerInteraction.Remove(playerId, new Request(requestId, requesterTag), guildId, position, uriPrefix), handler, event -> {
+                switch (event) {
+                    case MusicPlayerEvent.Removed r -> handler.onRemoved(r.track());
+                    case MusicPlayerEvent.TrackNotInQueue ignored -> handler.onTrackNotInQueue();
+                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
+                    default -> LOG.warn("Unexpected event '{}' for remove request", event.getClass().getSimpleName());
+                }
+            });
+        }
+
+        @Override
+        public void shuffle(String requesterTag, MusicPlayerEventListener handler) {
+            request(requestId -> new MusicPlayerInteraction.Shuffle(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
+                switch (event) {
+                    case MusicPlayerEvent.Shuffled s -> handler.onShuffled(s.count());
+                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
+                    default -> LOG.warn("Unexpected event '{}' for shuffle request", event.getClass().getSimpleName());
                 }
             });
         }

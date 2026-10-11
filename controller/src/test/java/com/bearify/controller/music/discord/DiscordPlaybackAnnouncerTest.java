@@ -338,6 +338,57 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void labelsRemovalAndRefreshesUpNext() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        TrackMetadata one = new TrackMetadata("One", "Artist", "https://example.com/1", 60_000);
+        TrackMetadata two = new TrackMetadata("Two", "Artist", "https://example.com/2", 60_000);
+        TrackMetadata three = new TrackMetadata("Three", "Artist", "https://example.com/3", 60_000);
+        TrackMetadata four = new TrackMetadata("Four", "Artist", "https://example.com/4", 60_000);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1", List.of(one, two, three), 7, 900_000L));
+        announcer.accept(new MusicPlayerEvent.Removed("player-1", new Request("req-3", "@user"), "guild-1", two,
+                List.of(one, three, four), 6, 840_000L));
+
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Removed by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Four"));
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Two"));
+        assertThat(allTexts(updated.get())).contains("-# +3 more on the trail · 11m 00s");
+    }
+
+    @Test
+    void labelsShuffleAndKeepsCountingTheWholeQueue() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        TrackMetadata one = new TrackMetadata("One", "Artist", "https://example.com/1", 60_000);
+        TrackMetadata two = new TrackMetadata("Two", "Artist", "https://example.com/2", 60_000);
+        TrackMetadata three = new TrackMetadata("Three", "Artist", "https://example.com/3", 60_000);
+        TrackMetadata five = new TrackMetadata("Five", "Artist", "https://example.com/5", 60_000);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1", List.of(one, two, three), 7, 900_000L));
+        announcer.accept(new MusicPlayerEvent.Shuffled("player-1", new Request("req-3", "@user"), "guild-1", 7, List.of(five, one, three)));
+
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Shuffled by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Five"));
+        assertThat(allTexts(updated.get())).contains("-# +4 more on the trail · 12m 00s");
+    }
+
+    @Test
+    void ignoresEmptyShuffle() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        AtomicInteger deletes = new AtomicInteger();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), deletes, Duration.ofSeconds(15));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Shuffled("player-1", new Request("req-2", "@user"), "guild-1", 0, List.of()));
+
+        assertThat(updated.get()).isNull();
+        assertThat(deletes.get()).isZero();
+    }
+
+    @Test
     void truncatesLongTrackTitleAt45Characters() {
         AtomicReference<ComponentMessage> sent = new AtomicReference<>();
         MusicPlayerEventConsumer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
@@ -414,7 +465,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.AutoPaused("player-1", "req-2", "guild-1"));
 
-        assertThat(allTexts(updated.get())).contains("\uD83D\uDD14 Paused: it's lonely in here");
+        assertThat(allTexts(updated.get())).contains("Paused: it's lonely in here");
         assertThat(buttonLabels(updated.get())).contains(PLAYER_PLAY_LABEL);
     }
 
