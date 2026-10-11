@@ -7,6 +7,7 @@ import com.bearify.discord.api.message.ContainerChild;
 import com.bearify.discord.api.message.Divider;
 import com.bearify.discord.api.message.ImageBlock;
 import com.bearify.discord.api.message.Section;
+import com.bearify.discord.api.message.Spacer;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.model.TrackMetadata;
@@ -54,7 +55,7 @@ class QueueCardTest {
 
         List<ContainerChild> children = card(reply).containers().getFirst().children();
         assertThat(children).extracting(child -> child.getClass().getSimpleName())
-                .containsExactly("TextBlock", "Divider", "TextBlock", "Divider", "TextBlock", "Divider", "TextBlock");
+                .containsExactly("TextBlock", "Spacer", "TextBlock", "Divider", "TextBlock", "Divider", "Spacer", "TextBlock");
     }
 
     @Test
@@ -64,7 +65,7 @@ class QueueCardTest {
         List<String> texts = texts(reply);
         assertThat(texts).filteredOn(text -> text.startsWith("Song ")).hasSize(10);
         assertThat(texts).contains("Song 10\n-# Artist • 1m 00s\n").doesNotContain("Song 11\n-# Artist • 1m 00s\n");
-        assertThat(texts.getLast()).isEqualTo("-# …and 35 more\n-# 45 tracks · 45m 00s");
+        assertThat(texts.subList(texts.size() - 2, texts.size())).containsExactly("-# …and 35 more", "-# 45 tracks · 45m 00s");
     }
 
     @Test
@@ -181,6 +182,7 @@ class QueueCardTest {
             case TextBlock ignored -> 1;
             case Divider ignored -> 1;
             case ImageBlock ignored -> 1;
+            case Spacer ignored -> 1;
         };
     }
 }

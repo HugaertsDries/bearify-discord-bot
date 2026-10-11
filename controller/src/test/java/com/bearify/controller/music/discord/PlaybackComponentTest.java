@@ -11,6 +11,7 @@ import com.bearify.discord.api.message.ContainerChild;
 import com.bearify.discord.api.message.Divider;
 import com.bearify.discord.api.message.ImageBlock;
 import com.bearify.discord.api.message.Section;
+import com.bearify.discord.api.message.Spacer;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
@@ -76,12 +77,24 @@ class PlaybackComponentTest {
         ComponentMessage message = announcer.render(new PlaybackAnnouncerPresets("Footer").get(PlaybackAnnouncerPreset.HEAVY_QUEUE));
 
         Container upNext = message.containers().getLast();
-        assertThat(upNext.children().get(upNext.children().size() - 2)).isInstanceOf(Divider.class);
+        assertThat(upNext.children().get(upNext.children().size() - 3)).isInstanceOf(Divider.class);
+        assertThat(upNext.children().get(upNext.children().size() - 2)).isInstanceOf(Spacer.class);
         assertThat(upNext.children().getLast()).isInstanceOfSatisfying(Section.class, section -> {
             assertThat(section.texts()).containsExactly("-# +9 more on the trail · 35m 22s");
             assertThat(section.accessory()).hasValueSatisfying(accessory -> assertThat(accessory)
                     .isEqualTo(new InteractiveButton(ButtonStyle.SECONDARY, "player:queue", "Show")));
         });
+    }
+
+    @Test
+    void stretchesUpNextRightUnderItsHeader() {
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+
+        ComponentMessage message = announcer.render(new PlaybackAnnouncerPresets("Footer").get(PlaybackAnnouncerPreset.BROADCAST));
+
+        Container upNext = message.containers().getLast();
+        assertThat(upNext.children().getFirst()).isInstanceOf(Section.class);
+        assertThat(upNext.children().get(1)).isInstanceOf(Spacer.class);
     }
 
     @Test
@@ -139,6 +152,7 @@ class PlaybackComponentTest {
             case TextBlock ignored -> 1;
             case Divider ignored -> 1;
             case ImageBlock ignored -> 1;
+            case Spacer ignored -> 1;
         };
     }
 

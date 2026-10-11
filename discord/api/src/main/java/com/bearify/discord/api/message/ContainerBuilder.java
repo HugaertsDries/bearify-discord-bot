@@ -33,6 +33,12 @@ public final class ContainerBuilder {
         return this;
     }
 
+    /** Stretches this container to the full message width, which a container holding only text does not get on its own. */
+    public ContainerBuilder spacer() {
+        children.add(new Spacer());
+        return this;
+    }
+
     public ContainerBuilder section(Consumer<SectionBuilder> consumer) {
         SectionBuilder builder = new SectionBuilder();
         consumer.accept(builder);

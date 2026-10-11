@@ -10,6 +10,7 @@ import com.bearify.discord.api.message.InteractiveButton;
 import com.bearify.discord.api.message.LinkButton;
 import com.bearify.discord.api.message.Section;
 import com.bearify.discord.api.message.SectionAccessory;
+import com.bearify.discord.api.message.Spacer;
 import com.bearify.discord.api.message.Spacing;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.discord.api.message.TopLevelItem;
@@ -22,10 +23,18 @@ import net.dv8tion.jda.api.components.section.SectionAccessoryComponent;
 import net.dv8tion.jda.api.components.separator.Separator;
 import net.dv8tion.jda.api.components.thumbnail.Thumbnail;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
+import net.dv8tion.jda.api.utils.FileUpload;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 
 final class ComponentMessageMapper {
+
+    // shortcut: spacer is an uploaded transparent image, Discord has no width setting; if edits stop resolving attachment://, fall back to a hosted URL behind the same Spacer mapping
+    private static final String SPACER_FILE = "spacer.png";
+    private static final byte[] SPACER_IMAGE = readSpacerImage();
 
     List<MessageTopLevelComponent> toJdaComponents(ComponentMessage message) {
         return message.items().stream()
@@ -54,6 +63,15 @@ final class ComponentMessageMapper {
         };
     }
 
+    /** The files a message must carry: the spacer image when it uses a {@link Spacer}, nothing otherwise. */
+    List<FileUpload> filesFor(ComponentMessage message) {
+        boolean usesSpacer = message.containers().stream()
+                .flatMap(container -> container.children().stream())
+                .anyMatch(Spacer.class::isInstance);
+        // a FileUpload is read once when sent, so every message gets a fresh one
+        return usesSpacer ? List.of(FileUpload.fromData(SPACER_IMAGE, SPACER_FILE)) : List.of();
+    }
+
     private List<ContainerChildComponent> toContainerChildren(ContainerChild child) {
         return switch (child) {
             case TextBlock textBlock -> List.of(TextDisplay.of(textBlock.text()));
@@ -63,6 +81,8 @@ final class ComponentMessageMapper {
             ));
             case Section section -> toSection(section);
             case ImageBlock imageBlock -> List.of(toMediaGallery(imageBlock));
+            // a wide transparent image stretches the container; the image itself travels as an attachment, see filesFor
+            case Spacer ignored -> List.of(MediaGallery.of(MediaGalleryItem.fromUrl("attachment://" + SPACER_FILE)));
         };
     }
 
@@ -84,15 +104,32 @@ final class ComponentMessageMapper {
         return switch (accessory) {
             case InteractiveButton button -> toButton(button);
             case LinkButton linkButton -> Button.link(linkButton.url(), linkButton.label());
-            case com.bearify.discord.api.message.Thumbnail thumbnail ->
-                    Thumbnail.fromUrl(thumbnail.url()).withDescription(thumbnail.description());
+            case com.bearify.discord.api.message.Thumbnail thumbnail -> {
+                Thumbnail jdaThumbnail = Thumbnail.fromUrl(thumbnail.url());
+                yield isBlank(thumbnail.description()) ? jdaThumbnail : jdaThumbnail.withDescription(thumbnail.description());
+            }
         };
     }
 
     private MediaGallery toMediaGallery(ImageBlock imageBlock) {
-        return MediaGallery.of(
-                MediaGalleryItem.fromUrl(imageBlock.url()).withDescription(imageBlock.description())
-        );
+        MediaGalleryItem item = MediaGalleryItem.fromUrl(imageBlock.url());
+        return MediaGallery.of(isBlank(imageBlock.description()) ? item : item.withDescription(imageBlock.description()));
+    }
+
+    // Discord's description is optional, but JDA rejects a blank one, so a decorative image simply has none
+    private static boolean isBlank(String description) {
+        return description == null || description.isBlank();
+    }
+
+    private static byte[] readSpacerImage() {
+        try (InputStream image = ComponentMessageMapper.class.getResourceAsStream(SPACER_FILE)) {
+            if (image == null) {
+                throw new IllegalStateException(SPACER_FILE + " is missing from the classpath");
+            }
+            return image.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private Separator.Spacing toJdaSpacing(Spacing spacing) {

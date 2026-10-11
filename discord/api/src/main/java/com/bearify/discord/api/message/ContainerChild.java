@@ -1,6 +1,6 @@
 package com.bearify.discord.api.message;
 
-public sealed interface ContainerChild permits TextBlock, Divider, ActionRow, Section, ImageBlock {
+public sealed interface ContainerChild permits TextBlock, Divider, ActionRow, Section, ImageBlock, Spacer {
 
     Kind kind();
 
@@ -9,6 +9,7 @@ public sealed interface ContainerChild permits TextBlock, Divider, ActionRow, Se
         SEPARATOR,
         ACTION_ROW,
         MEDIA_SECTION,
-        IMAGE_BLOCK
+        IMAGE_BLOCK,
+        SPACER
     }
 }

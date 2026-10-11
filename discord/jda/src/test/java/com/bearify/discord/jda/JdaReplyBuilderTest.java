@@ -7,8 +7,13 @@ import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
+import net.dv8tion.jda.api.utils.FileUpload;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.util.Collection;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -77,6 +82,7 @@ class JdaReplyBuilderTest {
         new JdaReplyBuilder(event, CARD, false).ephemeral().send();
 
         verify(followUp).useComponentsV2();
+        verify(followUp, never()).addFiles(anyCollection());
         verify(followUp).setEphemeral(true);
         verify(followUp).queue(isNull(), any());
         verify(hook, never()).sendMessage(anyString());
@@ -92,6 +98,7 @@ class JdaReplyBuilderTest {
         when(event.getHook()).thenReturn(hook);
         when(hook.editOriginalComponents(anyCollection())).thenReturn(edit);
         when(edit.useComponentsV2()).thenReturn(edit);
+        when(edit.setFiles(anyCollection())).thenReturn(edit);
 
         new JdaReplyBuilder(event, CARD, true).ephemeral().send();
 
@@ -130,5 +137,68 @@ class JdaReplyBuilderTest {
         verify(reply).setEphemeral(false);
         verify(reply).queue(isNull(), any());
         verify(event, never()).getHook();
+    }
+
+    // --- SPACER ---
+
+    private static final ComponentMessage SPACER_CARD = ComponentMessage.builder("card")
+            .container(container -> container.text("### Up Next").spacer())
+            .build();
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void attachesSpacerImageToFollowUp() {
+        IReplyCallback event = mock(IReplyCallback.class);
+        InteractionHook hook = mock(InteractionHook.class);
+        WebhookMessageCreateAction<Message> followUp = mock(WebhookMessageCreateAction.class);
+        when(event.isAcknowledged()).thenReturn(true);
+        when(event.getHook()).thenReturn(hook);
+        when(hook.sendMessageComponents(anyCollection())).thenReturn(followUp);
+        when(followUp.useComponentsV2()).thenReturn(followUp);
+        when(followUp.addFiles(anyCollection())).thenReturn(followUp);
+        when(followUp.setEphemeral(true)).thenReturn(followUp);
+
+        new JdaReplyBuilder(event, SPACER_CARD, false).ephemeral().send();
+
+        ArgumentCaptor<Collection<FileUpload>> files = ArgumentCaptor.forClass(Collection.class);
+        verify(followUp).addFiles(files.capture());
+        assertThat(files.getValue()).extracting(FileUpload::getName).containsExactly("spacer.png");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void attachesSpacerImageWhenEditingDeferredReply() {
+        IReplyCallback event = mock(IReplyCallback.class);
+        InteractionHook hook = mock(InteractionHook.class);
+        WebhookMessageEditAction<Message> edit = mock(WebhookMessageEditAction.class);
+        when(event.isAcknowledged()).thenReturn(true);
+        when(event.getHook()).thenReturn(hook);
+        when(hook.editOriginalComponents(anyCollection())).thenReturn(edit);
+        when(edit.useComponentsV2()).thenReturn(edit);
+        when(edit.setFiles(anyCollection())).thenReturn(edit);
+
+        new JdaReplyBuilder(event, SPACER_CARD, true).send();
+
+        ArgumentCaptor<Collection<FileUpload>> files = ArgumentCaptor.forClass(Collection.class);
+        verify(edit).setFiles(files.capture());
+        assertThat(files.getValue()).extracting(FileUpload::getName).containsExactly("spacer.png");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void attachesSpacerImageToDirectReply() {
+        IReplyCallback event = mock(IReplyCallback.class);
+        ReplyCallbackAction reply = mock(ReplyCallbackAction.class);
+        when(event.isAcknowledged()).thenReturn(false);
+        when(event.replyComponents(anyCollection())).thenReturn(reply);
+        when(reply.useComponentsV2()).thenReturn(reply);
+        when(reply.addFiles(anyCollection())).thenReturn(reply);
+        when(reply.setEphemeral(true)).thenReturn(reply);
+
+        new JdaReplyBuilder(event, SPACER_CARD, false).ephemeral().send();
+
+        ArgumentCaptor<Collection<FileUpload>> files = ArgumentCaptor.forClass(Collection.class);
+        verify(reply).addFiles(files.capture());
+        assertThat(files.getValue()).extracting(FileUpload::getName).containsExactly("spacer.png");
     }
 }

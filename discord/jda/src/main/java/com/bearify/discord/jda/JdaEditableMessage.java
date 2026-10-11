@@ -28,6 +28,7 @@ class JdaEditableMessage implements EditableMessage {
 
     @Override
     public void edit(ComponentMessage message) {
-        hook.editOriginalComponents(new ComponentMessageMapper().toJdaComponents(message)).useComponentsV2().complete();
+        ComponentMessageMapper mapper = new ComponentMessageMapper();
+        hook.editOriginalComponents(mapper.toJdaComponents(message)).useComponentsV2().setFiles(mapper.filesFor(message)).complete();
     }
 }

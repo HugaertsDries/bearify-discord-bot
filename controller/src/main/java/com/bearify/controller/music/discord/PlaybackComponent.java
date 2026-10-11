@@ -81,6 +81,7 @@ public class PlaybackComponent {
                 section.button(new InteractiveButton(SECONDARY, "player:clear", "Clear"));
                 section.text("### Up Next");
             });
+            container.spacer();
             TrackMetadata first = state.upNext().getFirst();
             container.text("""
                     **%s**
@@ -98,6 +99,7 @@ public class PlaybackComponent {
             int more = state.queueSize() - state.upNext().size();
             if (more > 0) {
                 container.separator();
+                container.spacer();
                 container.section(section -> {
                     section.button(new InteractiveButton(SECONDARY, "player:queue", PLAYER_SHOW_QUEUE_LABEL));
                     section.text("-# +" + more + " more on the trail" + moreLength(state).map(length -> " · " + length).orElse(""));

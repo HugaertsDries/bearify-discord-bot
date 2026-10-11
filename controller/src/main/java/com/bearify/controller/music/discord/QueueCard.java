@@ -82,20 +82,24 @@ final class QueueCard {
             container.text(header);
             current.ifPresent(track -> container.text("-# Now playing: " + escaped(truncate(track.title(), 50))
                     + " — " + escaped(truncate(track.author(), 50))));
-            container.separator();
+            container.spacer();
             PlaybackComponent.appendTrackRows(container, rows, QueueCard::escaped);
             container.separator();
-            container.text(footer(tracks, tracks.size() - rows.size()));
+            int unlisted = tracks.size() - rows.size();
+            if (unlisted > 0) {
+                container.text("-# …and " + unlisted + " more");
+            }
+            container.spacer();
+            container.text(footer(tracks));
         }).build();
     }
 
-    private static String footer(List<TrackMetadata> tracks, int unlisted) {
-        String more = unlisted > 0 ? "-# …and " + unlisted + " more\n" : "";
+    private static String footer(List<TrackMetadata> tracks) {
         String count = tracks.size() == 1 ? "1 track" : tracks.size() + " tracks";
         List<Long> known = tracks.stream().map(TrackMetadata::durationMs).filter(ms -> ms != LIVE_DURATION).toList();
         // live streams have no length to add up
         String total = known.isEmpty() ? "" : " · " + PlaybackComponent.total(Duration.ofMillis(known.stream().mapToLong(Long::longValue).sum()));
-        return more + "-# " + count + total;
+        return "-# " + count + total;
     }
 
     private static String escaped(String text) {

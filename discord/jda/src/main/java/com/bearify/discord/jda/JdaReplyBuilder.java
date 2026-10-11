@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
+import net.dv8tion.jda.api.utils.FileUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,12 @@ class JdaReplyBuilder implements ReplyBuilder {
     }
 
     JdaReplyBuilder(IReplyCallback event, ComponentMessage message, boolean editsDeferredReply) {
-        this(event, new Components(new ComponentMessageMapper().toJdaComponents(message)), editsDeferredReply);
+        this(event, components(message), editsDeferredReply);
+    }
+
+    private static Components components(ComponentMessage message) {
+        ComponentMessageMapper mapper = new ComponentMessageMapper();
+        return new Components(mapper.toJdaComponents(message), mapper.filesFor(message));
     }
 
     private JdaReplyBuilder(IReplyCallback event, Content content, boolean editsDeferredReply) {
@@ -88,20 +94,23 @@ class JdaReplyBuilder implements ReplyBuilder {
         }
     }
 
-    private record Components(List<MessageTopLevelComponent> components) implements Content {
+    private record Components(List<MessageTopLevelComponent> components, List<FileUpload> files) implements Content {
         @Override
         public WebhookMessageEditAction<Message> editOriginal(InteractionHook hook) {
-            return hook.editOriginalComponents(components).useComponentsV2();
+            // replaces the attachments, so the "thinking…" message ends up with exactly the files this message needs
+            return hook.editOriginalComponents(components).useComponentsV2().setFiles(files);
         }
 
         @Override
         public WebhookMessageCreateAction<Message> followUp(InteractionHook hook) {
-            return hook.sendMessageComponents(components).useComponentsV2();
+            WebhookMessageCreateAction<Message> followUp = hook.sendMessageComponents(components).useComponentsV2();
+            return files.isEmpty() ? followUp : followUp.addFiles(files);
         }
 
         @Override
         public ReplyCallbackAction reply(IReplyCallback event) {
-            return event.replyComponents(components).useComponentsV2();
+            ReplyCallbackAction reply = event.replyComponents(components).useComponentsV2();
+            return files.isEmpty() ? reply : reply.addFiles(files);
         }
     }
 }
