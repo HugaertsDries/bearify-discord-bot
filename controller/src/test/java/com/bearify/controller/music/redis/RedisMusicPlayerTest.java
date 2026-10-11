@@ -3,6 +3,7 @@ package com.bearify.controller.music.redis;
 import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
+import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
@@ -46,6 +47,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
     private static final TrackMetadata TRACK = new TrackMetadata("One More Time", "Daft Punk", "https://youtu.be/one-more-time", 320_000);
 
     @Autowired MusicPlayerPool pool;
+    @Autowired MusicPlayerAnnouncementRegistry announcementRegistry;
     @Autowired StringRedisTemplate redis;
     @Autowired ObjectMapper objectMapper;
 
@@ -302,6 +304,29 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(queued.get()).isEqualTo(TRACK));
             // outlasts the 500ms interaction timeout
             await().during(1, TimeUnit.SECONDS).atMost(2, TimeUnit.SECONDS).until(() -> !timedOut.get());
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
+    void dropsItsAnnouncerWhenBearHasNoPlayerForPlay() throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        // other tests leave announcers behind for the same bear
+        announcementRegistry.removeAll(PLAYER_ID, GUILD_ID);
+        AtomicBoolean failed = new AtomicBoolean(false);
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            player.play(new TrackRequest(QUERY, TEXT_CHANNEL_ID, REQUESTER_TAG), new MusicPlayerEventListener() {
+                @Override public void onFailed(String reason) { failed.set(true); }
+            });
+            publish(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, nextInteraction(received).requestId(), GUILD_ID));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(failed.get()).isTrue());
+            assertThat(announcementRegistry.findAll(PLAYER_ID, GUILD_ID)).isEmpty();
         } finally {
             container.stop();
         }

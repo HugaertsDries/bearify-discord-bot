@@ -82,6 +82,7 @@ class VoiceConnectionManagerTest {
     }
 
     @Autowired VoiceConnectionManager voiceConnectionManager;
+    @Autowired AudioPlayerPool pool;
     @Autowired FakeDiscordClient discordClient;
     @Autowired RedisConnectionFactory connectionFactory;
     @Autowired ObjectMapper objectMapper;
@@ -206,6 +207,25 @@ class VoiceConnectionManagerTest {
     }
 
     @Test
+    void stopsKickedBearOnceWhenItHasNoVoiceSession() throws Exception {
+        List<MusicPlayerEvent> stopped = new java.util.concurrent.CopyOnWriteArrayList<>();
+        startListener(body -> {
+            if (parseEvent(body) instanceof MusicPlayerEvent.Stopped event) stopped.add(event);
+        });
+        // a player without a voice session: what a kick leaves behind
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.DISCONNECTED);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.DISCONNECTED);
+        voiceConnectionManager.disconnect(GUILD_ID, "req-marker", StopReason.REQUESTED);
+
+        // the listener may deliver out of order, so hold the result for a while to catch a late second Stopped
+        await().during(Duration.ofMillis(500)).atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(stopped)
+                .extracting(event -> ((MusicPlayerEvent.Stopped) event).reason())
+                .containsExactlyInAnyOrder(StopReason.DISCONNECTED, StopReason.REQUESTED));
+    }
+
+    @Test
     void doesNothingWhenDisconnectingWithoutActiveGuild() {
         voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
@@ -260,6 +280,55 @@ class VoiceConnectionManagerTest {
 
         voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
+    }
+
+    @Test
+    void migratesAssignmentWhenConnectMovesLonelyBear() throws Exception {
+        AtomicReference<Boolean> oldKeyGoneAtReady = new AtomicReference<>();
+        startListener(body -> {
+            if (parseEvent(body) instanceof MusicPlayerEvent.Ready) {
+                oldKeyGoneAtReady.set(!redis.hasKey(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID)));
+            }
+        });
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        // the controller only sends Connect once channel B is assigned to this bear
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID_2), PLAYER_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID_2, GUILD_ID));
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID_2);
+
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> assertThat(oldKeyGoneAtReady.get()).isTrue());
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID_2))).isEqualTo(PLAYER_ID);
+        assertThat(redis.getExpire(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID_2))).isGreaterThan(0);
+    }
+
+    @Test
+    void keepsOtherAgentsAssignmentWhenStoppingSentOutBear() {
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        AudioPlayer player = pool.get(GUILD_ID).orElseThrow();
+        discordClient.guild(GUILD_ID).voice().orElseThrow().leave();
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "other-player");
+
+        voiceConnectionManager.stopSentOut(GUILD_ID, VOICE_CHANNEL_ID, player);
+
+        assertThat(pool.get(GUILD_ID)).isEmpty();
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo("other-player");
+    }
+
+    @Test
+    void rejectsConnectMoveIntoAnotherBearsChannel() throws Exception {
+        AtomicReference<MusicPlayerEvent> received = new AtomicReference<>();
+        startListener(body -> received.set(parseEvent(body)));
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID_2), "other-player");
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID_2, GUILD_ID));
+
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                assertThat(received.get()).isInstanceOf(MusicPlayerEvent.ConnectFailed.class));
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID_2))).isEqualTo("other-player");
     }
 
     // --- ASSIGNMENT KEY CLEANUP ---

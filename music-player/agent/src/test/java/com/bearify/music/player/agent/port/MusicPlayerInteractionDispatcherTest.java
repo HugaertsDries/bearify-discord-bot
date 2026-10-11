@@ -72,6 +72,7 @@ class MusicPlayerInteractionDispatcherTest {
     @Test
     void routesPlayQueryToLoader() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
         RecordingTrackLoader loader = new RecordingTrackLoader();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, loader, null, null, PLAYER_ID);
@@ -144,6 +145,7 @@ class MusicPlayerInteractionDispatcherTest {
     @Test
     void routesPlaylistToPlayPlaylist() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
         AudioTrackLoader loader = new AudioTrackLoader() {
             @Override
             public void load(String query, String requesterTag, AudioTrackLoadCallback callback) {
@@ -182,7 +184,7 @@ class MusicPlayerInteractionDispatcherTest {
         };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), primedPool(), loader, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("song a", TEXT_CHANNEL_ID, null)));
 
@@ -205,12 +207,27 @@ class MusicPlayerInteractionDispatcherTest {
         };
         RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), loader, eventDispatcher, null, PLAYER_ID);
+                new RecordingVoiceConnectionManager(), primedPool(), loader, eventDispatcher, null, PLAYER_ID);
 
         dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("empty list", TEXT_CHANNEL_ID, null)));
 
         assertThat(eventDispatcher.events)
                 .containsExactly(new MusicPlayerEvent.TrackNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID, "empty list"));
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenPlayingWithoutPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        RecordingTrackLoader loader = new RecordingTrackLoader();
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, loader, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Play(PLAYER_ID, REQUEST_ID, GUILD_ID, new TrackRequest("song a", TEXT_CHANNEL_ID, null)));
+
+        assertThat(eventDispatcher.events).containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+        assertThat(loader.loadCalls).isEmpty();
+        assertThat(pool.get(GUILD_ID)).isEmpty();
     }
 
     @Test
@@ -325,6 +342,12 @@ class MusicPlayerInteractionDispatcherTest {
         dispatcher.handle(new MusicPlayerInteraction.Search(REQUEST_ID, GUILD_ID, "daft punk", 5));
 
         assertThat(pool.get(GUILD_ID)).isEmpty();
+    }
+
+    private StubAudioPlayerPool primedPool() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        return pool;
     }
 
     // --- STUB ---

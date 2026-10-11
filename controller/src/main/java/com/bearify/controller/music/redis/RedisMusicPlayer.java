@@ -224,13 +224,18 @@ class RedisMusicPlayer implements MusicPlayer {
 
         @Override
         public void play(TrackRequest request, MusicPlayerEventListener handler) {
-            announcementRegistry.subscribe(playerId, guildId, trackAnnouncerFactory.create(request.textChannelId()));
+            var announcer = trackAnnouncerFactory.create(request.textChannelId());
+            announcementRegistry.subscribe(playerId, guildId, announcer);
             request(requestId -> new MusicPlayerInteraction.Play(playerId, requestId, guildId, request), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.TrackQueued q -> handler.onTrackQueued(q.track(), q.queuedCount());
                     case MusicPlayerEvent.TrackNotFound t -> handler.onTrackNotFound(t.query());
                     case MusicPlayerEvent.TrackLoadFailed t -> handler.onTrackLoadFailed(t.reason());
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
+                    case MusicPlayerEvent.PlayerNotFound ignored -> {
+                        // no track will ever start for it, so it would only post a duplicate player later
+                        announcementRegistry.unsubscribe(playerId, guildId, announcer);
+                        handler.onFailed("No player found in channel");
+                    }
                     default -> LOG.warn("Unexpected event '{}' for play request", event.getClass().getSimpleName());
                 }
             });

@@ -26,6 +26,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     static final String NOBODY_LISTENING_NOTICE = "Paused: it's lonely in here";
     static final String NOBODY_LISTENING_LEAVE_NOTE = BearifyEmoji.BEAR + " | Nobody was listening, so I wandered back to my cave.";
     static final String IDLE_LEAVE_NOTE = BearifyEmoji.BEAR + " | Nothing left to play, so I went for a nap.";
+    static final String DISCONNECTED_LEAVE_NOTE = BearifyEmoji.BEAR + " | I got disconnected from the voice channel, so I packed up.";
     // Shared by all announcers: one daemon thread instead of one per announcer that is never shut down
     private static final ScheduledExecutorService ACTION_TIMEOUTS =
             Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
@@ -133,7 +134,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         Optional<String> note = switch (event.reason()) {
             case NOBODY_LISTENING -> Optional.of(NOBODY_LISTENING_LEAVE_NOTE);
             case IDLE -> Optional.of(IDLE_LEAVE_NOTE);
-            case REQUESTED, DISCONNECTED -> Optional.empty();
+            case DISCONNECTED -> Optional.of(DISCONNECTED_LEAVE_NOTE);
+            case REQUESTED -> Optional.empty();
         };
         note.ifPresent(text -> {
             try {

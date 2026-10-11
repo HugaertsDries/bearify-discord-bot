@@ -16,6 +16,13 @@ public class MusicPlayerAnnouncementRegistry {
         return subscriptions.getOrDefault(new Key(playerId, guildId), Set.of());
     }
 
+    public void unsubscribe(String playerId, String guildId, MusicPlayerEventConsumer announcer) {
+        subscriptions.computeIfPresent(new Key(playerId, guildId), (ignored, announcers) -> {
+            announcers.remove(announcer);
+            return announcers.isEmpty() ? null : announcers;
+        });
+    }
+
     public void removeAll(String playerId, String guildId) {
         subscriptions.remove(new Key(playerId, guildId));
     }

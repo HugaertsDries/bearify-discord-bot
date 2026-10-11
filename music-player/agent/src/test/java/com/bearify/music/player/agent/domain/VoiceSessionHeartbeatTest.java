@@ -15,7 +15,9 @@ import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.domain.VoiceSessionHeartbeatTest.TestConfig;
+import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
@@ -63,6 +65,9 @@ class VoiceSessionHeartbeatTest {
 
     private static final String GUILD_ID = "guild-1";
     private static final String CHANNEL_ID = "voice-1";
+    private static final String OTHER_CHANNEL_ID = "voice-2";
+    private static final String PLAYER_ID = "test-player";
+    private static final String OTHER_PLAYER_ID = "other-player";
 
     private static final GenericContainer<?> REDIS =
             new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
@@ -96,7 +101,10 @@ class VoiceSessionHeartbeatTest {
         ((Map<?, ?>) ReflectionTestUtils.getField(pool, "entries")).clear();
         ((Map<?, ?>) ReflectionTestUtils.getField(heartbeat, "nobodyListeningSince")).clear();
         ((Map<?, ?>) ReflectionTestUtils.getField(heartbeat, "idleSince")).clear();
+        ((Map<?, ?>) ReflectionTestUtils.getField(heartbeat, "connectedChannels")).clear();
         redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID));
+        redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, OTHER_CHANNEL_ID));
+        redis.delete(PlayerRedisProtocol.Keys.connectRequest("req-3"));
     }
 
     @Test
@@ -303,19 +311,143 @@ class VoiceSessionHeartbeatTest {
     }
 
     @Test
-    void clearsTrackingWhenSessionDisappears() {
+    void stopsPlayerWhenBearWasDisconnectedFromVoice() {
+        pool.getOrCreate(GUILD_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        heartbeat.maintain();
+
+        discordClient.guild(GUILD_ID).simulateLeft();
+        heartbeat.maintain();
+        heartbeat.maintain();
+
+        assertThat(recordingManager.stopReason(GUILD_ID)).contains(StopReason.DISCONNECTED);
+        assertThat(recordingManager.disconnectCallsFor(GUILD_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void closesKickedBearsPlayerAndStopsItOnce() {
+        VoiceConnectionManager manager = realManager();
+        VoiceSessionHeartbeat realHeartbeat = heartbeatWith(manager);
+        manager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-1", CHANNEL_ID, GUILD_ID));
+        realHeartbeat.maintain();
+
+        discordClient.guild(GUILD_ID).simulateLeft();
+        realHeartbeat.maintain();
+        realHeartbeat.maintain();
+
+        assertThat(pool.get(GUILD_ID)).isEmpty();
+        assertThat(redis.hasKey(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID))).isFalse();
+        assertThat(stopReasons()).containsExactly(StopReason.DISCONNECTED);
+    }
+
+    @Test
+    void keepsNewPlayerWhenStopAndRejoinFallWithinOneTick() {
+        VoiceConnectionManager manager = realManager();
+        VoiceSessionHeartbeat realHeartbeat = heartbeatWith(manager);
+        manager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-1", CHANNEL_ID, GUILD_ID));
+        realHeartbeat.maintain();
+
+        manager.disconnect(GUILD_ID, "req-2", StopReason.REQUESTED);
+        discordClient.guild(GUILD_ID).deferJoins();
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.connectRequest("req-3"), "1");
+        manager.claim(new JoinRequest("req-3", GUILD_ID, CHANNEL_ID));
+        AudioPlayer fresh = pool.get(GUILD_ID).orElseThrow();
+        realHeartbeat.maintain();
+        discordClient.guild(GUILD_ID).completeJoin();
+        realHeartbeat.maintain();
+
+        assertThat(pool.get(GUILD_ID)).containsSame(fresh);
+        assertThat(stopReasons()).containsExactly(StopReason.REQUESTED);
+    }
+
+    @Test
+    void keepsPlayerWhenKickedBearIsJoinedAgainMidTick() {
+        VoiceConnectionManager manager = realManager();
+        VoiceSessionHeartbeat realHeartbeat = heartbeatWith(manager);
+        manager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-1", CHANNEL_ID, GUILD_ID));
+        AudioPlayer player = pool.get(GUILD_ID).orElseThrow();
+        realHeartbeat.maintain();
+
+        discordClient.guild(GUILD_ID).simulateLeft();
+        discordClient.guild(GUILD_ID).deferJoins();
+        manager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-2", CHANNEL_ID, GUILD_ID));
+        realHeartbeat.maintain();
+        discordClient.guild(GUILD_ID).completeJoin();
+        realHeartbeat.maintain();
+
+        assertThat(pool.get(GUILD_ID)).containsSame(player);
+        assertThat(stopReasons()).isEmpty();
+    }
+
+    @Test
+    void retriesStopOnLaterTickWhenDisconnectFailsAfterBearWasSentOut() {
+        pool.getOrCreate(GUILD_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        heartbeat.maintain();
+        discordClient.guild(GUILD_ID).simulateLeft();
+        recordingManager.failNextDisconnect();
+
+        heartbeat.maintain();
+        heartbeat.maintain();
+
+        assertThat(recordingManager.disconnectCallsFor(GUILD_ID)).isEqualTo(2);
+        assertThat(recordingManager.stopReason(GUILD_ID)).contains(StopReason.DISCONNECTED);
+    }
+
+    @Test
+    void keepsPlayerWhileJoinHasNotCompleted() {
+        pool.getOrCreate(GUILD_ID);
+
+        heartbeat.maintain();
+        heartbeat.maintain();
+
+        assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
+        assertThat(pool.get(GUILD_ID)).isPresent();
+    }
+
+    @Test
+    void reassignsChannelWhenBearWasMoved() {
+        pool.getOrCreate(GUILD_ID);
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID), PLAYER_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        heartbeat.maintain();
+
+        discordClient.guild(GUILD_ID).simulateJoined(OTHER_CHANNEL_ID);
+        heartbeat.maintain();
+
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, OTHER_CHANNEL_ID))).isEqualTo(PLAYER_ID);
+        assertThat(redis.getExpire(PlayerRedisProtocol.Keys.assignment(GUILD_ID, OTHER_CHANNEL_ID))).isGreaterThan(0);
+        assertThat(redis.hasKey(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID))).isFalse();
+        assertThat(pool.get(GUILD_ID)).isPresent();
+        assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
+    }
+
+    @Test
+    void recreatesAssignmentWhenKeyIsMissing() {
         pool.getOrCreate(GUILD_ID);
         discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
 
         heartbeat.maintain();
-        clock.advance(Duration.ofMinutes(4));
-        discordClient.guild(GUILD_ID).simulateLeft();
-        heartbeat.maintain();
-        clock.advance(Duration.ofMinutes(4));
+
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID))).isEqualTo(PLAYER_ID);
+        assertThat(redis.getExpire(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID))).isGreaterThan(0);
+    }
+
+    @Test
+    void leavesOtherAgentsAssignmentUntouched() {
+        pool.getOrCreate(GUILD_ID);
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID), OTHER_PLAYER_ID);
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, OTHER_CHANNEL_ID), OTHER_PLAYER_ID);
         discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
         heartbeat.maintain();
 
-        assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
+        discordClient.guild(GUILD_ID).simulateJoined(OTHER_CHANNEL_ID);
+        heartbeat.maintain();
+        discordClient.guild(GUILD_ID).simulateLeft();
+        heartbeat.maintain();
+
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID))).isEqualTo(OTHER_PLAYER_ID);
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, OTHER_CHANNEL_ID))).isEqualTo(OTHER_PLAYER_ID);
     }
 
     @Test
@@ -346,6 +478,21 @@ class VoiceSessionHeartbeatTest {
 
         assertThat(recordingManager.disconnectCallsFor(GUILD_ID)).isEqualTo(2);
         assertThat(recordingManager.getDisconnectedGuilds()).contains(GUILD_ID);
+    }
+
+    private VoiceConnectionManager realManager() {
+        return new VoiceConnectionManager(discordClient, events, pool, redis, properties, PLAYER_ID, clock);
+    }
+
+    private VoiceSessionHeartbeat heartbeatWith(VoiceConnectionManager manager) {
+        return new VoiceSessionHeartbeat(pool, discordClient, redis, properties, manager, clock, PLAYER_ID);
+    }
+
+    private List<StopReason> stopReasons() {
+        return events.getEvents().stream()
+                .filter(MusicPlayerEvent.Stopped.class::isInstance)
+                .map(event -> ((MusicPlayerEvent.Stopped) event).reason())
+                .toList();
     }
 
     private AudioPlayer playingPlayer() {
@@ -436,6 +583,11 @@ class VoiceSessionHeartbeatTest {
         }
 
         @Override
+        public void stopSentOut(String guildId, String channelId, AudioPlayer player) {
+            disconnect(guildId, StopReason.DISCONNECTED);
+        }
+
+        @Override
         public void close() {
         }
 
@@ -521,6 +673,8 @@ class VoiceSessionHeartbeatTest {
 
         private String connectedChannelId;
         private boolean listeners = false;
+        private boolean deferJoins;
+        private Runnable pendingJoin = () -> {};
 
         @Override
         public Optional<VoiceSession> voice() {
@@ -552,8 +706,23 @@ class VoiceSessionHeartbeatTest {
 
         @Override
         public void join(String channelId, AudioProvider provider, VoiceSessionListener onJoined) {
-            connectedChannelId = channelId;
-            onJoined.onJoined(channelId);
+            pendingJoin = () -> {
+                connectedChannelId = channelId;
+                onJoined.onJoined(channelId);
+            };
+            if (!deferJoins) {
+                pendingJoin.run();
+            }
+        }
+
+        // JDA joins asynchronously: until then voice() stays empty
+        void deferJoins() {
+            deferJoins = true;
+        }
+
+        void completeJoin() {
+            deferJoins = false;
+            pendingJoin.run();
         }
 
         void simulateJoined(String channelId) {

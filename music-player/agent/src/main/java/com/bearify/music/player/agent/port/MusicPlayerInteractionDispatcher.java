@@ -84,7 +84,13 @@ public class MusicPlayerInteractionDispatcher {
     }
 
     private void loadAndPlay(MusicPlayerInteraction.Play play) {
-        var player = pool.getOrCreate(play.guildId());
+        // only Connect creates a player: a bear sent out of voice must not queue into a fresh, silent one
+        var found = pool.get(play.guildId());
+        if (found.isEmpty()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, play.requestId(), play.guildId()));
+            return;
+        }
+        var player = found.get();
         var trackRequest = play.trackRequest();
         loader.load(trackRequest.query(), trackRequest.requesterTag(), new AudioTrackLoader.AudioTrackLoadCallback() {
             @Override

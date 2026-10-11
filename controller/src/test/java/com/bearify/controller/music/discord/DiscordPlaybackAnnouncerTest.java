@@ -451,6 +451,19 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void postsLeaveNoteWhenStoppedForDisconnect() {
+        List<String> texts = new ArrayList<>();
+        AtomicInteger deletes = new AtomicInteger();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(deletes, texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-2", "guild-1", StopReason.DISCONNECTED));
+
+        assertThat(deletes.get()).isEqualTo(1);
+        assertThat(texts).containsExactly(DiscordPlaybackAnnouncer.DISCONNECTED_LEAVE_NOTE);
+    }
+
+    @Test
     void postsNoLeaveNoteWhenStopRequested() {
         List<String> texts = new ArrayList<>();
         MusicPlayerEventConsumer announcer = announcerWithTexts(new AtomicInteger(), texts);
