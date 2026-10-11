@@ -76,6 +76,10 @@ public class MusicPlayerInteractionDispatcher {
                     search(search);
             case MusicPlayerInteraction.HealthCheck check ->
                     healthProbe.run(check.requestId());
+            case MusicPlayerInteraction.QueueRequest q ->
+                    pool.get(q.guildId()).ifPresentOrElse(
+                            player -> player.snapshot(q.requestId()),
+                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, q.requestId(), q.guildId())));
         }
     }
 

@@ -19,7 +19,6 @@ import java.util.Optional;
 import java.util.Random;
 
 import static com.bearify.controller.music.discord.AnsweringListener.NO_PLAYER_MESSAGE;
-
 @DiscordController
 @InteractionGroup(value = "player", description = "Player commands")
 public class MusicPlayerCommandController {
@@ -277,6 +276,23 @@ public class MusicPlayerCommandController {
                                     answer(clearedMessage());
                                 }
                             });
+                        },
+                        () -> replyNoPlayer(interaction)
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
+    @Interaction(value = "queue", description = "I'll show you everything that's coming up on the trail")
+    public void queue(CommandInteraction interaction) {
+        requireVoiceSession(interaction).ifPresent(ctx ->
+                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
+                        player -> {
+                            EditableMessage message = interaction.defer(true);
+                            switch (QueueCard.wholeQueue(player.queue())) {
+                                case QueueCard.Text text -> message.edit(text.text());
+                                case QueueCard.Card card -> message.edit(card.message());
+                            }
                         },
                         () -> replyNoPlayer(interaction)
                 )

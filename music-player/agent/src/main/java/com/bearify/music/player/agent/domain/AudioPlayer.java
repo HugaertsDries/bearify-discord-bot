@@ -21,6 +21,9 @@ import java.util.concurrent.TimeUnit;
 public class AudioPlayer implements AudioProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(AudioPlayer.class);
+    private static final int UP_NEXT_SIZE = 3;
+    // LavaPlayer reports a stream's length as Long.MAX_VALUE
+    private static final long LIVE_DURATION = Long.MAX_VALUE;
 
     private final AudioEngine engine;
     private final AudioProvider audioProvider;
@@ -81,8 +84,7 @@ public class AudioPlayer implements AudioProvider {
             engine.play(track);
         } else {
             queue.addLast(track);
-            List<TrackMetadata> upNext = queue.stream().limit(3).map(Track::toMetadata).toList();
-            eventDispatcher.dispatch(new MusicPlayerEvent.QueueUpdated(playerId, randomId(), guildId, upNext));
+            dispatchQueueUpdated();
         }
     }
 
@@ -94,8 +96,7 @@ public class AudioPlayer implements AudioProvider {
         if (engine.getPlayingTrack().isEmpty()) {
             engine.play(queue.pollFirst());
         }
-        List<TrackMetadata> upNext = queue.stream().limit(3).map(Track::toMetadata).toList();
-        eventDispatcher.dispatch(new MusicPlayerEvent.QueueUpdated(playerId, randomId(), guildId, upNext));
+        dispatchQueueUpdated();
     }
 
     public synchronized void togglePause(Request request) {
@@ -226,6 +227,13 @@ public class AudioPlayer implements AudioProvider {
         return engine.getPlayingTrack().isEmpty() || (engine.isPaused() && !autoPaused);
     }
 
+    public synchronized void snapshot(String requestId) {
+        eventDispatcher.dispatch(new MusicPlayerEvent.QueueSnapshot(
+                playerId, requestId, guildId,
+                engine.getPlayingTrack().map(Track::toMetadata),
+                queue.stream().map(Track::toMetadata).toList()));
+    }
+
     public synchronized void close() {
         if (closed) return;
         closed = true;
@@ -247,14 +255,31 @@ public class AudioPlayer implements AudioProvider {
         return UUID.randomUUID().toString();
     }
 
+    private void dispatchQueueUpdated() {
+        eventDispatcher.dispatch(new MusicPlayerEvent.QueueUpdated(playerId, randomId(), guildId, upNext(), queue.size(), queueDurationMs()));
+    }
+
+    // the player message shows only the first few; queueSize and queueDurationMs tell it how much more there is
+    private List<TrackMetadata> upNext() {
+        return queue.stream().limit(UP_NEXT_SIZE).map(Track::toMetadata).toList();
+    }
+
+    private long queueDurationMs() {
+        return queue.stream().mapToLong(Track::duration).filter(ms -> ms != LIVE_DURATION).sum();
+    }
+
     private class TrackEventHandler implements AudioEngineListener {
 
         @Override
         public void onTrackStart(Track track) {
             List<TrackMetadata> upNext;
+            int queueSize;
+            long queueDurationMs;
             synchronized (AudioPlayer.this) {
                 justRestarted = false;
-                upNext = queue.stream().limit(3).map(Track::toMetadata).toList();
+                upNext = upNext();
+                queueSize = queue.size();
+                queueDurationMs = queueDurationMs();
             }
             LOG.info("Now playing: {} by {}", track.title(), track.author());
             eventDispatcher.dispatch(new MusicPlayerEvent.TrackStart(
@@ -262,7 +287,9 @@ public class AudioPlayer implements AudioProvider {
                     new Request(randomId(), track.requesterTag()),
                     guildId,
                     track.toMetadata(),
-                    upNext));
+                    upNext,
+                    queueSize,
+                    queueDurationMs));
         }
 
         @Override

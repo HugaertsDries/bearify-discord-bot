@@ -1,6 +1,7 @@
 package com.bearify.discord.jda;
 
 import com.bearify.discord.api.interaction.EditableMessage;
+import com.bearify.discord.api.message.ComponentMessage;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 
 import java.time.Instant;
@@ -23,5 +24,10 @@ class JdaEditableMessage implements EditableMessage {
     @Override
     public void edit(String message) {
         hook.editOriginal(message).complete();
+    }
+
+    @Override
+    public void edit(ComponentMessage message) {
+        hook.editOriginalComponents(new ComponentMessageMapper().toJdaComponents(message)).useComponentsV2().complete();
     }
 }

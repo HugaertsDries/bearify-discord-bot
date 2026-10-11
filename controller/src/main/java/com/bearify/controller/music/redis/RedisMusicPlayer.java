@@ -46,6 +46,7 @@ class RedisMusicPlayer implements MusicPlayer {
     private final MusicPlayerAnnouncementRegistry announcementRegistry;
     private final DiscordPlaybackAnnouncerFactory trackAnnouncerFactory;
     private final MusicPlayerPoolProperties properties;
+    private final RedisBroadcast broadcast;
 
     RedisMusicPlayer(Optional<String> playerId,
                      String guildId,
@@ -65,6 +66,7 @@ class RedisMusicPlayer implements MusicPlayer {
         this.announcementRegistry = announcementRegistry;
         this.trackAnnouncerFactory = trackAnnouncerFactory;
         this.properties = properties;
+        this.broadcast = new RedisBroadcast(redis, objectMapper, pendingInteractions);
     }
 
     @Override
@@ -93,6 +95,9 @@ class RedisMusicPlayer implements MusicPlayer {
 
     @Override
     public void clear(String requesterTag, MusicPlayerEventListener handler) { state.clear(requesterTag, handler); }
+
+    @Override
+    public Optional<MusicPlayerEvent> queue() { return state.queue(); }
 
     private String serialize(Object value) {
         try {
@@ -173,6 +178,12 @@ class RedisMusicPlayer implements MusicPlayer {
         @Override
         public void clear(String requesterTag, MusicPlayerEventListener handler) {
             refuse("clear", handler);
+        }
+
+        @Override
+        public Optional<MusicPlayerEvent> queue() {
+            LOG.warn("queue() called on player in Pending state for guild '{}'", guildId);
+            return Optional.empty();
         }
 
         // only reachable before join answered; answering keeps a deferred caller from hanging
@@ -298,6 +309,20 @@ class RedisMusicPlayer implements MusicPlayer {
                     default -> LOG.warn("Unexpected event '{}' for clear request", event.getClass().getSimpleName());
                 }
             });
+        }
+
+        @Override
+        public Optional<MusicPlayerEvent> queue() {
+            try {
+                return broadcast.request(
+                        PlayerRedisProtocol.Channels.interactions(playerId),
+                        requestId -> new MusicPlayerInteraction.QueueRequest(playerId, requestId, guildId),
+                        MusicPlayerEvent.class,
+                        properties.queueTimeout());
+            } catch (RuntimeException e) {
+                LOG.warn("Failed to send a queue request to the music players", e);
+                return Optional.empty();
+            }
         }
 
         // a timeout or a failed send also answers handler, so no action can leave the user waiting

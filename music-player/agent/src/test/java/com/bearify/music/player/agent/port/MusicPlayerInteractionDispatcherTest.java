@@ -226,6 +226,30 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
+    void routesQueueRequestToPlayerSnapshot() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.QueueRequest(PLAYER_ID, REQUEST_ID, GUILD_ID));
+
+        assertThat(pool.snapshotCalls).containsExactly(GUILD_ID + "|" + REQUEST_ID);
+    }
+
+    @Test
+    void answersPlayerNotFoundForQueueRequestWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.QueueRequest(PLAYER_ID, REQUEST_ID, GUILD_ID));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    @Test
     void dispatchesSearchInteractionToLoaderAndPublishesSearchResults() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         List<String> searchCalls = new ArrayList<>();
@@ -313,6 +337,7 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> rewindCalls = new ArrayList<>();
         final List<String> forwardCalls = new ArrayList<>();
         final List<String> playPlaylistCalls = new ArrayList<>();
+        final List<String> snapshotCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
 
@@ -379,6 +404,11 @@ class MusicPlayerInteractionDispatcherTest {
             @Override
             public void play(List<Track> tracks) {
                 playPlaylistCalls.add(guildId + "|" + tracks.size());
+            }
+
+            @Override
+            public void snapshot(String requestId) {
+                snapshotCalls.add(guildId + "|" + requestId);
             }
         }
 

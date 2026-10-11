@@ -3,7 +3,10 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.discord.api.message.TextBlock;
 import com.bearify.discord.testing.MockButtonInteraction;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -150,6 +153,66 @@ class MusicPlayerButtonControllerTest {
         assertThat(interaction.getReplies()).isEmpty();
     }
 
+    @Test
+    void sendsTracksBeyondThePlayerAsEphemeralCard() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        player.queue = Optional.of(new MusicPlayerEvent.QueueSnapshot("player-1", "req-1", "guild-1",
+                Optional.of(new TrackMetadata("Song", "Artist", "https://example.com/song", 60_000)),
+                List.of(
+                        new TrackMetadata("One", "Artist", "https://example.com/1", 60_000),
+                        new TrackMetadata("Two", "Artist", "https://example.com/2", 60_000),
+                        new TrackMetadata("Three", "Artist", "https://example.com/3", 60_000),
+                        new TrackMetadata("Four", "Artist", "https://example.com/4", 60_000))));
+        MockButtonInteraction interaction = buttonInteraction();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).queue(interaction);
+
+        assertThat(interaction.isAcknowledged()).isTrue();
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+        assertThat(interaction.getReplies().getFirst().getComponentMessage()).hasValueSatisfying(card ->
+                assertThat(card.containers().getFirst().children())
+                        .contains(new TextBlock("### Further up the trail"), new TextBlock("Four\n-# Artist • 1m 00s\n"))
+                        .doesNotContain(new TextBlock("Three\n-# Artist • 1m 00s\n")));
+    }
+
+    @Test
+    void answersPlainTextWhenNothingIsBeyondThePlayer() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        player.queue = Optional.of(new MusicPlayerEvent.QueueSnapshot("player-1", "req-1", "guild-1", Optional.empty(),
+                List.of(new TrackMetadata("One", "Artist", "https://example.com/1", 60_000))));
+        MockButtonInteraction interaction = buttonInteraction();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).queue(interaction);
+
+        assertThat(interaction.getReplies().getFirst().getComponentMessage()).isEmpty();
+        assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo(QueueCard.NOTHING_FURTHER_MESSAGE);
+    }
+
+    @Test
+    void answersFullQueueWithTimeoutWhenBearDoesNotAnswer() {
+        MockButtonInteraction interaction = buttonInteraction();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(new RecordingMusicPlayer()))).queue(interaction);
+
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("didn't answer in time");
+    }
+
+    @Test
+    void rejectsFullQueueFromAnotherVoiceChannel() {
+        MockButtonInteraction interaction = MockButtonInteraction.forButton("player:queue")
+                .guildId("guild-1")
+                .voiceChannelId("voice-other")
+                .build();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.empty())).queue(interaction);
+
+        assertThat(interaction.isAcknowledged()).isFalse();
+        assertThat(interaction.getReplies()).hasSize(1);
+        assertThat(interaction.getReplies().getFirst().getContent()).contains("same voice channel");
+    }
+
     private static MockButtonInteraction buttonInteraction() {
         return MockButtonInteraction.forButton("player:any")
                 .guildId("guild-1")
@@ -189,6 +252,7 @@ class MusicPlayerButtonControllerTest {
         private Duration forwardSeek;
         private String clearRequester;
         private Consumer<MusicPlayerEventListener> answer = handler -> {};
+        private Optional<MusicPlayerEvent> queue = Optional.empty();
 
         /** How the player answers every request, as the agent's reply would. */
         private void answerWith(Consumer<MusicPlayerEventListener> answer) {
@@ -241,6 +305,11 @@ class MusicPlayerButtonControllerTest {
         public void clear(String requesterTag, MusicPlayerEventListener handler) {
             clearRequester = requesterTag;
             answer.accept(handler);
+        }
+
+        @Override
+        public Optional<MusicPlayerEvent> queue() {
+            return queue;
         }
     }
 }

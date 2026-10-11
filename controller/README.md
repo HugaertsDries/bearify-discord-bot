@@ -50,6 +50,9 @@ Fast-forwards by the given number of seconds (default: 10s for tracks under 5 mi
 ### `/player clear`
 Clears the current playlist.
 
+### `/player queue`
+Shows you, privately, the whole queue as a card in the player's Up Next style: the track playing now, up to 10 rows, then "…and N more", and the track count and total time. When more than 3 tracks are queued, the player's Up Next ends with "+N more on the trail" and a **Show** button that privately lists the tracks the player doesn't show.
+
 ### `/poke [pokes]`
 Pokes the bear a number of times (default: 4) and reports the response latency of each poke.
 

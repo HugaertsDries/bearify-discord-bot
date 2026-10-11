@@ -4,6 +4,7 @@ import com.bearify.controller.music.discord.PlaybackComponentState;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +25,8 @@ public class PlaybackAnnouncerPresets {
                                 new TrackMetadata("Stairway to Heaven", "Led Zeppelin", "https://example.com/stairway", 482_000),
                                 new TrackMetadata("Comfortably Numb", "Pink Floyd", "https://example.com/comfortably-numb", 384_000)
                         ))
+                        .queueSize(3)
+                        .queueDuration(Duration.ofMillis(390_000 + 482_000 + 384_000))
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
                         .paused(true)
@@ -47,9 +50,11 @@ public class PlaybackAnnouncerPresets {
                         .upNext(List.of(
                                 new TrackMetadata("Go Your Own Way", "Fleetwood Mac", "https://example.com/go-your-own-way", 216_000),
                                 new TrackMetadata("Dream On", "Aerosmith", "https://example.com/dream-on", 267_000),
-                                new TrackMetadata("Kashmir", "Led Zeppelin", "https://example.com/kashmir", 515_000),
-                                new TrackMetadata("Paranoid Android", "Radiohead", "https://example.com/paranoid-android", 387_000)
+                                new TrackMetadata("Kashmir", "Led Zeppelin", "https://example.com/kashmir", 515_000)
                         ))
+                        // the bear sends the first three; nine more wait behind the Show button
+                        .queueSize(12)
+                        .queueDuration(Duration.ofMinutes(52))
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
                         .paused(false)

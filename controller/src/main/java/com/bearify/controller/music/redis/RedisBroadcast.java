@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-/** Broadcasts an interaction to every bear and waits for the first reply to it. */
+/** Publishes an interaction on a channel, one bear's or every bear's, and waits for the first reply to it. */
 final class RedisBroadcast {
 
     private final StringRedisTemplate redis;

@@ -61,6 +61,23 @@ class MusicPlayerProtocolRoundTripTest {
     }
 
     @Test
+    void roundTripsQueueSnapshotWithoutCurrentTrack() {
+        MusicPlayerEvent event = new MusicPlayerEvent.QueueSnapshot("player-id", "request-id", "guild-id", Optional.empty(), List.of(track()));
+
+        String json = OBJECT_MAPPER.writerFor(MusicPlayerEvent.class).writeValueAsString(event);
+
+        assertThat(OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class)).isEqualTo(event);
+    }
+
+    @Test
+    void readsQueueUpdatedFromOlderBearWithoutQueueSize() {
+        String json = "{\"type\":\"queue_updated\",\"playerId\":\"player-id\",\"requestId\":\"request-id\",\"guildId\":\"guild-id\",\"upNext\":[]}";
+
+        assertThat(OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class))
+                .isEqualTo(new MusicPlayerEvent.QueueUpdated("player-id", "request-id", "guild-id", List.of(), 0, 0L));
+    }
+
+    @Test
     void readsStoppedWithoutReasonAsRequested() {
         String json = "{\"type\":\"player_stopped\",\"playerId\":\"player-id\",\"requestId\":\"request-id\",\"guildId\":\"guild-id\"}";
 
@@ -71,7 +88,7 @@ class MusicPlayerProtocolRoundTripTest {
     private static Object sample(Class<?> recordType) {
         RecordComponent[] components = recordType.getRecordComponents();
         Class<?>[] parameterTypes = Arrays.stream(components).map(RecordComponent::getType).toArray(Class<?>[]::new);
-        Object[] arguments = Arrays.stream(components).map(component -> sampleValue(component.getType(), component.getName())).toArray();
+        Object[] arguments = Arrays.stream(components).map(MusicPlayerProtocolRoundTripTest::sampleValue).toArray();
         try {
             return recordType.getDeclaredConstructor(parameterTypes).newInstance(arguments);
         } catch (ReflectiveOperationException e) {
@@ -79,11 +96,14 @@ class MusicPlayerProtocolRoundTripTest {
         }
     }
 
-    private static Object sampleValue(Class<?> type, String name) {
+    private static Object sampleValue(RecordComponent component) {
+        Class<?> type = component.getType();
+        String name = component.getName();
         if (type == String.class) return name + "-value";
-        if (type == long.class) return 42L;
-        if (type == int.class) return 7;
+        if (type == long.class || type == Long.class) return 42L;
+        if (type == int.class || type == Integer.class) return 7;
         if (type == boolean.class) return true;
+        if (type == Optional.class && component.getGenericType().getTypeName().contains(TrackMetadata.class.getName())) return Optional.of(track());
         // the last constant, so a reason lost in transit cannot hide behind a default of REQUESTED
         if (type.isEnum()) return type.getEnumConstants()[type.getEnumConstants().length - 1];
         if (type == Optional.class) return Optional.of(name + "-value");

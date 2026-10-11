@@ -4,6 +4,7 @@ import com.bearify.controller.AbstractControllerIntegrationTest;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.discord.api.message.TextBlock;
 import com.bearify.controller.music.spotify.SpotifyLinkResolver;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
@@ -11,6 +12,7 @@ import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +24,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -254,6 +257,57 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void showsQueueAsEphemeralCard() {
+        TrackMetadata current = new TrackMetadata("Never Gonna Give You Up", "Rick Astley", "https://example.com/rick", 213_000);
+        TrackMetadata next = new TrackMetadata("Africa", "TOTO", "https://example.com/africa", 295_000);
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.QueueSnapshot(PLAYER_ID, interaction.requestId(), GUILD_ID, Optional.of(current), List.of(next)));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("queue");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getLastComponentEdit().orElseThrow()
+                            .containers().getFirst().children())
+                            .contains(
+                                    new TextBlock("### Up Next"),
+                                    new TextBlock("-# Now playing: Never Gonna Give You Up — Rick Astley"),
+                                    new TextBlock("Africa\n-# TOTO • 4m 55s\n")));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void repliesNoPlayerWhenBearHasNoPlayerForQueue() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, interaction.requestId(), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteraction("queue");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
+                            .contains("not even playing songs"));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void repliesTimedOutWhenBearDoesNotAnswerQueue() {
+        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new TimingOutMusicPlayer()), NO_SPOTIFY);
+        MockCommandInteraction interaction = buildInteraction("queue");
+
+        controller.queue(interaction);
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains("didn't answer in time");
+    }
+
+    @Test
     void answersLeavePubliclyAfterBearConfirms() {
         RedisMessageListenerContainer bear = answerAs(interaction ->
                 new MusicPlayerEvent.Stopped(PLAYER_ID, interaction.requestId(), GUILD_ID, StopReason.REQUESTED));
@@ -405,6 +459,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
     }
 
     private static final class TimingOutMusicPlayer implements MusicPlayer {
@@ -417,5 +472,6 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
     }
 }

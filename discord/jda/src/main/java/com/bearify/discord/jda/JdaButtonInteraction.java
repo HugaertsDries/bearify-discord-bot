@@ -2,6 +2,7 @@ package com.bearify.discord.jda;
 
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.ReplyBuilder;
+import com.bearify.discord.api.message.ComponentMessage;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.ISnowflake;
 import net.dv8tion.jda.api.entities.Member;
@@ -23,6 +24,11 @@ class JdaButtonInteraction implements ButtonInteraction {
 
     @Override
     public ReplyBuilder reply(String message) {
+        return new JdaReplyBuilder(event, message, false);
+    }
+
+    @Override
+    public ReplyBuilder reply(ComponentMessage message) {
         return new JdaReplyBuilder(event, message, false);
     }
 

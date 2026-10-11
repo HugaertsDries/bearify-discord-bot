@@ -274,9 +274,24 @@ class DiscordPlaybackAnnouncerTest {
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1",
-                List.of(new TrackMetadata("New Song", "New Artist", "https://example.com/new", 120_000))));
+                List.of(new TrackMetadata("New Song", "New Artist", "https://example.com/new", 120_000)), 1, 120_000L));
 
         assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("New Song"));
+    }
+
+    @Test
+    void showsHowManyMoreAreQueuedWhenBearReportsALongerQueue() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+        List<TrackMetadata> upNext = List.of(
+                new TrackMetadata("One", "Artist", "https://example.com/1", 60_000),
+                new TrackMetadata("Two", "Artist", "https://example.com/2", 60_000),
+                new TrackMetadata("Three", "Artist", "https://example.com/3", 60_000));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1", upNext, 7, 900_000L));
+
+        assertThat(allTexts(updated.get())).contains("-# +4 more on the trail · 12m 00s");
     }
 
     @Test
@@ -298,7 +313,7 @@ class DiscordPlaybackAnnouncerTest {
 
         String longTitle = "A".repeat(100);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata(longTitle, "Artist", "https://example.com", 60_000), List.of()));
+                new TrackMetadata(longTitle, "Artist", "https://example.com", 60_000), List.of(), 0, 0L));
 
         assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("A".repeat(44)));
     }
@@ -310,7 +325,7 @@ class DiscordPlaybackAnnouncerTest {
 
         String longAuthor = "B".repeat(60);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", longAuthor, "https://example.com", 60_000), List.of()));
+                new TrackMetadata("Song", longAuthor, "https://example.com", 60_000), List.of(), 0, 0L));
 
         assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("B".repeat(39)));
     }
@@ -455,7 +470,7 @@ class DiscordPlaybackAnnouncerTest {
 
     private static MusicPlayerEvent.TrackStart trackStart(String playerId) {
         return new MusicPlayerEvent.TrackStart(playerId, new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of());
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L);
     }
 
     private static MusicPlayerEvent.TrackStart trackStartWithUpNext(String playerId) {
@@ -464,7 +479,7 @@ class DiscordPlaybackAnnouncerTest {
                 List.of(
                         new TrackMetadata("Hotel California", "Eagles", "https://example.com/1", 390_000),
                         new TrackMetadata("Stairway to Heaven", "Led Zeppelin", "https://example.com/2", 482_000)
-                ));
+                ), 2, 872_000L);
     }
 
     private static MusicPlayerEvent.TrackError trackError(String playerId) {

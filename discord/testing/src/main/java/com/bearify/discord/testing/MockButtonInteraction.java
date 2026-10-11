@@ -2,6 +2,7 @@ package com.bearify.discord.testing;
 
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.ReplyBuilder;
+import com.bearify.discord.api.message.ComponentMessage;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,13 @@ public class MockButtonInteraction implements ButtonInteraction {
 
     @Override
     public ReplyBuilder reply(String message) {
+        MockReplyBuilder reply = new MockReplyBuilder(message);
+        replies.add(reply);
+        return reply;
+    }
+
+    @Override
+    public ReplyBuilder reply(ComponentMessage message) {
         MockReplyBuilder reply = new MockReplyBuilder(message);
         replies.add(reply);
         return reply;

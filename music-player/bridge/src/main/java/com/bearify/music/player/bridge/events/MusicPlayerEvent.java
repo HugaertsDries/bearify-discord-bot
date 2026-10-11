@@ -37,6 +37,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.HealthCheckResult.class, name = "health_check_result"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.AutoPaused.class, name = "auto_paused"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.AutoResumed.class, name = "auto_resumed"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.QueueSnapshot.class, name = "queue_snapshot"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -64,22 +65,32 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackQueued,
         MusicPlayerEvent.HealthCheckResult,
         MusicPlayerEvent.AutoPaused,
-        MusicPlayerEvent.AutoResumed {
+        MusicPlayerEvent.AutoResumed,
+        MusicPlayerEvent.QueueSnapshot {
 
     String playerId();
     String requestId();
     String guildId();
 
-    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext) implements MusicPlayerEvent {
+    /**
+     * {@code upNext} is the start of the queue; {@code queueSize} and {@code queueDurationMs} (live streams excluded)
+     * cover the whole queue, and are 0 when an older bear sent the event (boxed so their absence reads as 0, not an error).
+     */
+    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs) implements MusicPlayerEvent {
         public TrackStart {
             upNext = upNext != null ? List.copyOf(upNext) : List.of();
+            queueSize = queueSize != null ? queueSize : 0;
+            queueDurationMs = queueDurationMs != null ? queueDurationMs : 0L;
         }
         @Override public String requestId() { return request.id(); }
     }
     record TrackError(String playerId, String requestId, String guildId, TrackMetadata track) implements MusicPlayerEvent {}
-    record QueueUpdated(String playerId, String requestId, String guildId, List<TrackMetadata> upNext) implements MusicPlayerEvent {
+    /** Same queue fields as {@link TrackStart}. */
+    record QueueUpdated(String playerId, String requestId, String guildId, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs) implements MusicPlayerEvent {
         public QueueUpdated {
             upNext = upNext != null ? List.copyOf(upNext) : List.of();
+            queueSize = queueSize != null ? queueSize : 0;
+            queueDurationMs = queueDurationMs != null ? queueDurationMs : 0L;
         }
     }
     record QueueEmpty(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
@@ -135,4 +146,10 @@ public sealed interface MusicPlayerEvent permits
     }
     record AutoPaused(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record AutoResumed(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    /** The whole queue, not just the next three tracks the player message shows. */
+    record QueueSnapshot(String playerId, String requestId, String guildId, Optional<TrackMetadata> current, List<TrackMetadata> upcoming) implements MusicPlayerEvent {
+        public QueueSnapshot {
+            upcoming = upcoming != null ? List.copyOf(upcoming) : List.of();
+        }
+    }
 }

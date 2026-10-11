@@ -6,6 +6,7 @@ import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.InteractionType;
+import com.bearify.discord.api.interaction.ReplyBuilder;
 import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
 
@@ -77,6 +78,19 @@ public class MusicPlayerButtonController {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
             player.clear(interaction.getUserMention(), answerFailuresPrivately(interaction));
+        });
+    }
+
+    @SuppressWarnings("unused")
+    @Interaction(type = InteractionType.BUTTON, value = "player:queue")
+    public void queue(ButtonInteraction interaction) {
+        requirePlayer(interaction).ifPresent(player -> {
+            interaction.acknowledge();
+            ReplyBuilder reply = switch (QueueCard.beyondPlayer(player.queue())) {
+                case QueueCard.Text text -> interaction.reply(text.text());
+                case QueueCard.Card card -> interaction.reply(card.message());
+            };
+            reply.ephemeral().send();
         });
     }
 

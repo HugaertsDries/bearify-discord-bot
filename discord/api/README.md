@@ -17,8 +17,9 @@ Defines the interfaces and models that the rest of the project depends on. By de
 
 ### Interaction
 - `CommandInteraction` — represents an incoming command: `getName()`, `getOption(name)`, `getSubcommandName()`, `getVoiceChannelId()`, `getGuildId()`, `getTextChannelId()`, `reply(message)`, `defer()`
+- `ButtonInteraction` — represents a button press: `getCustomId()`, `acknowledge()`, `reply(message)`, and `reply(ComponentMessage)` for a Components V2 reply (a follow-up once acknowledged)
 - `ReplyBuilder` — fluent reply builder: `reply("...").ephemeral().send()`
-- `EditableMessage` — handle to a deferred reply that can be updated: `edit(String message)`
+- `EditableMessage` — handle to a deferred reply that can be updated: `edit(String message)`, or `edit(ComponentMessage)` to turn it into a Components V2 message
 
 ### Voice
 - `AudioProvider` — supplies Opus-encoded audio frames for a voice connection: `canProvide()`, `provide20MsAudio()`, `isOpus()`

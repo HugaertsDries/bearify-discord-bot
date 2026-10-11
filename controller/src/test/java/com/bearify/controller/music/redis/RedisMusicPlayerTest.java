@@ -32,7 +32,8 @@ import static org.awaitility.Awaitility.await;
 
 @SpringBootTest(properties = {
         "music-player.pool.connect-request-ttl=500ms",
-        "music-player.pool.interaction-timeout=500ms"
+        "music-player.pool.interaction-timeout=500ms",
+        "music-player.pool.queue-timeout=200ms"
 })
 class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
 
@@ -228,6 +229,15 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
     }
 
     // --- TIMEOUTS ---
+
+    @Test
+    void answersQueueWithNothingWhenBearDoesNotAnswerInTime() {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+
+        MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+
+        assertThat(player.queue()).isEmpty();
+    }
 
     @Test
     void reportsFailureWhenTogglePauseTimesOut() {

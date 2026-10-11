@@ -3,6 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +40,8 @@ public final class PlaybackComponentState {
     private final TrackMetadata track;
     private final String requesterTag;
     private final List<TrackMetadata> upNext;
+    private final int queueSize;
+    private final Duration queueDuration;
     private final URI artworkUri;
     private final String footer;
     private final boolean paused;
@@ -49,6 +52,8 @@ public final class PlaybackComponentState {
         this.track = builder.track;
         this.requesterTag = builder.requesterTag;
         this.upNext = List.copyOf(builder.upNext);
+        this.queueSize = builder.queueSize;
+        this.queueDuration = builder.queueDuration;
         this.artworkUri = builder.artworkUri;
         this.footer = builder.footerText;
         this.paused = builder.paused;
@@ -78,6 +83,16 @@ public final class PlaybackComponentState {
         return upNext;
     }
 
+    /** The whole queue, of which {@link #upNext()} is the start; 0 when unknown. */
+    public int queueSize() {
+        return queueSize;
+    }
+
+    /** The whole queue's length without live streams; zero when unknown. */
+    public Duration queueDuration() {
+        return queueDuration;
+    }
+
     public Optional<URI> artworkUri() {
         return Optional.ofNullable(artworkUri);
     }
@@ -96,6 +111,8 @@ public final class PlaybackComponentState {
         private TrackMetadata track;
         private String requesterTag;
         private List<TrackMetadata> upNext = List.of();
+        private int queueSize;
+        private Duration queueDuration = Duration.ZERO;
         private URI artworkUri;
         private String footerText;
         private boolean paused;
@@ -130,6 +147,16 @@ public final class PlaybackComponentState {
 
         public Builder upNext(List<TrackMetadata> upNext) {
             this.upNext = upNext == null ? List.of() : List.copyOf(upNext);
+            return this;
+        }
+
+        public Builder queueSize(int queueSize) {
+            this.queueSize = queueSize;
+            return this;
+        }
+
+        public Builder queueDuration(Duration queueDuration) {
+            this.queueDuration = queueDuration == null ? Duration.ZERO : queueDuration;
             return this;
         }
 

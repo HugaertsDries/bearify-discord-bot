@@ -49,7 +49,7 @@ class RedisTrackCatalogueTest {
                 redis,
                 objectMapper,
                 pendingInteractions,
-                new MusicPlayerPoolProperties(Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofSeconds(5)));
+                new MusicPlayerPoolProperties(Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofSeconds(5)));
 
         List<TrackMetadata> results = trackCatalogue.find(GUILD_ID, "daft punk", 5);
 
@@ -63,7 +63,7 @@ class RedisTrackCatalogueTest {
                 mock(StringRedisTemplate.class),
                 new ObjectMapper(),
                 new MusicPlayerPendingInteractions(),
-                new MusicPlayerPoolProperties(Duration.ofSeconds(5), Duration.ofMinutes(1), Duration.ofMillis(100)));
+                new MusicPlayerPoolProperties(Duration.ofSeconds(5), Duration.ofMinutes(1), Duration.ofMillis(100), Duration.ofSeconds(5)));
 
         List<TrackMetadata> results = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> trackCatalogue.find(GUILD_ID, "daft punk", 5));
 

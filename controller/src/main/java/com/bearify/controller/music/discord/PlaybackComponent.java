@@ -2,11 +2,15 @@ package com.bearify.controller.music.discord;
 
 import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.message.ComponentMessageBuilder;
+import com.bearify.discord.api.message.ContainerBuilder;
 import com.bearify.discord.api.message.InteractiveButton;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.awt.Color;
 import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 import static com.bearify.discord.api.message.ButtonStyle.SECONDARY;
 
@@ -18,6 +22,9 @@ public class PlaybackComponent {
     public static final String PLAYER_PLAY_LABEL = "▶︎";
     public static final String PLAYER_FORWARD_LABEL = "▶︎";
     public static final String PLAYER_NEXT_LABEL = "▶︎▶︎❙";
+    public static final String PLAYER_SHOW_QUEUE_LABEL = "Show";
+    // LavaPlayer reports a stream's length as Long.MAX_VALUE
+    static final long LIVE_DURATION = Long.MAX_VALUE;
 
     private final AnnouncerProperties properties;
 
@@ -49,7 +56,7 @@ public class PlaybackComponent {
                 section.text("## " + truncate(state.track().title(), 45));
                 section.linkButton(state.track().uri(), "Source");
             });
-            container.text("### " + trackMetaLine(state.track(), 40));
+            container.text("### " + trackMetaLine(state.track(), 40, UnaryOperator.identity()));
             container.separator();
             container.text("-# **Requested by** " + state.requesterTag());
         });
@@ -81,25 +88,46 @@ public class PlaybackComponent {
 
                     """.formatted(
                     truncate(first.title(), 50),
-                    trackMetaLine(first, 50)
+                    trackMetaLine(first, 50, UnaryOperator.identity())
             ));
-            if (state.upNext().size() > 1) {
+            List<TrackMetadata> rest = state.upNext().subList(1, state.upNext().size());
+            if (!rest.isEmpty()) {
                 container.separator();
+                appendTrackRows(container, rest, UnaryOperator.identity());
             }
-            for (int index = 1; index < state.upNext().size(); index++) {
-                TrackMetadata track = state.upNext().get(index);
-                container.text("""
-                        %s
-                        -# %s
-                        """.formatted(
-                        truncate(track.title(), 50),
-                        trackMetaLine(track, 50)
-                ));
-                if (index + 1 < state.upNext().size()) {
-                    container.separator();
-                }
+            int more = state.queueSize() - state.upNext().size();
+            if (more > 0) {
+                container.separator();
+                container.section(section -> {
+                    section.button(new InteractiveButton(SECONDARY, "player:queue", PLAYER_SHOW_QUEUE_LABEL));
+                    section.text("-# +" + more + " more on the trail" + moreLength(state).map(length -> " · " + length).orElse(""));
+                });
             }
         });
+    }
+
+    /** Lists tracks the way Up Next lists all but its first; {@code clean} rewrites each title and author after truncation. */
+    static void appendTrackRows(ContainerBuilder container, List<TrackMetadata> tracks, UnaryOperator<String> clean) {
+        for (int index = 0; index < tracks.size(); index++) {
+            TrackMetadata track = tracks.get(index);
+            container.text("""
+                    %s
+                    -# %s
+                    """.formatted(
+                    clean.apply(truncate(track.title(), 50)),
+                    trackMetaLine(track, 50, clean)
+            ));
+            if (index + 1 < tracks.size()) {
+                container.separator();
+            }
+        }
+    }
+
+    // the queue's length minus what Up Next already shows; unknown when the bear didn't say
+    private static Optional<String> moreLength(PlaybackComponentState state) {
+        long shownMs = state.upNext().stream().mapToLong(TrackMetadata::durationMs).filter(ms -> ms != LIVE_DURATION).sum();
+        Duration more = state.queueDuration().minusMillis(shownMs);
+        return more.isPositive() ? Optional.of(total(more)) : Optional.empty();
     }
 
     private Color colorFor(PlaybackComponentState.NotificationStyle style) {
@@ -113,15 +141,35 @@ public class PlaybackComponent {
         return color.getRGB() & 0xFFFFFF;
     }
 
-    private static String trackMetaLine(TrackMetadata track, int authorLimit) {
-        return truncate(track.author(), authorLimit) + " \u2022 " + humanReadable(Duration.ofMillis(track.durationMs()));
+    private static String trackMetaLine(TrackMetadata track, int authorLimit, UnaryOperator<String> clean) {
+        return clean.apply(truncate(track.author(), authorLimit)) + " \u2022 " + length(track);
     }
 
-    private static String truncate(String text, int limit) {
+    static String length(TrackMetadata track) {
+        return track.durationMs() == LIVE_DURATION ? "LIVE" : humanReadable(Duration.ofMillis(track.durationMs()));
+    }
+
+    /** A queue's length: hours once it passes one, unlike a single track's. */
+    static String total(Duration duration) {
+        if (duration.toHours() > 0) {
+            return "%dh %02dm".formatted(duration.toHours(), duration.toMinutesPart());
+        }
+        return humanReadable(duration);
+    }
+
+    static String truncate(String text, int limit) {
         if (text == null) {
             return "";
         }
-        return text.length() <= limit ? text : text.substring(0, limit - 1) + "\u2026";
+        if (text.length() <= limit) {
+            return text;
+        }
+        int end = limit - 1;
+        // never keep half of an emoji: cutting between a surrogate pair leaves an invalid character
+        if (Character.isHighSurrogate(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.substring(0, end) + "\u2026";
     }
 
     static String humanReadable(Duration duration) {

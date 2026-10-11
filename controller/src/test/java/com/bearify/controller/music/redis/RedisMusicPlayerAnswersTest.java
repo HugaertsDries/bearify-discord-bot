@@ -91,6 +91,6 @@ class RedisMusicPlayerAnswersTest {
     private static MusicPlayer player(Optional<String> playerId, StringRedisTemplate redis) {
         return new RedisMusicPlayer(playerId, GUILD_ID, VOICE_CHANNEL_ID, redis, new ObjectMapper(),
                 new MusicPlayerPendingInteractions(), new MusicPlayerAnnouncementRegistry(), null,
-                new MusicPlayerPoolProperties(TIMEOUT, TIMEOUT, TIMEOUT));
+                new MusicPlayerPoolProperties(TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT));
     }
 }

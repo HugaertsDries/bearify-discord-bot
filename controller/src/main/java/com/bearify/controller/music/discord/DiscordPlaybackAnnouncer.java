@@ -10,6 +10,7 @@ import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -42,6 +43,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private long labelVersion;
     private volatile TrackMetadata currentTrack;
     private volatile List<TrackMetadata> currentUpNext = List.of();
+    private volatile int currentQueueSize;
+    private volatile Duration currentQueueDuration = Duration.ZERO;
     private volatile String currentRequesterTag;
 
     public DiscordPlaybackAnnouncer(DiscordClient discord,
@@ -83,6 +86,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         try {
             currentTrack = event.track();
             currentUpNext = event.upNext();
+            currentQueueSize = event.queueSize();
+            currentQueueDuration = Duration.ofMillis(event.queueDurationMs());
             currentRequesterTag = event.request().requesterTag();
             playbackState = PlaybackComponentState.PlaybackState.PLAYING;
             updateOrPost(playbackComponent.render(currentState()));
@@ -105,11 +110,15 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
 
     private void onQueueUpdated(MusicPlayerEvent.QueueUpdated event) {
         currentUpNext = event.upNext();
+        currentQueueSize = event.queueSize();
+        currentQueueDuration = Duration.ofMillis(event.queueDurationMs());
         refreshNowPlayingEmbed();
     }
 
     private void onCleared(MusicPlayerEvent.Cleared event) {
         currentUpNext = event.upNext();
+        currentQueueSize = event.upNext().size();
+        currentQueueDuration = Duration.ZERO;
         notify("Queue cleared by " + event.request().requesterTag());
     }
 
@@ -188,6 +197,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         currentTrack = null;
         currentRequesterTag = null;
         currentUpNext = List.of();
+        currentQueueSize = 0;
+        currentQueueDuration = Duration.ZERO;
         temporaryAction = null;
         autoPaused = false;
         SentMessage existing = activeMessage;
@@ -217,6 +228,8 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
                 .track(currentTrack)
                 .requesterTag(currentRequesterTag != null ? currentRequesterTag : "Unknown")
                 .upNext(currentUpNext)
+                .queueSize(currentQueueSize)
+                .queueDuration(currentQueueDuration)
                 .artworkUri(artworkUrlResolver.resolve(currentTrack).orElse(null))
                 .footer(properties.footer())
                 .paused(playbackState == PlaybackComponentState.PlaybackState.PAUSED)

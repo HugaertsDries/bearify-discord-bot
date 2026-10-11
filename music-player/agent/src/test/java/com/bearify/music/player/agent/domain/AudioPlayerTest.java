@@ -324,6 +324,22 @@ class AudioPlayerTest {
     }
 
     @Test
+    void snapshotsCurrentTrackAndFullQueue() {
+        InMemoryTrack playing = track("Playing", 120_000);
+        engine.play(playing);
+        List<InMemoryTrack> queued = List.of(
+                track("One", 60_000), track("Two", 60_000), track("Three", 60_000), track("Four", 60_000));
+        player.play(List.copyOf(queued));
+
+        player.snapshot("req-1");
+
+        assertThat(eventDispatcher.getLastEvent()).isEqualTo(new MusicPlayerEvent.QueueSnapshot(
+                PLAYER_ID, "req-1", GUILD_ID,
+                Optional.of(playing.toMetadata()),
+                queued.stream().map(Track::toMetadata).toList()));
+    }
+
+    @Test
     void doesNotEmitQueueEmptyWhenNextFailsButCurrentTrackKeepsPlaying() {
         InMemoryTrack playing = track("Playing", 120_000);
         engine.play(playing);
@@ -464,6 +480,30 @@ class AudioPlayerTest {
                 .map(e -> (MusicPlayerEvent.TrackStart) e)
                 .toList();
         assertThat(trackStarts.getLast().upNext()).hasSize(3);
+    }
+
+    @Test
+    void trackStartCountsWholeQueueBeyondUpNext() {
+        player.play(List.of(
+                track("Playing", 60_000), track("B", 60_000), track("C", 60_000), track("D", 60_000), track("E", 90_000)));
+
+        engine.triggerOnTrackStart(track("Playing", 60_000));
+
+        MusicPlayerEvent.TrackStart start = (MusicPlayerEvent.TrackStart) eventDispatcher.getLastEvent();
+        assertThat(start.upNext()).hasSize(3);
+        assertThat(start.queueSize()).isEqualTo(4);
+        assertThat(start.queueDurationMs()).isEqualTo(270_000);
+    }
+
+    @Test
+    void queueUpdatedLeavesLiveStreamsOutOfQueueDuration() {
+        engine.play(track("Playing", 60_000));
+
+        player.play(List.of(track("Radio", Long.MAX_VALUE), track("Song", 90_000)));
+
+        MusicPlayerEvent.QueueUpdated updated = (MusicPlayerEvent.QueueUpdated) eventDispatcher.getLastEvent();
+        assertThat(updated.queueSize()).isEqualTo(2);
+        assertThat(updated.queueDurationMs()).isEqualTo(90_000);
     }
 
     @Test

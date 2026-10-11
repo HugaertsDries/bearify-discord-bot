@@ -5,6 +5,7 @@ import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.spotify.SpotifyLinkResolver;
 import com.bearify.discord.testing.MockCommandInteraction;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
@@ -761,6 +762,11 @@ class MusicPlayerInteractionTest {
         public void clear(String requesterTag, MusicPlayerEventListener handler) {
             cleared = true;
             clearHandler = handler;
+        }
+
+        @Override
+        public Optional<MusicPlayerEvent> queue() {
+            return Optional.empty();
         }
     }
 }
