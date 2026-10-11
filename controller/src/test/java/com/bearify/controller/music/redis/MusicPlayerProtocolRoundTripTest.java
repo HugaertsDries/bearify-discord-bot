@@ -3,6 +3,7 @@ package com.bearify.controller.music.redis;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,14 @@ class MusicPlayerProtocolRoundTripTest {
         assertThat(OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class)).isEqualTo(event);
     }
 
+    @Test
+    void readsStoppedWithoutReasonAsRequested() {
+        String json = "{\"type\":\"player_stopped\",\"playerId\":\"player-id\",\"requestId\":\"request-id\",\"guildId\":\"guild-id\"}";
+
+        assertThat(OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class))
+                .isEqualTo(new MusicPlayerEvent.Stopped("player-id", "request-id", "guild-id", StopReason.REQUESTED));
+    }
+
     private static Object sample(Class<?> recordType) {
         RecordComponent[] components = recordType.getRecordComponents();
         Class<?>[] parameterTypes = Arrays.stream(components).map(RecordComponent::getType).toArray(Class<?>[]::new);
@@ -75,6 +84,8 @@ class MusicPlayerProtocolRoundTripTest {
         if (type == long.class) return 42L;
         if (type == int.class) return 7;
         if (type == boolean.class) return true;
+        // the last constant, so a reason lost in transit cannot hide behind a default of REQUESTED
+        if (type.isEnum()) return type.getEnumConstants()[type.getEnumConstants().length - 1];
         if (type == Optional.class) return Optional.of(name + "-value");
         if (type == Request.class) return new Request("request-id", "requester#0001");
         if (type == TrackRequest.class) return new TrackRequest("query", "text-channel-id", "requester#0001");

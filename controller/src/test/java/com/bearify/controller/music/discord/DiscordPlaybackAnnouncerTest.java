@@ -18,6 +18,7 @@ import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
@@ -224,7 +225,7 @@ class DiscordPlaybackAnnouncerTest {
         MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, sends, deletes, Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
-        announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-2", "guild-1"));
+        announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-2", "guild-1", StopReason.REQUESTED));
 
         assertThat(sends.get()).isEqualTo(1);
         assertThat(deletes.get()).isEqualTo(1);
@@ -359,6 +360,99 @@ class DiscordPlaybackAnnouncerTest {
                 "text-1");
     }
 
+    @Test
+    void showsNobodyListeningNoticeWhileAutoPaused() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.AutoPaused("player-1", "req-2", "guild-1"));
+
+        assertThat(allTexts(updated.get())).contains("\uD83D\uDD14 Paused: it's lonely in here");
+        assertThat(buttonLabels(updated.get())).contains(PLAYER_PLAY_LABEL);
+    }
+
+    @Test
+    void clearsNoticeWhenAutoResumed() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.AutoPaused("player-1", "req-2", "guild-1"));
+        announcer.accept(new MusicPlayerEvent.AutoResumed("player-1", "req-3", "guild-1"));
+
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains(DiscordPlaybackAnnouncer.NOBODY_LISTENING_NOTICE));
+        assertThat(buttonLabels(updated.get())).contains(PLAYER_PAUSE_LABEL);
+    }
+
+    @Test
+    void clearsNoticeWhenNextTrackStarts() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.AutoPaused("player-1", "req-2", "guild-1"));
+        announcer.accept(trackStart("player-1"));
+
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains(DiscordPlaybackAnnouncer.NOBODY_LISTENING_NOTICE));
+    }
+
+    @Test
+    void postsLeaveNoteWhenStoppedForNobodyListening() {
+        List<String> texts = new ArrayList<>();
+        AtomicInteger deletes = new AtomicInteger();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(deletes, texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-2", "guild-1", StopReason.NOBODY_LISTENING));
+
+        assertThat(deletes.get()).isEqualTo(1);
+        assertThat(texts).containsExactly(DiscordPlaybackAnnouncer.NOBODY_LISTENING_LEAVE_NOTE);
+    }
+
+    @Test
+    void postsLeaveNoteWhenStoppedForIdle() {
+        List<String> texts = new ArrayList<>();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(new AtomicInteger(), texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-2", "guild-1", StopReason.IDLE));
+
+        assertThat(texts).containsExactly(DiscordPlaybackAnnouncer.IDLE_LEAVE_NOTE);
+    }
+
+    @Test
+    void postsLeaveNoteWhenStoppedForIdleAfterQueueEnded() {
+        List<String> texts = new ArrayList<>();
+        AtomicInteger deletes = new AtomicInteger();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(deletes, texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.QueueEmpty("player-1", "req-2", "guild-1"));
+        announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-3", "guild-1", StopReason.IDLE));
+
+        assertThat(deletes.get()).isEqualTo(1);
+        assertThat(texts).containsExactly(DiscordPlaybackAnnouncer.IDLE_LEAVE_NOTE);
+    }
+
+    @Test
+    void postsNoLeaveNoteWhenStopRequested() {
+        List<String> texts = new ArrayList<>();
+        MusicPlayerEventConsumer announcer = announcerWithTexts(new AtomicInteger(), texts);
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Stopped("player-1", "req-2", "guild-1", StopReason.REQUESTED));
+
+        assertThat(texts).isEmpty();
+    }
+
+    private static MusicPlayerEventConsumer announcerWithTexts(AtomicInteger deletes, List<String> texts) {
+        return new DiscordPlaybackAnnouncer(
+                discordClient(new AtomicReference<>(), new AtomicInteger(), new AtomicReference<>(), deletes, new AtomicReference<>(), texts),
+                new AnnouncerProperties("#FFA500", "#FF4444", "Bearify", Duration.ofSeconds(15)),
+                "text-1");
+    }
+
     private static MusicPlayerEvent.TrackStart trackStart(String playerId) {
         return new MusicPlayerEvent.TrackStart(playerId, new Request("req-1", "@user"), "guild-1",
                 new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of());
@@ -383,6 +477,15 @@ class DiscordPlaybackAnnouncerTest {
                                                AtomicReference<ComponentMessage> updated,
                                                AtomicInteger deletes,
                                                AtomicReference<Thread> updatingThread) {
+        return discordClient(sent, sends, updated, deletes, updatingThread, new ArrayList<>());
+    }
+
+    private static DiscordClient discordClient(AtomicReference<ComponentMessage> sent,
+                                               AtomicInteger sends,
+                                               AtomicReference<ComponentMessage> updated,
+                                               AtomicInteger deletes,
+                                               AtomicReference<Thread> updatingThread,
+                                               List<String> texts) {
         return new DiscordClient() {
             @Override
             public void start(String token) {
@@ -411,6 +514,7 @@ class DiscordPlaybackAnnouncerTest {
                 return new TextChannel() {
                     @Override
                     public void send(String message) {
+                        texts.add(message);
                     }
 
                     @Override

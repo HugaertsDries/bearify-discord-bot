@@ -9,6 +9,7 @@ import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,19 +91,27 @@ public class VoiceConnectionManager implements AutoCloseable {
         }));
     }
 
-    public void disconnect(String guildId) {
-        disconnect(guildId, UUID.randomUUID().toString());
+    /** Leaves on the bear's own initiative; does nothing when a stop request already left, so no second leave note follows it. */
+    public void disconnect(String guildId, StopReason reason) {
+        synchronized (guildLocks.computeIfAbsent(guildId, k -> new Object())) {
+            if (client.guild(guildId).voice().isEmpty() && pool.get(guildId).isEmpty()) {
+                return;
+            }
+            disconnect(guildId, UUID.randomUUID().toString(), reason);
+        }
     }
 
     /** Leaves voice and answers {@code Stopped} under {@code requestId}, so a stop request gets its reply. */
-    public void disconnect(String guildId, String requestId) {
-        joiningGuilds.remove(guildId);
-        client.guild(guildId).voice().ifPresent(session -> {
-            redis.delete(PlayerRedisProtocol.Keys.assignment(guildId, session.getChannelId()));
-            session.leave();
-        });
-        pool.get(guildId).ifPresent(AudioPlayer::close);
-        eventDispatcher.dispatch(new MusicPlayerEvent.Stopped(playerId, requestId, guildId));
+    public void disconnect(String guildId, String requestId, StopReason reason) {
+        synchronized (guildLocks.computeIfAbsent(guildId, k -> new Object())) {
+            joiningGuilds.remove(guildId);
+            client.guild(guildId).voice().ifPresent(session -> {
+                redis.delete(PlayerRedisProtocol.Keys.assignment(guildId, session.getChannelId()));
+                session.leave();
+            });
+            pool.get(guildId).ifPresent(AudioPlayer::close);
+            eventDispatcher.dispatch(new MusicPlayerEvent.Stopped(playerId, requestId, guildId, reason));
+        }
     }
 
     private void handleInVoice(JoinRequest request, Guild guild, VoiceSession session) {
@@ -166,6 +175,6 @@ public class VoiceConnectionManager implements AutoCloseable {
 
     @Override
     public void close() {
-        pool.activeGuildIds().forEach(this::disconnect);
+        pool.activeGuildIds().forEach(guildId -> disconnect(guildId, StopReason.REQUESTED));
     }
 }

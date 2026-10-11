@@ -1,6 +1,7 @@
 package com.bearify.controller.music.domain;
 
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.StopReason;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -33,13 +34,27 @@ class MusicPlayerAnnouncementConsumerTest {
     }
 
     @Test
-    void acceptRemovesAllSubscriptionsAfterQueueEmpty() {
+    void keepsAnnouncerRegisteredAfterQueueEmpty() {
         MusicPlayerAnnouncementRegistry registry = new MusicPlayerAnnouncementRegistry();
         registry.subscribe(PLAYER_ID, GUILD_A, event -> {});
         MusicPlayerAnnouncementConsumer consumer = new MusicPlayerAnnouncementConsumer(registry);
 
         consumer.accept(new MusicPlayerEvent.QueueEmpty(PLAYER_ID, "req-1", GUILD_A));
 
+        assertThat(registry.findAll(PLAYER_ID, GUILD_A)).hasSize(1);
+    }
+
+    @Test
+    void removesAnnouncersWhenStopped() {
+        MusicPlayerAnnouncementRegistry registry = new MusicPlayerAnnouncementRegistry();
+        List<MusicPlayerEvent> delivered = new ArrayList<>();
+        registry.subscribe(PLAYER_ID, GUILD_A, delivered::add);
+        MusicPlayerAnnouncementConsumer consumer = new MusicPlayerAnnouncementConsumer(registry);
+        MusicPlayerEvent stopped = new MusicPlayerEvent.Stopped(PLAYER_ID, "req-1", GUILD_A, StopReason.IDLE);
+
+        consumer.accept(stopped);
+
+        assertThat(delivered).containsExactly(stopped);
         assertThat(registry.findAll(PLAYER_ID, GUILD_A)).isEmpty();
     }
 
@@ -53,7 +68,7 @@ class MusicPlayerAnnouncementConsumerTest {
         registry.subscribe(PLAYER_ID, GUILD_A, event -> delivered.incrementAndGet());
         MusicPlayerAnnouncementConsumer consumer = new MusicPlayerAnnouncementConsumer(registry);
 
-        consumer.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, "req-1", GUILD_A));
+        consumer.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, "req-1", GUILD_A, StopReason.REQUESTED));
 
         assertThat(delivered.get()).isEqualTo(1);
     }
@@ -83,7 +98,7 @@ class MusicPlayerAnnouncementConsumerTest {
         MusicPlayerAnnouncementConsumer consumer = new MusicPlayerAnnouncementConsumer(registry);
         MusicPlayerEvent guildBEvent = new MusicPlayerEvent.NothingToAdvance(PLAYER_ID, "req-2", GUILD_B);
 
-        consumer.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, "req-1", GUILD_A));
+        consumer.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, "req-1", GUILD_A, StopReason.REQUESTED));
         consumer.accept(guildBEvent);
 
         assertThat(registry.findAll(PLAYER_ID, GUILD_A)).isEmpty();

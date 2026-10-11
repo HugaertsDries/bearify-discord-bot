@@ -2,17 +2,22 @@ package com.bearify.music.player.agent;
 
 import com.bearify.music.player.agent.domain.VoiceConnectionManager;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.StopReason;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
 
     private final List<MusicPlayerInteraction.Connect> calls = new ArrayList<>();
     private final Set<String> disconnectedGuilds = new HashSet<>();
+    private final Map<String, StopReason> stopReasons = new HashMap<>();
 
     public RecordingVoiceConnectionManager() {
         super(null, null, null, null, null, "test", null);  // null args safe: connect/disconnect are fully overridden
@@ -24,13 +29,14 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
     }
 
     @Override
-    public void disconnect(String guildId) {
-        disconnectedGuilds.add(guildId);
+    public void disconnect(String guildId, StopReason reason) {
+        disconnect(guildId, "", reason);
     }
 
     @Override
-    public void disconnect(String guildId, String requestId) {
+    public void disconnect(String guildId, String requestId, StopReason reason) {
         disconnectedGuilds.add(guildId);
+        stopReasons.put(guildId, reason);
     }
 
     @Override
@@ -45,6 +51,10 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
         return Collections.unmodifiableSet(disconnectedGuilds);
     }
 
+    public Optional<StopReason> stopReason(String guildId) {
+        return Optional.ofNullable(stopReasons.get(guildId));
+    }
+
     public boolean isDisconnected() {
         return !disconnectedGuilds.isEmpty();
     }
@@ -52,5 +62,6 @@ public class RecordingVoiceConnectionManager extends VoiceConnectionManager {
     public void reset() {
         calls.clear();
         disconnectedGuilds.clear();
+        stopReasons.clear();
     }
 }

@@ -27,7 +27,8 @@ class AudioPlayerPoolTest {
                     Duration.ofSeconds(10)),
             new PlayerProperties.VoiceSession(
                     Duration.ofSeconds(10),
-                    Duration.ofMinutes(5)),
+                    Duration.ofMinutes(5),
+                    Duration.ofMinutes(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null, null, null)));
 
     private final DefaultAudioPlayerManager manager = new DefaultAudioPlayerManager();

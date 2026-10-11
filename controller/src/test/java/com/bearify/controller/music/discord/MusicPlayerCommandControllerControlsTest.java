@@ -7,6 +7,7 @@ import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackRequest;
@@ -253,7 +254,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     @Test
     void answersLeavePubliclyAfterBearConfirms() {
         RedisMessageListenerContainer bear = answerAs(interaction ->
-                new MusicPlayerEvent.Stopped(PLAYER_ID, interaction.requestId(), GUILD_ID));
+                new MusicPlayerEvent.Stopped(PLAYER_ID, interaction.requestId(), GUILD_ID, StopReason.REQUESTED));
 
         try {
             MockCommandInteraction interaction = buildInteraction("leave");

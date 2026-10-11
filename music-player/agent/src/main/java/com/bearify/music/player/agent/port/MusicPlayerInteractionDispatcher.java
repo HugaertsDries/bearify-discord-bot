@@ -3,6 +3,7 @@ package com.bearify.music.player.agent.port;
 import com.bearify.music.player.agent.domain.*;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.time.Duration;
@@ -44,7 +45,7 @@ public class MusicPlayerInteractionDispatcher {
             case MusicPlayerInteraction.Connect connect ->
                     manager.connect(connect);
             case MusicPlayerInteraction.Stop stop ->
-                    manager.disconnect(stop.guildId(), stop.requestId());
+                    manager.disconnect(stop.guildId(), stop.requestId(), StopReason.REQUESTED);
             case MusicPlayerInteraction.Play play ->
                     loadAndPlay(play);
             case MusicPlayerInteraction.TogglePause p ->

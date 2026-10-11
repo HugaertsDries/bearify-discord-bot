@@ -12,6 +12,7 @@ import com.bearify.music.player.agent.domain.Track;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class MusicPlayerInteractionDispatcherTest {
             Duration.ofSeconds(5),
             200,
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
-            new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5)),
+            new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5), Duration.ofMinutes(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null, null, null)));
 
     @Test
@@ -65,6 +66,7 @@ class MusicPlayerInteractionDispatcherTest {
         dispatcher.handle(new MusicPlayerInteraction.Stop(PLAYER_ID, REQUEST_ID, GUILD_ID));
 
         assertThat(voiceConnectionManager.getDisconnectedGuilds()).containsExactly(GUILD_ID);
+        assertThat(voiceConnectionManager.stopReason(GUILD_ID)).contains(StopReason.REQUESTED);
     }
 
     @Test

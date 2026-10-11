@@ -1,6 +1,7 @@
 package com.bearify.music.player.bridge.events;
 
 import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -34,6 +35,8 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.NothingPlaying.class, name = "nothing_playing"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackQueued.class, name = "track_queued"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.HealthCheckResult.class, name = "health_check_result"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.AutoPaused.class, name = "auto_paused"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.AutoResumed.class, name = "auto_resumed"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -59,7 +62,9 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.Restarted,
         MusicPlayerEvent.NothingPlaying,
         MusicPlayerEvent.TrackQueued,
-        MusicPlayerEvent.HealthCheckResult {
+        MusicPlayerEvent.HealthCheckResult,
+        MusicPlayerEvent.AutoPaused,
+        MusicPlayerEvent.AutoResumed {
 
     String playerId();
     String requestId();
@@ -112,7 +117,12 @@ public sealed interface MusicPlayerEvent permits
         }
     }
     record Ready(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
-    record Stopped(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    record Stopped(String playerId, String requestId, String guildId, StopReason reason) implements MusicPlayerEvent {
+        public Stopped {
+            // an older agent sends no reason
+            reason = reason != null ? reason : StopReason.REQUESTED;
+        }
+    }
     record ConnectFailed(String playerId, String requestId, String guildId, String reason) implements MusicPlayerEvent {}
     record PlayerNotFound(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     record Restarted(String playerId, Request request, String guildId) implements MusicPlayerEvent {
@@ -123,4 +133,6 @@ public sealed interface MusicPlayerEvent permits
     record HealthCheckResult(String playerId, String requestId, boolean ok, Optional<String> reason) implements MusicPlayerEvent {
         @Override public String guildId() { return ""; }
     }
+    record AutoPaused(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    record AutoResumed(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
 }

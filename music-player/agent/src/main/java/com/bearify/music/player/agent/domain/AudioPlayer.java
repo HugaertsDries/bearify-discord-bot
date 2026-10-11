@@ -35,6 +35,7 @@ public class AudioPlayer implements AudioProvider {
     private final Deque<Track> history = new ArrayDeque<>();
     private boolean justRestarted = false;
     private boolean closed = false;
+    private boolean autoPaused = false;
     private volatile boolean lastTrackWasError = false;
 
     protected AudioPlayer(AudioEngine engine,
@@ -104,6 +105,8 @@ public class AudioPlayer implements AudioProvider {
         }
         boolean nowPaused = !engine.isPaused();
         engine.setPaused(nowPaused);
+        // a human took over, so a returning listener must not toggle it again
+        autoPaused = false;
         if (nowPaused) {
             eventDispatcher.dispatch(new MusicPlayerEvent.Paused(playerId, request, guildId));
         } else {
@@ -182,7 +185,9 @@ public class AudioPlayer implements AudioProvider {
         engine.play(queue.pollFirst());
         if (wasPaused) {
             // a fresh id, so this Paused doesn't answer the forward request in place of Skipped
-            eventDispatcher.dispatch(new MusicPlayerEvent.Paused(playerId, new Request(randomId(), request.requesterTag()), guildId));
+            eventDispatcher.dispatch(autoPaused
+                    ? new MusicPlayerEvent.AutoPaused(playerId, randomId(), guildId)
+                    : new MusicPlayerEvent.Paused(playerId, new Request(randomId(), request.requesterTag()), guildId));
         }
         eventDispatcher.dispatch(new MusicPlayerEvent.Skipped(playerId, request, guildId));
     }
@@ -190,6 +195,35 @@ public class AudioPlayer implements AudioProvider {
     public synchronized void clear(Request request) {
         queue.clear();
         eventDispatcher.dispatch(new MusicPlayerEvent.Cleared(playerId, request, guildId, List.of()));
+    }
+
+    /** Pauses because nobody is listening; only a playing, unpaused track is paused. */
+    public synchronized void autoPause() {
+        if (engine.getPlayingTrack().isEmpty() || engine.isPaused()) {
+            return;
+        }
+        engine.setPaused(true);
+        autoPaused = true;
+        eventDispatcher.dispatch(new MusicPlayerEvent.AutoPaused(playerId, randomId(), guildId));
+    }
+
+    /** Resumes only what {@link #autoPause()} paused, never a human pause. */
+    public synchronized void autoResume() {
+        if (!autoPaused) {
+            return;
+        }
+        autoPaused = false;
+        if (!engine.isPaused()) {
+            // a skip or previous already resumed playback
+            return;
+        }
+        engine.setPaused(false);
+        eventDispatcher.dispatch(new MusicPlayerEvent.AutoResumed(playerId, randomId(), guildId));
+    }
+
+    /** Nothing is playing, or a human paused it; an auto-pause is not idle. */
+    public synchronized boolean isIdle() {
+        return engine.getPlayingTrack().isEmpty() || (engine.isPaused() && !autoPaused);
     }
 
     public synchronized void close() {

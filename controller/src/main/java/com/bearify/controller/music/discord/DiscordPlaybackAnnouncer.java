@@ -1,5 +1,6 @@
 package com.bearify.controller.music.discord;
 
+import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.MusicPlayerEventConsumer;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.SentMessage;
@@ -21,6 +22,9 @@ import java.util.concurrent.TimeUnit;
 public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
 
     private static final Logger LOG = LoggerFactory.getLogger(DiscordPlaybackAnnouncer.class);
+    static final String NOBODY_LISTENING_NOTICE = "Paused: it's lonely in here";
+    static final String NOBODY_LISTENING_LEAVE_NOTE = BearifyEmoji.BEAR + " | Nobody was listening, so I wandered back to my cave.";
+    static final String IDLE_LEAVE_NOTE = BearifyEmoji.BEAR + " | Nothing left to play, so I went for a nap.";
     // Shared by all announcers: one daemon thread instead of one per announcer that is never shut down
     private static final ScheduledExecutorService ACTION_TIMEOUTS =
             Executors.newSingleThreadScheduledExecutor(new AnnouncerThreadFactory());
@@ -33,6 +37,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private volatile SentMessage activeMessage;
     private volatile PlaybackComponentState.PlaybackState playbackState = PlaybackComponentState.PlaybackState.PLAYING;
     private volatile String temporaryAction;
+    private volatile boolean autoPaused;
     private volatile ScheduledFuture<?> clearActionTask;
     private long labelVersion;
     private volatile TrackMetadata currentTrack;
@@ -53,8 +58,10 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         switch (event) {
             case MusicPlayerEvent.TrackStart started -> onTrackStart(started);
             case MusicPlayerEvent.TrackError error -> onTrackError(error);
-            case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackComponentState.PlaybackState.PAUSED);
-            case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackComponentState.PlaybackState.PLAYING);
+            case MusicPlayerEvent.Paused paused -> updatePlaybackState(PlaybackComponentState.PlaybackState.PAUSED, false);
+            case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackComponentState.PlaybackState.PLAYING, false);
+            case MusicPlayerEvent.AutoPaused ignored -> updatePlaybackState(PlaybackComponentState.PlaybackState.PAUSED, true);
+            case MusicPlayerEvent.AutoResumed autoResumed -> updatePlaybackState(PlaybackComponentState.PlaybackState.PLAYING, false);
             case MusicPlayerEvent.Skipped skipped -> notify("Skipped by " + skipped.request().requesterTag());
             case MusicPlayerEvent.WentBack wentBack -> notify("Jumped back by " + wentBack.request().requesterTag());
             case MusicPlayerEvent.Restarted restarted -> notify("Restarted by " + restarted.request().requesterTag());
@@ -63,7 +70,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
             case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
             case MusicPlayerEvent.QueueEmpty ignored -> deleteEmbed();
-            case MusicPlayerEvent.Stopped ignored -> deleteEmbed();
+            case MusicPlayerEvent.Stopped stopped -> onStopped(stopped);
             default -> {
             }
         }
@@ -72,6 +79,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private void onTrackStart(MusicPlayerEvent.TrackStart event) {
         cancelClearTask();
         temporaryAction = null;
+        autoPaused = false;
         try {
             currentTrack = event.track();
             currentUpNext = event.upNext();
@@ -105,9 +113,26 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         notify("Queue cleared by " + event.request().requesterTag());
     }
 
-    private void updatePlaybackState(PlaybackComponentState.PlaybackState state) {
+    private void updatePlaybackState(PlaybackComponentState.PlaybackState state, boolean autoPaused) {
         playbackState = state;
+        this.autoPaused = autoPaused;
         refreshNowPlayingEmbed();
+    }
+
+    private void onStopped(MusicPlayerEvent.Stopped event) {
+        deleteEmbed();
+        Optional<String> note = switch (event.reason()) {
+            case NOBODY_LISTENING -> Optional.of(NOBODY_LISTENING_LEAVE_NOTE);
+            case IDLE -> Optional.of(IDLE_LEAVE_NOTE);
+            case REQUESTED, DISCONNECTED -> Optional.empty();
+        };
+        note.ifPresent(text -> {
+            try {
+                discord.textChannel(textChannelId).send(text);
+            } catch (Exception e) {
+                LOG.warn("Failed to post leave note for channel {}", textChannelId, e);
+            }
+        });
     }
 
     private void notify(String action) {
@@ -164,6 +189,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         currentRequesterTag = null;
         currentUpNext = List.of();
         temporaryAction = null;
+        autoPaused = false;
         SentMessage existing = activeMessage;
         activeMessage = null;
         if (existing != null) {
@@ -200,6 +226,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private Optional<PlaybackComponentState.Notification> currentNotification() {
         return Optional.ofNullable(temporaryAction)
                 .filter(text -> !text.isBlank())
+                .or(() -> autoPaused ? Optional.of(NOBODY_LISTENING_NOTICE) : Optional.empty())
                 .map(text -> new PlaybackComponentState.Notification(notificationStyleFor(text), text));
     }
 

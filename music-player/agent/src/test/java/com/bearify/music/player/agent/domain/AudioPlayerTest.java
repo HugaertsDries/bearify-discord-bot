@@ -26,7 +26,7 @@ class AudioPlayerTest {
             Duration.ofSeconds(5),
             200,
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
-            new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5)),
+            new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5), Duration.ofMinutes(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null, null, null)));
     private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
 
@@ -543,6 +543,110 @@ class AudioPlayerTest {
                 .map(e -> (MusicPlayerEvent.QueueUpdated) e)
                 .findFirst().orElseThrow();
         assertThat(event.upNext()).isEmpty();
+    }
+
+    @Test
+    void autoPauseDispatchesAutoPaused() {
+        engine.play(track("Song A", 120_000));
+
+        player.autoPause();
+
+        assertThat(engine.isPaused()).isTrue();
+        assertThat(eventDispatcher.getLastEvent()).isInstanceOf(MusicPlayerEvent.AutoPaused.class);
+    }
+
+    @Test
+    void autoPauseIgnoresAlreadyPausedPlayer() {
+        engine.play(track("Song A", 120_000));
+        engine.setPaused(true);
+
+        player.autoPause();
+
+        assertThat(eventDispatcher.getEvents()).noneMatch(MusicPlayerEvent.AutoPaused.class::isInstance);
+    }
+
+    @Test
+    void autoPauseIgnoresPlayerWithoutTrack() {
+        player.autoPause();
+
+        assertThat(engine.isPaused()).isFalse();
+        assertThat(eventDispatcher.getEvents()).isEmpty();
+    }
+
+    @Test
+    void autoResumeResumesAutoPausedPlayer() {
+        engine.play(track("Song A", 120_000));
+        player.autoPause();
+
+        player.autoResume();
+
+        assertThat(engine.isPaused()).isFalse();
+        assertThat(eventDispatcher.getLastEvent()).isInstanceOf(MusicPlayerEvent.AutoResumed.class);
+    }
+
+    @Test
+    void autoResumeOnlyResumesAutoPausedPlayer() {
+        engine.play(track("Song A", 120_000));
+        player.togglePause(new Request("req-1", "@user"));
+
+        player.autoResume();
+
+        assertThat(engine.isPaused()).isTrue();
+        assertThat(eventDispatcher.getEvents()).noneMatch(MusicPlayerEvent.AutoResumed.class::isInstance);
+    }
+
+    @Test
+    void togglePauseClearsAutoPause() {
+        engine.play(track("Song A", 120_000));
+        player.autoPause();
+        player.togglePause(new Request("req-1", "@user"));
+        player.togglePause(new Request("req-2", "@user"));
+
+        player.autoResume();
+
+        assertThat(engine.isPaused()).isTrue();
+        assertThat(eventDispatcher.getEvents()).noneMatch(MusicPlayerEvent.AutoResumed.class::isInstance);
+    }
+
+    @Test
+    void keepsAutoPauseWhenForwardingPastTheEnd() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        player.autoPause();
+
+        player.forward(Duration.ofMinutes(5), new Request("req-1", "@user"));
+
+        assertThat(engine.isPaused()).isTrue();
+        assertThat(eventDispatcher.getEvents()).filteredOn(MusicPlayerEvent.AutoPaused.class::isInstance).hasSize(2);
+        assertThat(eventDispatcher.getEvents()).noneMatch(MusicPlayerEvent.Paused.class::isInstance);
+    }
+
+    @Test
+    void reportsIdleWhenNothingPlays() {
+        assertThat(player.isIdle()).isTrue();
+    }
+
+    @Test
+    void reportsIdleWhenHumanPaused() {
+        engine.play(track("Song A", 120_000));
+        player.togglePause(new Request("req-1", "@user"));
+
+        assertThat(player.isIdle()).isTrue();
+    }
+
+    @Test
+    void doesNotReportIdleWhenAutoPaused() {
+        engine.play(track("Song A", 120_000));
+        player.autoPause();
+
+        assertThat(player.isIdle()).isFalse();
+    }
+
+    @Test
+    void doesNotReportIdleWhilePlaying() {
+        engine.play(track("Song A", 120_000));
+
+        assertThat(player.isIdle()).isFalse();
     }
 
     private static InMemoryTrack track(String title, long duration) {

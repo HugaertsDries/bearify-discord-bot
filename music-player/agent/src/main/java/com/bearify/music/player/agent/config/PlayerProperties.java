@@ -32,16 +32,22 @@ public record PlayerProperties(
 
     public record VoiceSession(
             @DefaultValue("10s") Duration heartbeatInterval,
-            @DefaultValue("5m") Duration lonelyTimeout) {
+            @DefaultValue("5m") Duration nobodyListeningTimeout,
+            @DefaultValue("10m") Duration idleTimeout) {
 
         @AssertTrue(message = "music-player.voice-session.heartbeat-interval must be greater than 0")
         public boolean hasPositiveHeartbeatInterval() {
             return heartbeatInterval.compareTo(Duration.ZERO) > 0;
         }
 
-        @AssertTrue(message = "music-player.voice-session.lonely-timeout must be greater than 0")
-        public boolean hasPositiveLonelyTimeout() {
-            return lonelyTimeout.compareTo(Duration.ZERO) > 0;
+        @AssertTrue(message = "music-player.voice-session.nobody-listening-timeout must be greater than 0")
+        public boolean hasPositiveNobodyListeningTimeout() {
+            return nobodyListeningTimeout.compareTo(Duration.ZERO) > 0;
+        }
+
+        @AssertTrue(message = "music-player.voice-session.idle-timeout must be greater than 0")
+        public boolean hasPositiveIdleTimeout() {
+            return idleTimeout.compareTo(Duration.ZERO) > 0;
         }
     }
 

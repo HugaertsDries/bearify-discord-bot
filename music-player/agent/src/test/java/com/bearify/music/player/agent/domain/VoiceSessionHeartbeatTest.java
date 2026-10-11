@@ -13,7 +13,11 @@ import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
+import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.domain.VoiceSessionHeartbeatTest.TestConfig;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.Request;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +53,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "player.id=test-player",
         "music-player.assignment.ttl=30s",
         "music-player.voice-session.heartbeat-interval=10s",
-        "music-player.voice-session.lonely-timeout=5m",
+        "music-player.voice-session.nobody-listening-timeout=5m",
+        "music-player.voice-session.idle-timeout=10m",
         "spring.main.allow-bean-definition-overriding=true",
         "spring.task.scheduling.enabled=false"
 })
@@ -78,6 +83,10 @@ class VoiceSessionHeartbeatTest {
     @Autowired StringRedisTemplate redis;
     @Autowired VoiceSessionHeartbeat heartbeat;
     @Autowired MutableClock clock;
+    @Autowired PlayerProperties properties;
+
+    private final AudioPlayerTest.InMemoryAudioEngine engine = new AudioPlayerTest.InMemoryAudioEngine();
+    private final AudioPlayerTest.RecordingEventDispatcher events = new AudioPlayerTest.RecordingEventDispatcher();
 
     @AfterEach
     void cleanup() {
@@ -85,7 +94,8 @@ class VoiceSessionHeartbeatTest {
         discordClient.reset();
         clock.reset();
         ((Map<?, ?>) ReflectionTestUtils.getField(pool, "entries")).clear();
-        ((Map<?, ?>) ReflectionTestUtils.getField(heartbeat, "lonelyGuilds")).clear();
+        ((Map<?, ?>) ReflectionTestUtils.getField(heartbeat, "nobodyListeningSince")).clear();
+        ((Map<?, ?>) ReflectionTestUtils.getField(heartbeat, "idleSince")).clear();
         redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID));
     }
 
@@ -116,7 +126,7 @@ class VoiceSessionHeartbeatTest {
     }
 
     @Test
-    void doesNotDisconnectBeforeLonelyTimeoutExpires() {
+    void doesNotDisconnectBeforeNobodyListeningTimeoutExpires() {
         pool.getOrCreate(GUILD_ID);
         discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
 
@@ -128,7 +138,7 @@ class VoiceSessionHeartbeatTest {
     }
 
     @Test
-    void disconnectsWhenLonelyTimeoutExpires() {
+    void disconnectsWithNobodyListeningReasonAfterTimeout() {
         pool.getOrCreate(GUILD_ID);
         discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
 
@@ -136,27 +146,164 @@ class VoiceSessionHeartbeatTest {
         clock.advance(Duration.ofMinutes(5));
         heartbeat.maintain();
 
-        assertThat(recordingManager.getDisconnectedGuilds()).contains(GUILD_ID);
+        assertThat(recordingManager.stopReason(GUILD_ID)).contains(StopReason.NOBODY_LISTENING);
     }
 
     @Test
-    void clearsLonelyTrackingWhenNonBotUserReturns() {
-        pool.getOrCreate(GUILD_ID);
+    void autoPausesWhenNobodyIsListening() {
+        playingPlayer();
         discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
 
         heartbeat.maintain();
-        clock.advance(Duration.ofMinutes(4));
-        discordClient.guild(GUILD_ID).setLonely(false);
+
+        assertThat(engine.isPaused()).isTrue();
+        assertThat(events.getEvents()).anyMatch(MusicPlayerEvent.AutoPaused.class::isInstance);
+    }
+
+    @Test
+    void keepsPlayingWhileSomeoneIsListening() {
+        playingPlayer();
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        discordClient.guild(GUILD_ID).setListeners(true);
+
         heartbeat.maintain();
-        clock.advance(Duration.ofMinutes(4));
-        discordClient.guild(GUILD_ID).setLonely(true);
+
+        assertThat(engine.isPaused()).isFalse();
+    }
+
+    @Test
+    void autoResumesWhenListenerReturns() {
+        playingPlayer();
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        heartbeat.maintain();
+
+        discordClient.guild(GUILD_ID).setListeners(true);
+        heartbeat.maintain();
+
+        assertThat(engine.isPaused()).isFalse();
+        assertThat(events.getLastEvent()).isInstanceOf(MusicPlayerEvent.AutoResumed.class);
+    }
+
+    @Test
+    void keepsHumanPauseWhenListenerReturns() {
+        AudioPlayer player = playingPlayer();
+        player.togglePause(new Request("req-1", "@user"));
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        heartbeat.maintain();
+
+        discordClient.guild(GUILD_ID).setListeners(true);
+        heartbeat.maintain();
+
+        assertThat(engine.isPaused()).isTrue();
+        assertThat(events.getEvents()).noneMatch(MusicPlayerEvent.AutoResumed.class::isInstance);
+    }
+
+    @Test
+    void disconnectsWithIdleReasonAfterIdleTimeout() {
+        pool.getOrCreate(GUILD_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        discordClient.guild(GUILD_ID).setListeners(true);
+
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(9).plusSeconds(59));
+        heartbeat.maintain();
+        assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
+
+        clock.advance(Duration.ofSeconds(1));
+        heartbeat.maintain();
+
+        assertThat(recordingManager.stopReason(GUILD_ID)).contains(StopReason.IDLE);
+    }
+
+    @Test
+    void disconnectsWithIdleReasonWhenHumanPauseLasts() {
+        AudioPlayer player = playingPlayer();
+        player.togglePause(new Request("req-1", "@user"));
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        discordClient.guild(GUILD_ID).setListeners(true);
+
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(10));
+        heartbeat.maintain();
+
+        assertThat(recordingManager.stopReason(GUILD_ID)).contains(StopReason.IDLE);
+    }
+
+    @Test
+    void startsIdleTimerAfreshForPlayerCreatedAfterLeave() {
+        pool.getOrCreate(GUILD_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        discordClient.guild(GUILD_ID).setListeners(true);
+        heartbeat.maintain();
+
+        pool.get(GUILD_ID).orElseThrow().close();
+        clock.advance(Duration.ofMinutes(6));
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(6));
+        pool.getOrCreate(GUILD_ID);
         heartbeat.maintain();
 
         assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
     }
 
     @Test
-    void clearsLonelyTrackingWhenSessionDisappears() {
+    void leavesWithNobodyListeningReasonWhenListenersLeaveAHumanPause() {
+        AudioPlayer player = playingPlayer();
+        player.togglePause(new Request("req-1", "@user"));
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        discordClient.guild(GUILD_ID).setListeners(true);
+        heartbeat.maintain();
+
+        clock.advance(Duration.ofMinutes(8));
+        discordClient.guild(GUILD_ID).setListeners(false);
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(3));
+        heartbeat.maintain();
+        assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
+
+        clock.advance(Duration.ofMinutes(2));
+        heartbeat.maintain();
+
+        assertThat(recordingManager.stopReason(GUILD_ID)).contains(StopReason.NOBODY_LISTENING);
+    }
+
+    @Test
+    void resetsIdleTimerWhenPlaybackResumes() {
+        AudioPlayer player = playingPlayer();
+        player.togglePause(new Request("req-1", "@user"));
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+        discordClient.guild(GUILD_ID).setListeners(true);
+
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(6));
+        player.togglePause(new Request("req-2", "@user"));
+        heartbeat.maintain();
+        player.togglePause(new Request("req-3", "@user"));
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(6));
+        heartbeat.maintain();
+
+        assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
+    }
+
+    @Test
+    void clearsNobodyListeningTrackingWhenListenerReturns() {
+        pool.getOrCreate(GUILD_ID);
+        discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
+
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(4));
+        discordClient.guild(GUILD_ID).setListeners(true);
+        heartbeat.maintain();
+        clock.advance(Duration.ofMinutes(4));
+        discordClient.guild(GUILD_ID).setListeners(false);
+        heartbeat.maintain();
+
+        assertThat(recordingManager.getDisconnectedGuilds()).isEmpty();
+    }
+
+    @Test
+    void clearsTrackingWhenSessionDisappears() {
         pool.getOrCreate(GUILD_ID);
         discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
 
@@ -172,7 +319,7 @@ class VoiceSessionHeartbeatTest {
     }
 
     @Test
-    void resetsLonelyTrackingWhenChannelChanges() {
+    void resetsTrackingWhenChannelChanges() {
         pool.getOrCreate(GUILD_ID);
         discordClient.guild(GUILD_ID).simulateJoined(CHANNEL_ID);
 
@@ -199,6 +346,16 @@ class VoiceSessionHeartbeatTest {
 
         assertThat(recordingManager.disconnectCallsFor(GUILD_ID)).isEqualTo(2);
         assertThat(recordingManager.getDisconnectedGuilds()).contains(GUILD_ID);
+    }
+
+    private AudioPlayer playingPlayer() {
+        AudioPlayer player = new AudioPlayer(engine, new AudioPlayerTest.NoOpAudioProvider(), events, properties,
+                null, "test-player", GUILD_ID, () -> {});
+        @SuppressWarnings("unchecked")
+        Map<String, AudioPlayer> entries = (Map<String, AudioPlayer>) ReflectionTestUtils.getField(pool, "entries");
+        entries.put(GUILD_ID, player);
+        engine.play(new AudioPlayerTest.InMemoryTrack("Song A", 120_000, "@alice"));
+        return player;
     }
 
     @TestConfiguration
@@ -260,6 +417,7 @@ class VoiceSessionHeartbeatTest {
 
         private final Set<String> disconnectedGuilds = new java.util.HashSet<>();
         private final Map<String, Integer> disconnectCalls = new HashMap<>();
+        private final Map<String, StopReason> stopReasons = new HashMap<>();
         private boolean failNextDisconnect;
 
         TestVoiceConnectionManager() {
@@ -267,13 +425,14 @@ class VoiceSessionHeartbeatTest {
         }
 
         @Override
-        public void disconnect(String guildId) {
+        public void disconnect(String guildId, StopReason reason) {
             disconnectCalls.merge(guildId, 1, Integer::sum);
             if (failNextDisconnect) {
                 failNextDisconnect = false;
                 throw new IllegalStateException("boom");
             }
             disconnectedGuilds.add(guildId);
+            stopReasons.put(guildId, reason);
         }
 
         @Override
@@ -282,6 +441,10 @@ class VoiceSessionHeartbeatTest {
 
         Set<String> getDisconnectedGuilds() {
             return Set.copyOf(disconnectedGuilds);
+        }
+
+        Optional<StopReason> stopReason(String guildId) {
+            return Optional.ofNullable(stopReasons.get(guildId));
         }
 
         void failNextDisconnect() {
@@ -295,6 +458,7 @@ class VoiceSessionHeartbeatTest {
         void reset() {
             disconnectedGuilds.clear();
             disconnectCalls.clear();
+            stopReasons.clear();
             failNextDisconnect = false;
         }
     }
@@ -356,7 +520,7 @@ class VoiceSessionHeartbeatTest {
     static final class FakeGuild implements Guild {
 
         private String connectedChannelId;
-        private boolean lonely = true;
+        private boolean listeners = false;
 
         @Override
         public Optional<VoiceSession> voice() {
@@ -371,7 +535,12 @@ class VoiceSessionHeartbeatTest {
 
                 @Override
                 public boolean isLonely() {
-                    return lonely;
+                    return !listeners;
+                }
+
+                @Override
+                public boolean hasListeners() {
+                    return listeners;
                 }
 
                 @Override
@@ -391,8 +560,8 @@ class VoiceSessionHeartbeatTest {
             connectedChannelId = channelId;
         }
 
-        void setLonely(boolean lonely) {
-            this.lonely = lonely;
+        void setListeners(boolean listeners) {
+            this.listeners = listeners;
         }
 
         void simulateLeft() {

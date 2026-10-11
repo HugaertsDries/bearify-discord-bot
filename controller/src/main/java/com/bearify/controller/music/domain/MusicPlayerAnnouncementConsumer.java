@@ -23,7 +23,8 @@ public class MusicPlayerAnnouncementConsumer implements MusicPlayerEventConsumer
                 LOG.warn("Failed to deliver event {} for player {}", event.getClass().getSimpleName(), event.playerId(), e);
             }
         }
-        if (event instanceof MusicPlayerEvent.Stopped || event instanceof MusicPlayerEvent.QueueEmpty) {
+        // kept after QueueEmpty, so an idle leave still has a channel to post its note in
+        if (event instanceof MusicPlayerEvent.Stopped) {
             registry.removeAll(event.playerId(), event.guildId());
         }
     }

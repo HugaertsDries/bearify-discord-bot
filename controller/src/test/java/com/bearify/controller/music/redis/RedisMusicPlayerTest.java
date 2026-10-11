@@ -6,6 +6,7 @@ import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
@@ -388,7 +389,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             player.stop(new MusicPlayerEventListener() {
                 @Override public void onStopped() { stopped.set(true); }
             });
-            publish(new MusicPlayerEvent.Stopped(PLAYER_ID, nextInteraction(received).requestId(), GUILD_ID));
+            publish(new MusicPlayerEvent.Stopped(PLAYER_ID, nextInteraction(received).requestId(), GUILD_ID, StopReason.REQUESTED));
 
             await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(stopped.get()).isTrue());
         } finally {

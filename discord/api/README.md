@@ -22,7 +22,7 @@ Defines the interfaces and models that the rest of the project depends on. By de
 
 ### Voice
 - `AudioProvider` — supplies Opus-encoded audio frames for a voice connection: `canProvide()`, `provide20MsAudio()`, `isOpus()`
-- `VoiceSession` — represents an active voice connection: `getChannelId()`, `isLonely()`, `leave()`
+- `VoiceSession` — represents an active voice connection: `getChannelId()`, `isLonely()`, `hasListeners()`, `leave()`
 - `VoiceSessionListener` — callback fired once the bot has joined a voice channel: `onJoined(channelId)`
 
 ### Model

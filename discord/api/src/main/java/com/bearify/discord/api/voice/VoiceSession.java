@@ -12,6 +12,9 @@ public interface VoiceSession {
     /** Whether no non-bot users are present in the current channel. */
     boolean isLonely();
 
+    /** Whether at least one non-bot member who is not deafened (self or server) is in the current channel. */
+    boolean hasListeners();
+
     /** Leave the current voice channel. */
     void leave();
 }

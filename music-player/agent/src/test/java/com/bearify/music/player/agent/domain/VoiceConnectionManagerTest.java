@@ -15,6 +15,7 @@ import com.bearify.discord.api.voice.VoiceSessionListener;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,8 +93,8 @@ class VoiceConnectionManagerTest {
 
     @BeforeEach
     void resetState() {
-        voiceConnectionManager.disconnect(GUILD_ID);
-        voiceConnectionManager.disconnect(GUILD_ID_2);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
+        voiceConnectionManager.disconnect(GUILD_ID_2, StopReason.REQUESTED);
         discordClient.reset();
         clock.reset();
     }
@@ -167,7 +168,7 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
@@ -179,15 +180,34 @@ class VoiceConnectionManagerTest {
             if (parseEvent(body) instanceof MusicPlayerEvent.Stopped event) stopped.set(event);
         });
 
-        voiceConnectionManager.disconnect(GUILD_ID, REQUEST_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, REQUEST_ID, StopReason.REQUESTED);
 
         await().atMost(2, TimeUnit.SECONDS)
-                .untilAsserted(() -> assertThat(stopped.get()).isEqualTo(new MusicPlayerEvent.Stopped(PLAYER_ID, REQUEST_ID, GUILD_ID)));
+                .untilAsserted(() -> assertThat(stopped.get()).isEqualTo(new MusicPlayerEvent.Stopped(PLAYER_ID, REQUEST_ID, GUILD_ID, StopReason.REQUESTED)));
+    }
+
+    @Test
+    void sendsNoSecondStoppedWhenTimerFiresAfterStopRequest() throws Exception {
+        List<MusicPlayerEvent> stopped = new java.util.concurrent.CopyOnWriteArrayList<>();
+        startListener(body -> {
+            if (parseEvent(body) instanceof MusicPlayerEvent.Stopped event) stopped.add(event);
+        });
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+
+        voiceConnectionManager.disconnect(GUILD_ID, REQUEST_ID, StopReason.REQUESTED);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.NOBODY_LISTENING);
+        // a request always gets its answer, so it marks the end of the stream
+        voiceConnectionManager.disconnect(GUILD_ID, "req-marker", StopReason.REQUESTED);
+
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> assertThat(stopped).containsExactly(
+                new MusicPlayerEvent.Stopped(PLAYER_ID, REQUEST_ID, GUILD_ID, StopReason.REQUESTED),
+                new MusicPlayerEvent.Stopped(PLAYER_ID, "req-marker", GUILD_ID, StopReason.REQUESTED)));
     }
 
     @Test
     void doesNothingWhenDisconnectingWithoutActiveGuild() {
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isZero();
     }
@@ -197,8 +217,8 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
-        voiceConnectionManager.disconnect(GUILD_ID);
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
@@ -210,7 +230,7 @@ class VoiceConnectionManagerTest {
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
         discordClient.guild(GUILD_ID_2).simulateJoined("voice-2");
 
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
         assertThat(discordClient.guild(GUILD_ID_2).getLeaveCount()).isZero();
@@ -222,12 +242,12 @@ class VoiceConnectionManagerTest {
     void tracksGuildAsConnectedOnlyAfterJoinCallbackFires() {
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
 
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isZero();
 
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
 
@@ -238,7 +258,7 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, "voice-2", GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined("voice-2");
 
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
         assertThat(discordClient.guild(GUILD_ID).getLeaveCount()).isEqualTo(1);
     }
 
@@ -250,7 +270,7 @@ class VoiceConnectionManagerTest {
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isNull();
     }
@@ -259,7 +279,7 @@ class VoiceConnectionManagerTest {
     void doesNotDeleteAssignmentKeyWhenNotConnected() {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
 
-        voiceConnectionManager.disconnect(GUILD_ID);
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         // No voice session active → key should not be touched
         assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo("test-player");
@@ -586,6 +606,7 @@ class VoiceConnectionManagerTest {
                 return Optional.of(new VoiceSession() {
                     @Override public String getChannelId() { return connectedChannelId; }
                     @Override public boolean isLonely() { return lonely; }
+                    @Override public boolean hasListeners() { return !lonely; }
                     @Override public void leave() { leaveCount++; connectedChannelId = null; }
                 });
             }

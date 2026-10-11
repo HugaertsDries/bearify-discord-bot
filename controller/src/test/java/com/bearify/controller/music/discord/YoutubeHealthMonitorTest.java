@@ -3,6 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.music.domain.HealthChecker;
 import com.bearify.discord.testing.MockDiscordClient;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
 
@@ -235,7 +236,7 @@ class YoutubeHealthMonitorTest {
     @Test
     void ignoresOtherEvents() {
         monitor.accept(new MusicPlayerEvent.TrackNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID, "query"));
-        monitor.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, REQUEST_ID, GUILD_ID));
+        monitor.accept(new MusicPlayerEvent.Stopped(PLAYER_ID, REQUEST_ID, GUILD_ID, StopReason.REQUESTED));
 
         assertThat(executor.queued()).isZero();
     }

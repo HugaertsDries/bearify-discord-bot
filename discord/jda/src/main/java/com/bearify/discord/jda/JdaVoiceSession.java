@@ -36,6 +36,14 @@ class JdaVoiceSession implements VoiceSession {
     }
 
     @Override
+    public boolean hasListeners() {
+        // a missing voice state (cache off) counts as listening, which keeps the bear playing
+        return channel.getMembers().stream()
+                .filter(m -> !m.getUser().isBot())
+                .anyMatch(m -> m.getVoiceState() == null || !m.getVoiceState().isDeafened());
+    }
+
+    @Override
     public void leave() {
         if( audioManager.getSendingHandler() instanceof Closeable closeable) {
             try {
