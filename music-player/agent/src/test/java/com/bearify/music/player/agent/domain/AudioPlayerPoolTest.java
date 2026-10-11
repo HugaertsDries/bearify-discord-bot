@@ -9,6 +9,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +25,7 @@ class AudioPlayerPoolTest {
             Duration.ofMinutes(5),
             Duration.ofSeconds(5),
             200,
+            100,
             new PlayerProperties.Assignment(
                     Duration.ofSeconds(30),
                     Duration.ofSeconds(10)),
@@ -71,5 +74,30 @@ class AudioPlayerPoolTest {
                 "player-1");
 
         assertThat(pool.activeGuildIds()).isEmpty();
+    }
+
+    @Test
+    void appliesDefaultVolumeToNewPlayer() {
+        var properties = new PlayerProperties(
+                PROPERTIES.previousRestartThreshold(), PROPERTIES.seekShortDefault(), PROPERTIES.seekLongDefault(),
+                PROPERTIES.seekTrackLengthThreshold(), PROPERTIES.errorSkipDelay(), PROPERTIES.playlistMaxTracks(),
+                40,
+                PROPERTIES.assignment(), PROPERTIES.voiceSession(), PROPERTIES.engine());
+        List<LavaAudioEngine> engines = new ArrayList<>();
+        var pool = new AudioPlayerPool(
+                mock(DiscordClient.class),
+                mock(MusicPlayerEventDispatcher.class),
+                properties,
+                Executors.newScheduledThreadPool(1),
+                () -> {
+                    var engine = new LavaAudioEngine(manager);
+                    engines.add(engine);
+                    return engine;
+                },
+                "player-1");
+
+        pool.getOrCreate("guild-1");
+
+        assertThat(engines).singleElement().extracting(LavaAudioEngine::getVolume).isEqualTo(40);
     }
 }

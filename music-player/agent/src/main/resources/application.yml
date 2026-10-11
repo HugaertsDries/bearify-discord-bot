@@ -27,6 +27,8 @@ music-player:
   seek-track-length-threshold: 5m
   error-skip-delay: 5s
   playlist-max-tracks: 200
+  # below 100 LavaPlayer re-encodes every frame instead of passing YouTube's Opus through, which costs CPU
+  default-volume: 100
   engine:
     youtube:
       refresh-token: ${YOUTUBE_REFRESH_TOKEN:}

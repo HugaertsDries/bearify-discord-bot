@@ -38,6 +38,7 @@ class MusicPlayerInteractionDispatcherTest {
             Duration.ofSeconds(3), Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofMinutes(5),
             Duration.ofSeconds(5),
             200,
+            100,
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
             new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5), Duration.ofMinutes(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null, null, null)));
@@ -267,6 +268,30 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
+    void routesSetVolumeToPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.SetVolume(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 40));
+
+        assertThat(pool.setVolumeCalls).containsExactly("40|" + GUILD_ID + "|@user");
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenSettingVolumeWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.SetVolume(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 40));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    @Test
     void dispatchesSearchInteractionToLoaderAndPublishesSearchResults() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         List<String> searchCalls = new ArrayList<>();
@@ -361,6 +386,7 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> forwardCalls = new ArrayList<>();
         final List<String> playPlaylistCalls = new ArrayList<>();
         final List<String> snapshotCalls = new ArrayList<>();
+        final List<String> setVolumeCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
 
@@ -433,6 +459,11 @@ class MusicPlayerInteractionDispatcherTest {
             public void snapshot(String requestId) {
                 snapshotCalls.add(guildId + "|" + requestId);
             }
+
+            @Override
+            public void setVolume(int volume, Request request) {
+                setVolumeCalls.add(volume + "|" + guildId + "|" + request.requesterTag());
+            }
         }
 
         private static final class NoOpEngine implements AudioEngine {
@@ -440,6 +471,8 @@ class MusicPlayerInteractionDispatcherTest {
             @Override public void play(Track t) {}
             @Override public boolean isPaused() { return false; }
             @Override public void setPaused(boolean p) {}
+            @Override public int getVolume() { return 100; }
+            @Override public void setVolume(int volume) {}
             @Override public void addListener(AudioEngineListener l) {}
         }
 

@@ -130,6 +130,15 @@ class PlaybackComponentTest {
     }
 
     @Test
+    void showsVolumeOnRequesterLine() {
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+
+        ComponentMessage message = announcer.render(baseState().volume(40).build());
+
+        assertThat(texts(message)).contains("-# **Requested by** @user · 🔊 40%");
+    }
+
+    @Test
     void staysUnderFortyComponentsWithHeavyQueue() {
         PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
 

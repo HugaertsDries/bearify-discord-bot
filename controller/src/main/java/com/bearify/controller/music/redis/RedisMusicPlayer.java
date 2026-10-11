@@ -97,6 +97,9 @@ class RedisMusicPlayer implements MusicPlayer {
     public void clear(String requesterTag, MusicPlayerEventListener handler) { state.clear(requesterTag, handler); }
 
     @Override
+    public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { state.setVolume(volume, requesterTag, handler); }
+
+    @Override
     public Optional<MusicPlayerEvent> queue() { return state.queue(); }
 
     private String serialize(Object value) {
@@ -178,6 +181,11 @@ class RedisMusicPlayer implements MusicPlayer {
         @Override
         public void clear(String requesterTag, MusicPlayerEventListener handler) {
             refuse("clear", handler);
+        }
+
+        @Override
+        public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
+            refuse("setVolume", handler);
         }
 
         @Override
@@ -314,6 +322,17 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.Cleared ignored -> handler.onCleared();
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for clear request", event.getClass().getSimpleName());
+                }
+            });
+        }
+
+        @Override
+        public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
+            request(requestId -> new MusicPlayerInteraction.SetVolume(playerId, new Request(requestId, requesterTag), guildId, volume), handler, event -> {
+                switch (event) {
+                    case MusicPlayerEvent.VolumeChanged v -> handler.onVolumeChanged(v.volume());
+                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
+                    default -> LOG.warn("Unexpected event '{}' for setVolume request", event.getClass().getSimpleName());
                 }
             });
         }

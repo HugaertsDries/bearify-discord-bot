@@ -18,6 +18,7 @@ public interface MusicPlayer {
     /** {@link java.time.Duration#ZERO} means use the player's configured default. */
     void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler);
     void clear(String requesterTag, MusicPlayerEventListener handler);
+    void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler);
     /** Blocks for the bear's reply, a {@link MusicPlayerEvent.QueueSnapshot} or {@link MusicPlayerEvent.PlayerNotFound}; empty when it doesn't answer in time. */
     Optional<MusicPlayerEvent> queue();
 }

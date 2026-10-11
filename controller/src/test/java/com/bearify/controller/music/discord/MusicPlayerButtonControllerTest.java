@@ -321,6 +321,11 @@ class MusicPlayerButtonControllerTest {
         }
 
         @Override
+        public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
+            answer.accept(handler);
+        }
+
+        @Override
         public Optional<MusicPlayerEvent> queue() {
             return queue;
         }

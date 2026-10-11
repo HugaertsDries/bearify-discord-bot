@@ -4,6 +4,8 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.time.Duration;
 
@@ -58,8 +60,21 @@ class PlayerPropertiesValidationTest {
     }
 
     @Test
+    void rejectsDefaultVolumeAboveHundred() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(PlayerPropertiesConfig.class)
+                .withPropertyValues("music-player.default-volume=150")
+                .run(context -> assertThat(context).getFailure()
+                        .rootCause().hasMessageContaining("defaultVolume"));
+    }
+
+    @Test
     void treatsBlankRefreshTokenAsAbsent() {
         var youtube = new PlayerProperties.Engine.Youtube(" ", null, null);
         assertThat(youtube.refreshToken()).isEmpty();
+    }
+
+    @EnableConfigurationProperties(PlayerProperties.class)
+    static class PlayerPropertiesConfig {
     }
 }

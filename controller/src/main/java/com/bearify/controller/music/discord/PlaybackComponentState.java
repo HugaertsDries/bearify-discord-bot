@@ -42,6 +42,7 @@ public final class PlaybackComponentState {
     private final List<TrackMetadata> upNext;
     private final int queueSize;
     private final Duration queueDuration;
+    private final int volume;
     private final URI artworkUri;
     private final String footer;
     private final boolean paused;
@@ -54,6 +55,7 @@ public final class PlaybackComponentState {
         this.upNext = List.copyOf(builder.upNext);
         this.queueSize = builder.queueSize;
         this.queueDuration = builder.queueDuration;
+        this.volume = builder.volume;
         this.artworkUri = builder.artworkUri;
         this.footer = builder.footerText;
         this.paused = builder.paused;
@@ -93,6 +95,10 @@ public final class PlaybackComponentState {
         return queueDuration;
     }
 
+    public int volume() {
+        return volume;
+    }
+
     public Optional<URI> artworkUri() {
         return Optional.ofNullable(artworkUri);
     }
@@ -113,6 +119,7 @@ public final class PlaybackComponentState {
         private List<TrackMetadata> upNext = List.of();
         private int queueSize;
         private Duration queueDuration = Duration.ZERO;
+        private int volume = 100;
         private URI artworkUri;
         private String footerText;
         private boolean paused;
@@ -157,6 +164,11 @@ public final class PlaybackComponentState {
 
         public Builder queueDuration(Duration queueDuration) {
             this.queueDuration = queueDuration == null ? Duration.ZERO : queueDuration;
+            return this;
+        }
+
+        public Builder volume(int volume) {
+            this.volume = volume;
             return this;
         }
 

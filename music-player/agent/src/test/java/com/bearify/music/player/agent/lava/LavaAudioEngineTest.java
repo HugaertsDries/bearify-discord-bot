@@ -38,6 +38,15 @@ class LavaAudioEngineTest {
         assertThat(other.getPlayingTrack()).isEmpty();
     }
 
+    @Test
+    void delegatesVolumeToLavaPlayer() {
+        var engine = new LavaAudioEngine(manager);
+
+        engine.setVolume(40);
+
+        assertThat(engine.getVolume()).isEqualTo(40);
+    }
+
     private record RecordingLoadHandler(List<String> outcomes) implements AudioLoadResultHandler {
         @Override public void trackLoaded(AudioTrack track) { outcomes.add("trackLoaded"); }
         @Override public void playlistLoaded(AudioPlaylist playlist) { outcomes.add("playlistLoaded"); }

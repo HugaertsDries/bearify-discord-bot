@@ -34,6 +34,7 @@ public class MusicPlayerCommandController {
     private static final String TRACK_NOT_FOUND_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that track. Try a different search or link?";
     private static final String NEGATIVE_REWIND_MESSAGE = BearifyEmoji.REWIND + " | Use a positive number of seconds, bear with me.";
     private static final String NEGATIVE_FORWARD_MESSAGE = BearifyEmoji.FORWARD + " | Use a positive number of seconds, bear with me.";
+    private static final String VOLUME_OUT_OF_RANGE_MESSAGE = BearifyEmoji.BLOCKED + " | Volume goes from 0 to 100, bear with me.";
     private static final String TRACK_LOAD_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | Oops! Something went wrong loading this track. This could be due to age-restrictions or region lock. (I'm technically less than 1 year old)";
     private static final String SPOTIFY_NOT_A_SONG_MESSAGE = BearifyEmoji.BLOCKED + " | I can only sniff out single Spotify songs. Paste a track link instead!";
     private static final String SPOTIFY_UNREADABLE_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that Spotify song. Try a YouTube link or a search instead?";
@@ -283,6 +284,30 @@ public class MusicPlayerCommandController {
     }
 
     @SuppressWarnings("unused")
+    @Interaction(value = "volume", description = "I'll turn the music up or down for everyone")
+    public void volume(CommandInteraction interaction,
+                       @Option(name = "level", description = "The volume from 0 to 100", required = true) int level) {
+        if (level < 0 || level > 100) {
+            interaction.reply(VOLUME_OUT_OF_RANGE_MESSAGE).ephemeral().send();
+            return;
+        }
+        requireVoiceSession(interaction).ifPresent(ctx ->
+                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
+                        player -> {
+                            EditableMessage message = interaction.defer(true);
+                            player.setVolume(level, interaction.getUserMention(), new AnsweringListener(message::edit) {
+                                @Override
+                                public void onVolumeChanged(int volume) {
+                                    answer(volumeMessage(volume));
+                                }
+                            });
+                        },
+                        () -> replyNoPlayer(interaction)
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
     @Interaction(value = "queue", description = "I'll show you everything that's coming up on the trail")
     public void queue(CommandInteraction interaction) {
         requireVoiceSession(interaction).ifPresent(ctx ->
@@ -398,6 +423,10 @@ public class MusicPlayerCommandController {
 
     private static String clearedMessage() {
         return BearifyEmoji.TRASH + " | Cleared the playlist. Fresh paws.";
+    }
+
+    private static String volumeMessage(int volume) {
+        return BearifyEmoji.SPEAKER + " | Volume set to " + volume + "%. Only too loud for you? Right-click the bear → User Volume.";
     }
 
     private record ChannelContext(String guildId, String voiceChannelId) {}

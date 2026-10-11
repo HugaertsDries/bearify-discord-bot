@@ -150,6 +150,29 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void labelsVolumeChangeWithRequester() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.VolumeChanged("player-1", new Request("req-2", "@other"), "guild-1", 40));
+
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Volume set to 40% by @other"));
+        assertThat(allTexts(updated.get())).contains("-# **Requested by** @user · " + BearifyEmoji.SPEAKER + " 40%");
+    }
+
+    @Test
+    void showsVolumeFromTrackStart() {
+        AtomicReference<ComponentMessage> sent = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 40));
+
+        assertThat(allTexts(sent.get())).contains("-# **Requested by** @user · " + BearifyEmoji.SPEAKER + " 40%");
+    }
+
+    @Test
     void acceptReplacesOlderTemporaryActionWithNewerOne() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
@@ -321,7 +344,7 @@ class DiscordPlaybackAnnouncerTest {
 
         String longTitle = "A".repeat(100);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata(longTitle, "Artist", "https://example.com", 60_000), List.of(), 0, 0L));
+                new TrackMetadata(longTitle, "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100));
 
         assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("A".repeat(44)));
     }
@@ -333,7 +356,7 @@ class DiscordPlaybackAnnouncerTest {
 
         String longAuthor = "B".repeat(60);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", longAuthor, "https://example.com", 60_000), List.of(), 0, 0L));
+                new TrackMetadata("Song", longAuthor, "https://example.com", 60_000), List.of(), 0, 0L, 100));
 
         assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("B".repeat(39)));
     }
@@ -571,7 +594,7 @@ class DiscordPlaybackAnnouncerTest {
 
     private static MusicPlayerEvent.TrackStart trackStart(String playerId) {
         return new MusicPlayerEvent.TrackStart(playerId, new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L);
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100);
     }
 
     private static MusicPlayerEvent.TrackStart trackStartWithUpNext(String playerId) {
@@ -580,7 +603,7 @@ class DiscordPlaybackAnnouncerTest {
                 List.of(
                         new TrackMetadata("Hotel California", "Eagles", "https://example.com/1", 390_000),
                         new TrackMetadata("Stairway to Heaven", "Led Zeppelin", "https://example.com/2", 482_000)
-                ), 2, 872_000L);
+                ), 2, 872_000L, 100);
     }
 
     private static MusicPlayerEvent.TrackError trackError(String playerId) {

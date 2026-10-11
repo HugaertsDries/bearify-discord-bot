@@ -39,6 +39,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.AutoResumed.class, name = "auto_resumed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.QueueSnapshot.class, name = "queue_snapshot"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.NotSeekable.class, name = "not_seekable"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.VolumeChanged.class, name = "volume_changed"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -68,7 +69,8 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.AutoPaused,
         MusicPlayerEvent.AutoResumed,
         MusicPlayerEvent.QueueSnapshot,
-        MusicPlayerEvent.NotSeekable {
+        MusicPlayerEvent.NotSeekable,
+        MusicPlayerEvent.VolumeChanged {
 
     String playerId();
     String requestId();
@@ -77,12 +79,14 @@ public sealed interface MusicPlayerEvent permits
     /**
      * {@code upNext} is the start of the queue; {@code queueSize} and {@code queueDurationMs} (live streams excluded)
      * cover the whole queue, and are 0 when an older bear sent the event (boxed so their absence reads as 0, not an error).
+     * {@code volume} is the bear's current volume, 100 (LavaPlayer's default) when an older bear sent the event.
      */
-    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs) implements MusicPlayerEvent {
+    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs, Integer volume) implements MusicPlayerEvent {
         public TrackStart {
             upNext = upNext != null ? List.copyOf(upNext) : List.of();
             queueSize = queueSize != null ? queueSize : 0;
             queueDurationMs = queueDurationMs != null ? queueDurationMs : 0L;
+            volume = volume != null ? volume : 100;
         }
         @Override public String requestId() { return request.id(); }
     }
@@ -156,4 +160,7 @@ public sealed interface MusicPlayerEvent permits
     }
     /** A rewind or forward on a track that can't seek, such as a live stream. */
     record NotSeekable(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
+    record VolumeChanged(String playerId, Request request, String guildId, int volume) implements MusicPlayerEvent {
+        @Override public String requestId() { return request.id(); }
+    }
 }

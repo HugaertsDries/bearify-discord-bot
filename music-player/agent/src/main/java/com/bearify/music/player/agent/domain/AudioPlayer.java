@@ -118,6 +118,12 @@ public class AudioPlayer implements AudioProvider {
         }
     }
 
+    public synchronized void setVolume(int volume, Request request) {
+        int clamped = Math.clamp(volume, 0, 100);
+        engine.setVolume(clamped);
+        eventDispatcher.dispatch(new MusicPlayerEvent.VolumeChanged(playerId, request, guildId, clamped));
+    }
+
     public synchronized void next(Request request) {
         if (queue.isEmpty()) {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
@@ -307,7 +313,8 @@ public class AudioPlayer implements AudioProvider {
                     track.toMetadata(),
                     upNext,
                     queueSize,
-                    queueDurationMs));
+                    queueDurationMs,
+                    engine.getVolume()));
         }
 
         @Override

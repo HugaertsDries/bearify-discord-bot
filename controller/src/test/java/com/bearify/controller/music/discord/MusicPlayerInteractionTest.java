@@ -765,6 +765,10 @@ class MusicPlayerInteractionTest {
         }
 
         @Override
+        public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
+        }
+
+        @Override
         public Optional<MusicPlayerEvent> queue() {
             return Optional.empty();
         }

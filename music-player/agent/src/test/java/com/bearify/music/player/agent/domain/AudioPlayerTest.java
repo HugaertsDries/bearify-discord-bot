@@ -28,6 +28,7 @@ class AudioPlayerTest {
             Duration.ofSeconds(3), Duration.ofSeconds(10), Duration.ofSeconds(30), Duration.ofMinutes(5),
             Duration.ofSeconds(5),
             200,
+            100,
             new PlayerProperties.Assignment(Duration.ofSeconds(30), Duration.ofSeconds(10)),
             new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5), Duration.ofMinutes(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null, null, null)));
@@ -407,6 +408,24 @@ class AudioPlayerTest {
     }
 
     @Test
+    void setsVolumeOnEngineAndAnnouncesIt() {
+        player.setVolume(40, new Request("req-1", "@user"));
+
+        assertThat(engine.getVolume()).isEqualTo(40);
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.VolumeChanged(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 40));
+    }
+
+    @Test
+    void clampsVolumeAboveHundred() {
+        player.setVolume(150, new Request("req-1", "@user"));
+
+        assertThat(engine.getVolume()).isEqualTo(100);
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.VolumeChanged(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 100));
+    }
+
+    @Test
     void snapshotsCurrentTrackAndFullQueue() {
         InMemoryTrack playing = track("Playing", 120_000);
         engine.play(playing);
@@ -607,6 +626,16 @@ class AudioPlayerTest {
         assertThat(start.upNext()).hasSize(3);
         assertThat(start.queueSize()).isEqualTo(4);
         assertThat(start.queueDurationMs()).isEqualTo(270_000);
+    }
+
+    @Test
+    void includesCurrentVolumeInTrackStart() {
+        player.setVolume(40, new Request("req-1", "@user"));
+
+        player.play(track("Song A", 120_000));
+
+        MusicPlayerEvent.TrackStart start = (MusicPlayerEvent.TrackStart) eventDispatcher.getLastEvent();
+        assertThat(start.volume()).isEqualTo(40);
     }
 
     @Test
@@ -838,9 +867,12 @@ class AudioPlayerTest {
     static final class InMemoryAudioEngine implements AudioEngine {
         private Track playingTrack;
         private boolean paused;
+        private int volume = 100;
         private AudioEngineListener listener;
 
         @Override public Optional<Track> getPlayingTrack() { return Optional.ofNullable(playingTrack); }
+        @Override public int getVolume() { return volume; }
+        @Override public void setVolume(int volume) { this.volume = volume; }
 
         @Override
         public void play(Track track) {

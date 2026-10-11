@@ -46,6 +46,8 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String NOTHING_PLAYING_MESSAGE = "\uD83C\uDF6F | Nothing's playing right now. Queue something with `/player play`!";
     private static final String QUEUE_EMPTY_MESSAGE = "\uD83C\uDF6F | This is where the trail ends. Try adding more using `/player play` command!";
     private static final String NOT_SEEKABLE_MESSAGE = "\uD83D\uDED1\uFE0F | I can't paw back and forth through a live stream.";
+    private static final String VOLUME_SET_MESSAGE = "🔊 | Volume set to 40%. Only too loud for you? Right-click the bear → User Volume.";
+    private static final String VOLUME_OUT_OF_RANGE_MESSAGE = "🛑️ | Volume goes from 0 to 100, bear with me.";
     private static final SpotifyLinkResolver NO_SPOTIFY = new SpotifyLinkResolver(uri -> Optional.empty());
 
     @Autowired CommandRegistry commandRegistry;
@@ -325,6 +327,42 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void setsVolumeAndRepliesWithUserVolumeTip() {
+        BlockingQueue<MusicPlayerInteraction> sent = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer bear = answerAs(interaction -> {
+            sent.offer(interaction);
+            MusicPlayerInteraction.SetVolume setVolume = (MusicPlayerInteraction.SetVolume) interaction;
+            return new MusicPlayerEvent.VolumeChanged(PLAYER_ID, setVolume.request(), GUILD_ID, setVolume.volume());
+        });
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("volume", "level", "40");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(VOLUME_SET_MESSAGE));
+            assertThat(sent).singleElement()
+                    .isInstanceOfSatisfying(MusicPlayerInteraction.SetVolume.class, setVolume -> {
+                        assertThat(setVolume.volume()).isEqualTo(40);
+                        assertThat(setVolume.guildId()).isEqualTo(GUILD_ID);
+                    });
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void repliesTimedOutWhenBearDoesNotAnswerVolume() {
+        MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new TimingOutMusicPlayer()), NO_SPOTIFY);
+        MockCommandInteraction interaction = buildInteractionWithOption("volume", "level", "40");
+
+        controller.volume(interaction, 40);
+
+        assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains("didn't answer in time");
+    }
+
+    @Test
     void answersLeavePubliclyAfterBearConfirms() {
         RedisMessageListenerContainer bear = answerAs(interaction ->
                 new MusicPlayerEvent.Stopped(PLAYER_ID, interaction.requestId(), GUILD_ID, StopReason.REQUESTED));
@@ -405,6 +443,30 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void rejectsVolumeOutOfRangeWithoutContactingBear() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction tooLoud = buildInteractionWithOption("volume", "level", "101");
+            MockCommandInteraction tooQuiet = buildInteractionWithOption("volume", "level", "-1");
+            commandRegistry.handle(tooLoud);
+            commandRegistry.handle(tooQuiet);
+
+            for (MockCommandInteraction interaction : List.of(tooLoud, tooQuiet)) {
+                assertThat(interaction.getReplies()).singleElement().satisfies(reply -> {
+                    assertThat(reply.isEphemeral()).isTrue();
+                    assertThat(reply.getContent()).isEqualTo(VOLUME_OUT_OF_RANGE_MESSAGE);
+                });
+                assertThat(interaction.getDeferredMessage()).isEmpty();
+            }
+            assertThat(received.poll(500, TimeUnit.MILLISECONDS)).isNull();
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
     void editsPauseReplyWhenPlayerFails() {
         MusicPlayerCommandController controller = new MusicPlayerCommandController(new SinglePlayerPool(new FailingMusicPlayer()), NO_SPOTIFY);
         MockCommandInteraction interaction = buildInteraction("pause");
@@ -476,6 +538,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
     }
 
@@ -489,6 +552,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { handler.onTimedOut(); }
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
     }
 }

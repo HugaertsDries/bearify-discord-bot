@@ -27,6 +27,7 @@ public class PlaybackAnnouncerPresets {
                         ))
                         .queueSize(3)
                         .queueDuration(Duration.ofMillis(390_000 + 482_000 + 384_000))
+                        .volume(40)
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
                         .paused(true)

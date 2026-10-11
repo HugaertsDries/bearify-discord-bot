@@ -78,6 +78,13 @@ class MusicPlayerProtocolRoundTripTest {
     }
 
     @Test
+    void readsTrackStartFromOlderBearWithoutVolumeAsFullVolume() {
+        String json = "{\"type\":\"track_start\",\"playerId\":\"player-id\",\"request\":{\"id\":\"request-id\",\"requesterTag\":\"@user\"},\"guildId\":\"guild-id\",\"upNext\":[]}";
+
+        assertThat(((MusicPlayerEvent.TrackStart) OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class)).volume()).isEqualTo(100);
+    }
+
+    @Test
     void readsStoppedWithoutReasonAsRequested() {
         String json = "{\"type\":\"player_stopped\",\"playerId\":\"player-id\",\"requestId\":\"request-id\",\"guildId\":\"guild-id\"}";
 

@@ -17,6 +17,10 @@ public interface AudioEngine {
 
     void setPaused(boolean paused);
 
+    int getVolume();
+
+    void setVolume(int volume);
+
     void addListener(AudioEngineListener listener);
 
 }

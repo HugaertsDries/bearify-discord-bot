@@ -42,6 +42,7 @@ public class AudioPlayerPool {
     public AudioPlayer getOrCreate(String guildId) {
         return entries.computeIfAbsent(guildId, id -> {
             LavaAudioEngine engine = engineFactory.get();
+            engine.setVolume(properties.defaultVolume());
             return new AudioPlayer(
                     engine, engine, eventDispatcher, properties, scheduler, playerId, id,
                     new VoiceChannelStatus(client, id),

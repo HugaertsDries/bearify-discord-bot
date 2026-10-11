@@ -53,6 +53,9 @@ Clears the current playlist.
 ### `/player queue`
 Shows you, privately, the whole queue as a card in the player's Up Next style: the track playing now, up to 10 rows, then "…and N more", and the track count and total time. When more than 3 tracks are queued, the player's Up Next ends with "+N more on the trail" and a **Show** button that privately lists the tracks the player doesn't show.
 
+### `/player volume <level>`
+Sets the bear's volume from 0 to 100 for everyone in the channel. The player shows it next to the requester. The bear starts every visit at `music-player.default-volume` (100).
+
 ### `/poke [pokes]`
 Pokes the bear a number of times (default: 4) and reports the response latency of each poke.
 

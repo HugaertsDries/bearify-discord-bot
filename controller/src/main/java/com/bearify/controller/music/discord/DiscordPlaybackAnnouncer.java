@@ -56,6 +56,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private volatile int currentQueueSize;
     private volatile Duration currentQueueDuration = Duration.ZERO;
     private volatile String currentRequesterTag;
+    private volatile int currentVolume = 100;
 
     public DiscordPlaybackAnnouncer(DiscordClient discord,
                                     AnnouncerProperties properties,
@@ -87,6 +88,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
             case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
             case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
+            case MusicPlayerEvent.VolumeChanged volumeChanged -> onVolumeChanged(volumeChanged);
             case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
             case MusicPlayerEvent.QueueEmpty ignored -> onQueueEmpty();
             case MusicPlayerEvent.Stopped stopped -> onStopped(stopped);
@@ -106,6 +108,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             currentQueueSize = event.queueSize();
             currentQueueDuration = Duration.ofMillis(event.queueDurationMs());
             currentRequesterTag = event.request().requesterTag();
+            currentVolume = event.volume();
             playbackState = PlaybackComponentState.PlaybackState.PLAYING;
             updateOrPost(playbackComponent.render(currentState()));
         } catch (Exception e) {
@@ -138,6 +141,11 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         currentQueueSize = event.upNext().size();
         currentQueueDuration = Duration.ZERO;
         notify("Queue cleared by " + event.request().requesterTag());
+    }
+
+    private void onVolumeChanged(MusicPlayerEvent.VolumeChanged event) {
+        currentVolume = event.volume();
+        notify("Volume set to " + event.volume() + "% by " + event.request().requesterTag());
     }
 
     private void updatePlaybackState(PlaybackComponentState.PlaybackState state, boolean autoPaused) {
@@ -270,6 +278,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
                 .upNext(currentUpNext)
                 .queueSize(currentQueueSize)
                 .queueDuration(currentQueueDuration)
+                .volume(currentVolume)
                 .artworkUri(artworkUrlResolver.resolve(currentTrack).orElse(null))
                 .footer(properties.footer())
                 .paused(playbackState == PlaybackComponentState.PlaybackState.PAUSED)

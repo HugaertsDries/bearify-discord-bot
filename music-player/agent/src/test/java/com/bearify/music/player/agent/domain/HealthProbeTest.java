@@ -192,6 +192,8 @@ class HealthProbeTest {
         @Override public Optional<Track> getPlayingTrack() { return Optional.empty(); }
         @Override public boolean isPaused() { return false; }
         @Override public void setPaused(boolean paused) {}
+        @Override public int getVolume() { return 100; }
+        @Override public void setVolume(int volume) {}
         @Override public void addListener(AudioEngineListener listener) { this.listener = listener; }
 
         @Override public boolean canProvide() { return canProvide; }

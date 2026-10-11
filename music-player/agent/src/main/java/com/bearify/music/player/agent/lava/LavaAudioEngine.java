@@ -57,6 +57,16 @@ public class LavaAudioEngine implements AudioEngine, AudioProvider {
     }
 
     @Override
+    public int getVolume() {
+        return audioPlayer.getVolume();
+    }
+
+    @Override
+    public void setVolume(int volume) {
+        audioPlayer.setVolume(volume);
+    }
+
+    @Override
     public void addListener(AudioEngineListener listener) {
         audioPlayer.addListener(new AudioEventAdapter() {
             @Override

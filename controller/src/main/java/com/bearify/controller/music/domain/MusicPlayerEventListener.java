@@ -22,6 +22,7 @@ public interface MusicPlayerEventListener {
     /** {@code seek} is what the player actually applied, also when its default was requested. */
     default void onForwarded(Duration seek) {}
     default void onCleared() {}
+    default void onVolumeChanged(int volume) {}
     default void onStopped() {}
     default void onNothingPlaying() {}
     default void onNothingToAdvance() {}

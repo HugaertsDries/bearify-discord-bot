@@ -114,7 +114,7 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
 
     private static MusicPlayerEvent.TrackStart trackStart() {
         return new MusicPlayerEvent.TrackStart(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID,
-                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L);
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100);
     }
 
     private void cleanUp() {

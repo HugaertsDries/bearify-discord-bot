@@ -58,7 +58,7 @@ public class PlaybackComponent {
             });
             container.text("### " + trackMetaLine(state.track(), 40, UnaryOperator.identity()));
             container.separator();
-            container.text("-# **Requested by** " + state.requesterTag());
+            container.text("-# **Requested by** " + state.requesterTag() + " · " + BearifyEmoji.SPEAKER + " " + state.volume() + "%");
         });
     }
 
