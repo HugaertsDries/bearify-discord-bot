@@ -8,6 +8,9 @@ public interface EditableMessage {
 
     Instant getCreatedAt();
 
+    /** Leaves an ephemeral reply until the user dismisses it, instead of letting it clean itself up. */
+    EditableMessage keep();
+
     void edit(String message);
 
     void edit(ComponentMessage message);

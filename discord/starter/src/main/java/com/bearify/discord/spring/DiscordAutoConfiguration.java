@@ -94,7 +94,7 @@ public class DiscordAutoConfiguration {
         };
         List<CommandDefinition> definitions = Stream.concat(
                 registry.getDefinitions().stream(), messageContextRegistry.getDefinitions().stream()).toList();
-        return factory.create(definitions, interactionHandler, properties.activity());
+        return factory.create(definitions, interactionHandler, properties.activity(), properties.ephemeralDeleteAfter());
     }
 
     private static void replyWithGenericError(Interaction interaction) {

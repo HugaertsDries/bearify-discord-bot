@@ -9,7 +9,7 @@ Defines the interfaces and models that the rest of the project depends on. By de
 
 ### Gateway
 - `DiscordClient` — bot client interface: `start(token)`, `start(token, guildId)`, `guild(guildId)`, `selfUserId()`, `textChannel(channelId)`, `shutdown()`
-- `DiscordClientFactory` — creates a fully configured `DiscordClient` given commands and an interaction handler
+- `DiscordClientFactory` — creates a fully configured `DiscordClient` given commands, an interaction handler, an optional activity and an optional delay after which ephemeral replies delete themselves
 - `Guild` — guild-scoped operations:
   - `voice()` — returns the bot's current `VoiceSession` for this guild, or empty if not connected
   - `isInVoice(userId)` — whether that member is in one of the guild's voice channels right now
@@ -21,8 +21,8 @@ Defines the interfaces and models that the rest of the project depends on. By de
 - `CommandInteraction` — a `RepliableInteraction` for an incoming command: `getName()`, `getOption(name)`, `getSubcommandName()`
 - `MessageContextInteraction` — a `RepliableInteraction` for a message context-menu command (Apps on a message): `getName()`, `getTargetMessageContent()`, `getTargetAuthorMention()`
 - `ButtonInteraction` — represents a button press: `getCustomId()`, `acknowledge()`, `reply(message)`, and `reply(ComponentMessage)` for a Components V2 reply (a follow-up once acknowledged)
-- `ReplyBuilder` — fluent reply builder: `reply("...").ephemeral().send()`
-- `EditableMessage` — handle to a deferred reply that can be updated: `edit(String message)`, or `edit(ComponentMessage)` to turn it into a Components V2 message
+- `ReplyBuilder` — fluent reply builder: `reply("...").ephemeral().send()`; `keep()` leaves an ephemeral reply until the user dismisses it instead of letting it clean itself up
+- `EditableMessage` — handle to a deferred reply that can be updated: `edit(String message)`, or `edit(ComponentMessage)` to turn it into a Components V2 message; `keep()` leaves an ephemeral reply until the user dismisses it
 
 ### Voice
 - `AudioProvider` — supplies Opus-encoded audio frames for a voice connection: `canProvide()`, `provide20MsAudio()`, `isOpus()`

@@ -77,7 +77,8 @@ public class MusicPlayerButtonController {
             interaction.acknowledge();
             ReplyBuilder reply = switch (QueueCard.beyondPlayer(player.queue())) {
                 case QueueCard.Text text -> interaction.reply(text.text());
-                case QueueCard.Card card -> interaction.reply(card.message());
+                // someone may still be reading the queue, so it stays until they dismiss it
+                case QueueCard.Card card -> interaction.reply(card.message()).keep();
             };
             reply.ephemeral().send();
         });

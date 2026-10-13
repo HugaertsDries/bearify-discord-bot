@@ -54,7 +54,7 @@ class PlayerLivenessMonitorTest extends AbstractControllerIntegrationTest {
         redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID));
         redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, OTHER_VOICE_CHANNEL_ID));
         redis.opsForValue().set(PlayerRedisProtocol.Keys.bot(PLAYER_ID), BOT_USER_ID);
-        discord = new MockDiscordClient.Factory().create(List.of(), interaction -> {}, Optional.empty());
+        discord = new MockDiscordClient.Factory().create(List.of(), interaction -> {}, Optional.empty(), Optional.empty());
         registry = new MusicPlayerAnnouncementRegistry();
         delivered = new CopyOnWriteArrayList<>();
         registry.subscribe(PLAYER_ID, GUILD_ID, delivered::add);

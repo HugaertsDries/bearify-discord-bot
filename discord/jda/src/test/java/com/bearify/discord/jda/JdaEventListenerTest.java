@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -199,7 +200,7 @@ class JdaEventListenerTest {
         when(target.getAuthor()).thenReturn(author);
         when(author.getAsMention()).thenReturn("<@42>");
 
-        JdaMessageContextInteraction interaction = new JdaMessageContextInteraction(event);
+        JdaMessageContextInteraction interaction = new JdaMessageContextInteraction(event, Optional.empty());
 
         assertThat(interaction.getName()).isEqualTo("Play with Bearify");
         assertThat(interaction.getTargetMessageContent()).isEqualTo("listen https://youtu.be/dQw4w9WgXcQ");

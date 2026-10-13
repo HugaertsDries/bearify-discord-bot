@@ -13,6 +13,13 @@ public class MockEditableMessage implements EditableMessage {
     private final Instant createdAt = Instant.now();
     private final List<String> edits = new ArrayList<>();
     private final List<ComponentMessage> componentEdits = new ArrayList<>();
+    private boolean kept = false;
+
+    @Override
+    public EditableMessage keep() {
+        kept = true;
+        return this;
+    }
 
     @Override
     public void edit(String message) {
@@ -39,6 +46,10 @@ public class MockEditableMessage implements EditableMessage {
 
     public Optional<ComponentMessage> getLastComponentEdit() {
         return componentEdits.isEmpty() ? Optional.empty() : Optional.of(componentEdits.getLast());
+    }
+
+    public boolean isKept() {
+        return kept;
     }
 
     public boolean hasEdits() {

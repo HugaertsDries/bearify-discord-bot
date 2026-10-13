@@ -10,6 +10,7 @@ public class MockReplyBuilder implements ReplyBuilder {
     private final String content;
     private final Optional<ComponentMessage> componentMessage;
     private boolean ephemeral = false;
+    private boolean kept = false;
     private boolean sent = false;
 
     MockReplyBuilder(String content) {
@@ -29,6 +30,12 @@ public class MockReplyBuilder implements ReplyBuilder {
     }
 
     @Override
+    public ReplyBuilder keep() {
+        this.kept = true;
+        return this;
+    }
+
+    @Override
     public void send() {
         this.sent = true;
     }
@@ -44,6 +51,10 @@ public class MockReplyBuilder implements ReplyBuilder {
 
     public boolean isEphemeral() {
         return ephemeral;
+    }
+
+    public boolean isKept() {
+        return kept;
     }
 
     public boolean isSent() {

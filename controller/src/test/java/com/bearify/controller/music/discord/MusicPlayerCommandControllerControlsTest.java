@@ -306,6 +306,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
                                     new TextBlock("### Up Next"),
                                     new TextBlock("-# Now playing: Never Gonna Give You Up — Rick Astley"),
                                     new TextBlock("Africa\n-# TOTO • 4m 55s\n")));
+            assertThat(interaction.getDeferredMessage().orElseThrow().isKept()).isTrue();
         } finally {
             bear.stop();
         }
@@ -336,6 +337,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         controller.queue(interaction);
 
         assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow()).contains("didn't answer in time");
+        assertThat(interaction.getDeferredMessage().orElseThrow().isKept()).isFalse();
     }
 
     @Test

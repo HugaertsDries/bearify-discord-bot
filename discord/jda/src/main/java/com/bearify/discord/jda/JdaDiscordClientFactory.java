@@ -6,6 +6,7 @@ import com.bearify.discord.api.gateway.DiscordClientFactory;
 import com.bearify.discord.api.interaction.Interaction;
 import com.bearify.discord.api.model.CommandDefinition;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -18,7 +19,8 @@ class JdaDiscordClientFactory implements DiscordClientFactory {
     @Override
     public DiscordClient create(List<CommandDefinition> commands,
                                 Consumer<Interaction> handler,
-                                Optional<Activity> activity) {
-        return new JdaDiscordClient(commands, handler, activity.orElse(null));
+                                Optional<Activity> activity,
+                                Optional<Duration> ephemeralDeleteAfter) {
+        return new JdaDiscordClient(commands, handler, activity.orElse(null), ephemeralDeleteAfter);
     }
 }

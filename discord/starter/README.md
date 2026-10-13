@@ -86,6 +86,7 @@ If that reply fails too (for example because the handler already replied), the f
 | `discord.guild-id` | No | Guild ID for instant command registration (dev only) |
 | `discord.activity.type` | No | Presence type: `PLAYING`, `LISTENING`, `WATCHING` or `COMPETING` (required when `text` is set) |
 | `discord.activity.text` | No | Presence text (required when `type` is set) |
+| `discord.ephemeral-delete-after` | No | Delete ephemeral replies this long after the bot last wrote to them, e.g. `30s`; must be under 15 minutes (Discord's interaction window). Absent keeps them until the user dismisses them. A reply opts out with `keep()` |
 
 ## Contents
 - `@DiscordController` — marks a class as a Spring bean holding interaction handlers

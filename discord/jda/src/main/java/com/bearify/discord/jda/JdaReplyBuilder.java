@@ -13,7 +13,9 @@ import net.dv8tion.jda.api.utils.FileUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 class JdaReplyBuilder implements ReplyBuilder {
 
@@ -21,19 +23,22 @@ class JdaReplyBuilder implements ReplyBuilder {
 
     private final IReplyCallback event;
     private final Content content;
-    private final boolean editsDeferredReply;
+    private final Optional<JdaEditableMessage> deferredReply;
+    private final Optional<Duration> deleteAfter;
     private boolean ephemeral = false;
+    private boolean kept = false;
 
     /**
-     * @param editsDeferredReply true when the command deferred: its "thinking…" message is then replaced
-     *                           instead of left hanging next to a follow-up
+     * @param deferredReply present when the command deferred: its "thinking…" message is then replaced
+     *                      instead of left hanging next to a follow-up
+     * @param deleteAfter   how long after sending an ephemeral reply deletes itself; empty keeps them
      */
-    JdaReplyBuilder(IReplyCallback event, String message, boolean editsDeferredReply) {
-        this(event, new Text(message), editsDeferredReply);
+    JdaReplyBuilder(IReplyCallback event, String message, Optional<JdaEditableMessage> deferredReply, Optional<Duration> deleteAfter) {
+        this(event, new Text(message), deferredReply, deleteAfter);
     }
 
-    JdaReplyBuilder(IReplyCallback event, ComponentMessage message, boolean editsDeferredReply) {
-        this(event, components(message), editsDeferredReply);
+    JdaReplyBuilder(IReplyCallback event, ComponentMessage message, Optional<JdaEditableMessage> deferredReply, Optional<Duration> deleteAfter) {
+        this(event, components(message), deferredReply, deleteAfter);
     }
 
     private static Components components(ComponentMessage message) {
@@ -41,10 +46,11 @@ class JdaReplyBuilder implements ReplyBuilder {
         return new Components(mapper.toJdaComponents(message), mapper.filesFor(message));
     }
 
-    private JdaReplyBuilder(IReplyCallback event, Content content, boolean editsDeferredReply) {
+    private JdaReplyBuilder(IReplyCallback event, Content content, Optional<JdaEditableMessage> deferredReply, Optional<Duration> deleteAfter) {
         this.event = event;
         this.content = content;
-        this.editsDeferredReply = editsDeferredReply;
+        this.deferredReply = deferredReply;
+        this.deleteAfter = deleteAfter;
     }
 
     @Override
@@ -54,18 +60,38 @@ class JdaReplyBuilder implements ReplyBuilder {
     }
 
     @Override
+    public ReplyBuilder keep() {
+        this.kept = true;
+        return this;
+    }
+
+    @Override
     public void send() {
         // A deferred interaction can no longer be replied to, only edited or followed up through its hook
-        if (editsDeferredReply) {
+        if (deferredReply.isPresent()) {
+            // the deferred reply settled at defer time whether it is ephemeral, and so whether it deletes itself
+            JdaEditableMessage deferred = deferredReply.get();
+            if (kept) {
+                deferred.keep();
+            }
             content.editOriginal(event.getHook())
-                    .queue(null, failure -> LOG.warn("Failed to edit deferred reply: {}", failure.getMessage(), failure));
+                    .queue(edited -> deferred.deleteLater(),
+                            failure -> LOG.warn("Failed to edit deferred reply: {}", failure.getMessage(), failure));
         } else if (event.isAcknowledged()) {
-            content.followUp(event.getHook()).setEphemeral(ephemeral)
-                    .queue(null, failure -> LOG.warn("Failed to send follow-up reply: {}", failure.getMessage(), failure));
+            InteractionHook hook = event.getHook();
+            // after a button's acknowledge() the original is the message holding the button, so only the follow-up goes
+            content.followUp(hook).setEphemeral(ephemeral)
+                    .queue(followUp -> deleteDelay().ifPresent(delay -> JdaEditableMessage.deleteLater(hook.deleteMessageById(followUp.getId()), delay)),
+                            failure -> LOG.warn("Failed to send follow-up reply: {}", failure.getMessage(), failure));
         } else {
             content.reply(event).setEphemeral(ephemeral)
-                    .queue(null, failure -> LOG.warn("Failed to send interaction reply: {}", failure.getMessage(), failure));
+                    .queue(hook -> deleteDelay().ifPresent(delay -> JdaEditableMessage.deleteLater(hook.deleteOriginal(), delay)),
+                            failure -> LOG.warn("Failed to send interaction reply: {}", failure.getMessage(), failure));
         }
+    }
+
+    private Optional<Duration> deleteDelay() {
+        return deleteAfter.filter(delay -> ephemeral && !kept);
     }
 
     /** What the reply carries: plain text, or a Components V2 message. */

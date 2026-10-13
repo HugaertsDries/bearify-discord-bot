@@ -39,7 +39,7 @@ class YoutubeHealthMonitorTest {
     private final StubClock clock = new StubClock();
     private final StubHealthChecker checker = new StubHealthChecker();
     private final QueueingExecutor executor = new QueueingExecutor();
-    private final MockDiscordClient discord = new MockDiscordClient.Factory().create(List.of(), interaction -> {}, Optional.empty());
+    private final MockDiscordClient discord = new MockDiscordClient.Factory().create(List.of(), interaction -> {}, Optional.empty(), Optional.empty());
     private final YoutubeHealthMonitor monitor = monitor(CHANNEL_ID);
 
     // --- SCHEDULED CHECKS ---

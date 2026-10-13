@@ -35,7 +35,7 @@ class JdaDiscordClientTest {
 
     @Test
     void mapsAutocompleteFlagToJdaOptionData() throws Exception {
-        JdaDiscordClient client = new JdaDiscordClient(java.util.List.of(), interaction -> {}, null);
+        JdaDiscordClient client = new JdaDiscordClient(java.util.List.of(), interaction -> {}, null, java.util.Optional.empty());
         OptionDefinition option = new OptionDefinition(
                 "search",
                 "Search",
@@ -56,7 +56,7 @@ class JdaDiscordClientTest {
     @Test
     @SuppressWarnings("unchecked")
     void mapsMessageCommandToGuildOnlyMessageContextCommand() throws Exception {
-        JdaDiscordClient client = new JdaDiscordClient(java.util.List.of(CommandDefinition.message("Play with Bearify")), interaction -> {}, null);
+        JdaDiscordClient client = new JdaDiscordClient(java.util.List.of(CommandDefinition.message("Play with Bearify")), interaction -> {}, null, java.util.Optional.empty());
 
         Method method = JdaDiscordClient.class.getDeclaredMethod("toCommandData");
         method.setAccessible(true);

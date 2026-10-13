@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,7 +63,7 @@ class DiscordAutoConfigurationTest {
         private Consumer<com.bearify.discord.api.interaction.Interaction> handler;
 
         @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<com.bearify.discord.api.interaction.Interaction> handler, Optional<Activity> activity) {
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<com.bearify.discord.api.interaction.Interaction> handler, Optional<Activity> activity, Optional<Duration> ephemeralDeleteAfter) {
             this.handler = handler;
             return new NoopDiscordClient();
         }
@@ -350,6 +351,28 @@ class DiscordAutoConfigurationTest {
     }
 
     @Test
+    void forwardsEphemeralDeleteAfterToDiscordClientFactory() {
+        contextRunner
+                .withPropertyValues("discord.token=my-token", "discord.ephemeral-delete-after=30s")
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> {
+                    MockDiscordClient.Factory factory = ctx.getBean(MockDiscordClient.Factory.class);
+                    assertThat(factory.getLastCreatedEphemeralDeleteAfter()).contains(Duration.ofSeconds(30));
+                });
+    }
+
+    @Test
+    void keepsEphemeralRepliesWhenDeleteAfterIsNotConfigured() {
+        contextRunner
+                .withPropertyValues("discord.token=my-token")
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> {
+                    MockDiscordClient.Factory factory = ctx.getBean(MockDiscordClient.Factory.class);
+                    assertThat(factory.getLastCreatedEphemeralDeleteAfter()).isEmpty();
+                });
+    }
+
+    @Test
     void routesDispatchedInteractionThroughRegistryToHandler() {
         contextRunner
                 .withPropertyValues("discord.token=test-token")
@@ -514,5 +537,13 @@ class DiscordAutoConfigurationTest {
                 )
                 .withUserConfiguration(MockClientConfig.class)
                 .run(ctx -> assertThat(ctx).hasFailed());
+    }
+
+    @Test
+    void rejectsEphemeralDeleteAfterOutsideDiscordsFifteenMinuteWindow() {
+        contextRunner
+                .withPropertyValues("discord.token=my-token", "discord.ephemeral-delete-after=15m")
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> assertThat(ctx).getFailure().hasStackTraceContaining("ephemeralDeleteAfter"));
     }
 }

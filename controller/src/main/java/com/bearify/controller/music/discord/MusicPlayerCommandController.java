@@ -390,7 +390,8 @@ public class MusicPlayerCommandController {
                             EditableMessage message = interaction.defer(true);
                             switch (QueueCard.wholeQueue(player.queue())) {
                                 case QueueCard.Text text -> message.edit(text.text());
-                                case QueueCard.Card card -> message.edit(card.message());
+                                // someone may still be reading the queue, so it stays until they dismiss it
+                                case QueueCard.Card card -> message.keep().edit(card.message());
                             }
                         },
                         () -> replyNoPlayer(interaction)

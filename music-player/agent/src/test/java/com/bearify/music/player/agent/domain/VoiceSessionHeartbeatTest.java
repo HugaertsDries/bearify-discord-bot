@@ -624,7 +624,7 @@ class VoiceSessionHeartbeatTest {
         }
 
         @Override
-        public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Optional<Activity> activity) {
+        public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Optional<Activity> activity, Optional<Duration> ephemeralDeleteAfter) {
             return client;
         }
     }

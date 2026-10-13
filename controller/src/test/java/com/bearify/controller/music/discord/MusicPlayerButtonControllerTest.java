@@ -178,6 +178,7 @@ class MusicPlayerButtonControllerTest {
         assertThat(interaction.isAcknowledged()).isTrue();
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
+        assertThat(interaction.getReplies().getFirst().isKept()).isTrue();
         assertThat(interaction.getReplies().getFirst().getComponentMessage()).hasValueSatisfying(card ->
                 assertThat(card.containers().getFirst().children())
                         .contains(new TextBlock("### Further up the trail"), new TextBlock("Four\n-# Artist • 1m 00s\n"))
@@ -195,6 +196,7 @@ class MusicPlayerButtonControllerTest {
 
         assertThat(interaction.getReplies().getFirst().getComponentMessage()).isEmpty();
         assertThat(interaction.getReplies().getFirst().getContent()).isEqualTo(QueueCard.NOTHING_FURTHER_MESSAGE);
+        assertThat(interaction.getReplies().getFirst().isKept()).isFalse();
     }
 
     @Test

@@ -20,7 +20,9 @@ import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -37,15 +39,18 @@ public class JdaDiscordClient implements DiscordClient {
     private final ExecutorService interactionExecutor;
     private final Consumer<Interaction> interactionHandler;
     private final Activity activity;
+    private final Optional<Duration> ephemeralDeleteAfter;
 
     private JDA jda;
 
     JdaDiscordClient(List<CommandDefinition> commands,
                      Consumer<Interaction> interactionHandler,
-                     Activity activity) {
+                     Activity activity,
+                     Optional<Duration> ephemeralDeleteAfter) {
         this.commands = commands;
         this.interactionHandler = interactionHandler;
         this.activity = activity;
+        this.ephemeralDeleteAfter = ephemeralDeleteAfter;
         this.interactionExecutor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
@@ -114,7 +119,7 @@ public class JdaDiscordClient implements DiscordClient {
             var audio = new AudioModuleConfig();
             audio = audio.withDaveSessionFactory(new JDaveSessionFactory());
             JDABuilder builder = JDABuilder.createDefault(token)
-                    .addEventListeners(new JdaEventListener(interactionExecutor, interactionHandler))
+                    .addEventListeners(new JdaEventListener(interactionExecutor, interactionHandler, ephemeralDeleteAfter))
                     .setAudioModuleConfig(audio)
                     // Spring's lifecycle shuts JDA down after the app has cleaned up; JDA's own hook would race it
                     .setEnableShutdownHook(false);

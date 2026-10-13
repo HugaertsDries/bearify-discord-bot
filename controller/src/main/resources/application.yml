@@ -16,6 +16,7 @@ discord:
   activity:
     type: PLAYING
     text: "Playing with Honey"
+  ephemeral-delete-after: 30s  # private replies vanish this long after the bot last wrote to them (the queue card stays)
 
 bearify:
   health:

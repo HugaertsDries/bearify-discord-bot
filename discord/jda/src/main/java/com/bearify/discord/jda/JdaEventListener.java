@@ -11,6 +11,8 @@ import net.dv8tion.jda.api.events.interaction.command.MessageContextInteractionE
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
+import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -29,15 +31,12 @@ class JdaEventListener extends ListenerAdapter {
     private final Function<CommandAutoCompleteInteractionEvent, AutocompleteInteraction> autocompleteInteractionFactory;
     private final Function<MessageContextInteractionEvent, MessageContextInteraction> messageContextInteractionFactory;
 
-    JdaEventListener(Executor executor, Consumer<Interaction> interactionHandler) {
-        this(executor, interactionHandler, JdaCommandInteraction::new, JdaButtonInteraction::new, JdaAutocompleteInteraction::new, JdaMessageContextInteraction::new);
-    }
-
-    JdaEventListener(Executor executor,
-                     Consumer<Interaction> interactionHandler,
-                     Function<SlashCommandInteractionEvent, CommandInteraction> commandInteractionFactory,
-                     Function<ButtonInteractionEvent, ButtonInteraction> buttonInteractionFactory) {
-        this(executor, interactionHandler, commandInteractionFactory, buttonInteractionFactory, JdaAutocompleteInteraction::new, JdaMessageContextInteraction::new);
+    JdaEventListener(Executor executor, Consumer<Interaction> interactionHandler, Optional<Duration> ephemeralDeleteAfter) {
+        this(executor, interactionHandler,
+                event -> new JdaCommandInteraction(event, ephemeralDeleteAfter),
+                event -> new JdaButtonInteraction(event, ephemeralDeleteAfter),
+                JdaAutocompleteInteraction::new,
+                event -> new JdaMessageContextInteraction(event, ephemeralDeleteAfter));
     }
 
     JdaEventListener(Executor executor,

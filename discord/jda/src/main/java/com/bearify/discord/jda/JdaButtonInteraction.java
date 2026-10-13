@@ -7,14 +7,18 @@ import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.ISnowflake;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+
+import java.time.Duration;
 import java.util.Optional;
 
 class JdaButtonInteraction implements ButtonInteraction {
 
     private final ButtonInteractionEvent event;
+    private final Optional<Duration> ephemeralDeleteAfter;
 
-    JdaButtonInteraction(ButtonInteractionEvent event) {
+    JdaButtonInteraction(ButtonInteractionEvent event, Optional<Duration> ephemeralDeleteAfter) {
         this.event = event;
+        this.ephemeralDeleteAfter = ephemeralDeleteAfter;
     }
 
     @Override
@@ -24,12 +28,12 @@ class JdaButtonInteraction implements ButtonInteraction {
 
     @Override
     public ReplyBuilder reply(String message) {
-        return new JdaReplyBuilder(event, message, false);
+        return new JdaReplyBuilder(event, message, Optional.empty(), ephemeralDeleteAfter);
     }
 
     @Override
     public ReplyBuilder reply(ComponentMessage message) {
-        return new JdaReplyBuilder(event, message, false);
+        return new JdaReplyBuilder(event, message, Optional.empty(), ephemeralDeleteAfter);
     }
 
     @Override

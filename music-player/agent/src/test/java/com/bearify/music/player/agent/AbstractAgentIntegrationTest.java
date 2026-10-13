@@ -8,6 +8,7 @@ import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -56,7 +57,7 @@ public abstract class AbstractAgentIntegrationTest {
         DiscordClientFactory discordClientFactory() {
             return new DiscordClientFactory() {
                 @Override
-                public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Optional<Activity> activity) {
+                public DiscordClient create(List<CommandDefinition> commands, Consumer<Interaction> handler, Optional<Activity> activity, Optional<Duration> ephemeralDeleteAfter) {
                     return new NoOpDiscordClient();
                 }
             };

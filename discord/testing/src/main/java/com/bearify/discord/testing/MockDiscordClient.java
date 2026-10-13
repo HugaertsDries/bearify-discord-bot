@@ -16,6 +16,7 @@ import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
 import com.bearify.discord.api.voice.VoiceSessionListener;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -202,12 +203,15 @@ public class MockDiscordClient implements DiscordClient {
 
         private MockDiscordClient lastCreated;
         private Optional<Activity> lastCreatedActivity = Optional.empty();
+        private Optional<Duration> lastCreatedEphemeralDeleteAfter = Optional.empty();
 
         @Override
         public MockDiscordClient create(List<CommandDefinition> commands,
                                         Consumer<Interaction> handler,
-                                        Optional<Activity> activity) {
+                                        Optional<Activity> activity,
+                                        Optional<Duration> ephemeralDeleteAfter) {
             lastCreatedActivity = activity;
+            lastCreatedEphemeralDeleteAfter = ephemeralDeleteAfter;
             lastCreated = new MockDiscordClient(commands, handler);
             return lastCreated;
         }
@@ -218,6 +222,10 @@ public class MockDiscordClient implements DiscordClient {
 
         public Optional<Activity> getLastCreatedActivity() {
             return lastCreatedActivity;
+        }
+
+        public Optional<Duration> getLastCreatedEphemeralDeleteAfter() {
+            return lastCreatedEphemeralDeleteAfter;
         }
 
     }

@@ -10,6 +10,7 @@ import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEve
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -19,18 +20,21 @@ import java.util.Optional;
 class JdaCommandInteraction implements CommandInteraction {
 
     private final SlashCommandInteractionEvent event;
-    private volatile boolean deferred;
+    private final Optional<Duration> ephemeralDeleteAfter;
+    private volatile Optional<JdaEditableMessage> deferredReply = Optional.empty();
 
-    JdaCommandInteraction(SlashCommandInteractionEvent event) {
+    JdaCommandInteraction(SlashCommandInteractionEvent event, Optional<Duration> ephemeralDeleteAfter) {
         this.event = event;
+        this.ephemeralDeleteAfter = ephemeralDeleteAfter;
     }
 
     @Override
     public EditableMessage defer(boolean ephemeral) {
         Instant createdAt = Instant.now();
         InteractionHook hook = event.deferReply(ephemeral).complete();
-        deferred = true;
-        return new JdaEditableMessage(hook, createdAt);
+        JdaEditableMessage message = new JdaEditableMessage(hook, createdAt, ephemeral ? ephemeralDeleteAfter : Optional.empty());
+        deferredReply = Optional.of(message);
+        return message;
     }
 
     @Override
@@ -42,7 +46,7 @@ class JdaCommandInteraction implements CommandInteraction {
 
     @Override
     public ReplyBuilder reply(String message) {
-        return new JdaReplyBuilder(event, message, deferred);
+        return new JdaReplyBuilder(event, message, deferredReply, ephemeralDeleteAfter);
     }
 
     @Override
