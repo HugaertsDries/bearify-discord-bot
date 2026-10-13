@@ -6,6 +6,7 @@ import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.spotify.SpotifyLinkResolver;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
@@ -766,6 +767,14 @@ class MusicPlayerInteractionTest {
 
         @Override
         public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
+        }
+
+        @Override
+        public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {
+        }
+
+        @Override
+        public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {
         }
 
         @Override

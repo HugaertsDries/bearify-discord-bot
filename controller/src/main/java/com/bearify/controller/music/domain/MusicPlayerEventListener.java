@@ -1,5 +1,6 @@
 package com.bearify.controller.music.domain;
 
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.time.Duration;
@@ -27,6 +28,7 @@ public interface MusicPlayerEventListener {
     /** {@code count} is 0 when the queue was empty. */
     default void onShuffled(int count) {}
     default void onVolumeChanged(int volume) {}
+    default void onLoopModeChanged(LoopMode mode) {}
     default void onJumped(Duration position) {}
     /** A jump to or past the end of the playing track, which is {@code trackLength} long. */
     default void onJumpOutOfRange(Duration trackLength) {}

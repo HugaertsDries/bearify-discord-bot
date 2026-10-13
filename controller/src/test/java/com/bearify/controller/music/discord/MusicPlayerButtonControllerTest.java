@@ -6,6 +6,7 @@ import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.discord.testing.MockButtonInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
 
@@ -56,29 +57,6 @@ class MusicPlayerButtonControllerTest {
     }
 
     @Test
-    void dispatchesSeekButtonsWithDefaultThirtySeconds() {
-        RecordingMusicPlayer player = new RecordingMusicPlayer();
-        RecordingMusicPlayerPool pool = new RecordingMusicPlayerPool(Optional.of(player));
-        MusicPlayerButtonController handler = new MusicPlayerButtonController(pool);
-        MockButtonInteraction rewind = MockButtonInteraction.forButton("player:rewind")
-                .guildId("guild-1")
-                .voiceChannelId("vc-123")
-                .userMention("@dries")
-                .build();
-        MockButtonInteraction forward = MockButtonInteraction.forButton("player:forward")
-                .guildId("guild-1")
-                .voiceChannelId("vc-123")
-                .userMention("@dries")
-                .build();
-
-        handler.rewind(rewind);
-        handler.forward(forward);
-
-        assertThat(player.rewindSeek).isEqualTo(Duration.ofSeconds(30));
-        assertThat(player.forwardSeek).isEqualTo(Duration.ofSeconds(30));
-    }
-
-    @Test
     void dispatchesClearButtonToPlayerClear() {
         RecordingMusicPlayer player = new RecordingMusicPlayer();
         RecordingMusicPlayerPool pool = new RecordingMusicPlayerPool(Optional.of(player));
@@ -98,12 +76,42 @@ class MusicPlayerButtonControllerTest {
     }
 
     @Test
+    void cyclesLoopFromPlayerButton() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        MockButtonInteraction interaction = MockButtonInteraction.forButton("player:loop")
+                .guildId("guild-1")
+                .voiceChannelId("vc-123")
+                .userMention("@dries")
+                .build();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).loop(interaction);
+
+        assertThat(player.cycleLoopRequester).isEqualTo("@dries");
+        assertThat(interaction.isAcknowledged()).isTrue();
+        assertThat(interaction.getReplies()).isEmpty();
+    }
+
+    @Test
+    void rejectsLoopFromAnotherVoiceChannel() {
+        MockButtonInteraction interaction = MockButtonInteraction.forButton("player:loop")
+                .guildId("guild-1")
+                .voiceChannelId("voice-other")
+                .build();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.empty())).loop(interaction);
+
+        assertThat(interaction.isAcknowledged()).isFalse();
+        assertThat(interaction.getReplies()).singleElement()
+                .satisfies(reply -> assertThat(reply.getContent()).contains("same voice channel"));
+    }
+
+    @Test
     void answersEachButtonOnceWhenItsRequestTimesOut() {
         RecordingMusicPlayer player = new RecordingMusicPlayer();
         player.answerWith(MusicPlayerEventListener::onTimedOut);
         MusicPlayerButtonController handler = new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player)));
         List<Consumer<MockButtonInteraction>> buttons = List.of(
-                handler::pausePlay, handler::previous, handler::rewind, handler::forward, handler::next, handler::clear);
+                handler::pausePlay, handler::previous, handler::next, handler::clear, handler::loop);
 
         for (Consumer<MockButtonInteraction> button : buttons) {
             MockButtonInteraction interaction = buttonInteraction();
@@ -127,19 +135,6 @@ class MusicPlayerButtonControllerTest {
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
         assertThat(interaction.getReplies().getFirst().getContent()).contains("Nothing's playing right now");
-    }
-
-    @Test
-    void repliesEphemerallyWhenForwardingALiveStream() {
-        RecordingMusicPlayer player = new RecordingMusicPlayer();
-        player.answerWith(MusicPlayerEventListener::onNotSeekable);
-        MockButtonInteraction interaction = buttonInteraction();
-
-        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).forward(interaction);
-
-        assertThat(interaction.getReplies()).hasSize(1);
-        assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("live stream");
     }
 
     @Test
@@ -261,9 +256,8 @@ class MusicPlayerButtonControllerTest {
         private String togglePauseRequester;
         private String previousRequester;
         private String nextRequester;
-        private Duration rewindSeek;
-        private Duration forwardSeek;
         private String clearRequester;
+        private String cycleLoopRequester;
         private Consumer<MusicPlayerEventListener> answer = handler -> {};
         private Optional<MusicPlayerEvent> queue = Optional.empty();
 
@@ -304,13 +298,11 @@ class MusicPlayerButtonControllerTest {
 
         @Override
         public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
-            rewindSeek = seek;
             answer.accept(handler);
         }
 
         @Override
         public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {
-            forwardSeek = seek;
             answer.accept(handler);
         }
 
@@ -323,6 +315,16 @@ class MusicPlayerButtonControllerTest {
         @Override
         public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
             answer.accept(handler);
+        }
+
+        @Override
+        public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {
+            cycleLoopRequester = requesterTag;
+            answer.accept(handler);
+        }
+
+        @Override
+        public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {
         }
 
         @Override

@@ -1,5 +1,6 @@
 package com.bearify.music.player.bridge.events;
 
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -22,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Remove.class, name = "remove"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Shuffle.class, name = "shuffle"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.SetVolume.class, name = "set_volume"),
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.CycleLoop.class, name = "cycle_loop"),
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.SetLoop.class, name = "set_loop"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Jump.class, name = "jump")
 })
 public sealed interface MusicPlayerInteraction permits
@@ -40,6 +43,8 @@ public sealed interface MusicPlayerInteraction permits
         MusicPlayerInteraction.Remove,
         MusicPlayerInteraction.Shuffle,
         MusicPlayerInteraction.SetVolume,
+        MusicPlayerInteraction.CycleLoop,
+        MusicPlayerInteraction.SetLoop,
         MusicPlayerInteraction.Jump {
 
     String playerId();
@@ -87,6 +92,12 @@ public sealed interface MusicPlayerInteraction permits
     }
 
     record SetVolume(String playerId, Request request, String guildId, int volume) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
+    record CycleLoop(String playerId, Request request, String guildId) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
+    record SetLoop(String playerId, Request request, String guildId, LoopMode mode) implements MusicPlayerInteraction {
         @Override public String requestId() { return request.id(); }
     }
 

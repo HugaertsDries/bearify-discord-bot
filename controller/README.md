@@ -63,7 +63,13 @@ Mixes up the upcoming tracks once. The track playing now stays.
 Shows you, privately, the whole queue as a card in the player's Up Next style: the track playing now, up to 10 rows, then "…and N more", and the track count and total time. When more than 3 tracks are queued, the player's Up Next ends with "+N more on the trail" and a **Show** button that privately lists the tracks the player doesn't show.
 
 ### `/player volume <level>`
-Sets the bear's volume from 0 to 100 for everyone in the channel. The player shows it next to the requester. The bear starts every visit at `music-player.default-volume` (100).
+Sets the bear's volume from 0 to 100 for everyone in the channel. The player's status line is a tuner faceplate in a coloured code block: a red on-air light (grey while paused), a ten-segment VU meter and, below 100%, the level, e.g. `● ON AIR   ▮▮▮▮▯▯▯▯▯▯  40` (`MUTE` at 0). Discord's phone apps may show it without colours. The bear starts every visit at `music-player.default-volume` (100).
+
+### `/player loop <mode>`
+Sets the loop to `off`, `queue` or `track` directly (suggested as you type); same effect as the ↻ button.
+
+### ↻ Loop button
+The last button in the player's controls cycles the loop: `↻` (grey) off → `↻` (blurple) queue (a finished, skipped or forwarded-past-the-end track goes to the end of the queue, so the list keeps going round) → `↻¹` (blurple) one track (the song starts over when it ends; skipping moves on and loops the next one) → off. A track that fails to play is never looped, and the loop is off again whenever the bear comes back.
 
 ### `/poke [pokes]`
 Pokes the bear a number of times (default: 4) and reports the response latency of each poke.

@@ -13,11 +13,14 @@ import com.bearify.discord.api.message.ImageBlock;
 import com.bearify.discord.api.message.Section;
 import com.bearify.discord.api.message.Spacer;
 import com.bearify.discord.api.message.TextBlock;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -130,12 +133,45 @@ class PlaybackComponentTest {
     }
 
     @Test
-    void showsVolumeOnRequesterLine() {
+    void rendersStatusLineAsTunerFaceplate() {
         PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
 
         ComponentMessage message = announcer.render(baseState().volume(40).build());
 
-        assertThat(texts(message)).contains("-# **Requested by** @user · 🔊 40%");
+        assertThat(message.containers().getFirst().children().getFirst()).isInstanceOfSatisfying(TextBlock.class, block ->
+                assertThat(plain(block.text())).isEqualTo("```ansi\n● ON AIR   ▮▮▮▮▯▯▯▯▯▯  40\n```"));
+    }
+
+    @Test
+    void lightsMeterSegmentsRoundingUp() {
+        assertThat(plain(PlaybackComponent.tuner(PlaybackComponentState.PlaybackState.PLAYING, 100))).contains("ON AIR   ▮▮▮▮▮▮▮▮▮▮\n");
+        assertThat(plain(PlaybackComponent.tuner(PlaybackComponentState.PlaybackState.PLAYING, 5))).contains("▮▯▯▯▯▯▯▯▯▯  5\n");
+        assertThat(plain(PlaybackComponent.tuner(PlaybackComponentState.PlaybackState.PLAYING, 0))).contains("▯▯▯▯▯▯▯▯▯▯  MUTE\n");
+    }
+
+    @Test
+    void coloursOnAirLightAndMeterLikeARadio() {
+        String playing = PlaybackComponent.tuner(PlaybackComponentState.PlaybackState.PLAYING, 100);
+
+        assertThat(playing).startsWith("```ansi\n\u001b[31m●");
+        assertThat(PlaybackComponent.tuner(PlaybackComponentState.PlaybackState.PAUSED, 100)).startsWith("```ansi\n\u001b[30m●");
+        assertThat(playing).contains("\u001b[32m▮", "\u001b[33m▮");
+        assertThat(playing).endsWith("\u001b[31m▮\u001b[0m\n```");
+    }
+
+    @Test
+    void rendersLoopButtonAfterTheControlsPerMode() {
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+
+        assertThat(controls(announcer.render(baseState().build())).buttons()).containsExactly(
+                new InteractiveButton(ButtonStyle.SECONDARY, "player:previous", PlaybackComponent.PLAYER_PREVIOUS_LABEL),
+                new InteractiveButton(ButtonStyle.PRIMARY, "player:pause-play", PlaybackComponent.PLAYER_PAUSE_LABEL),
+                new InteractiveButton(ButtonStyle.SECONDARY, "player:next", PlaybackComponent.PLAYER_NEXT_LABEL),
+                new InteractiveButton(ButtonStyle.SECONDARY, "player:loop", "↻"));
+        assertThat(controls(announcer.render(baseState().loopMode(LoopMode.QUEUE).build())).buttons().get(3))
+                .isEqualTo(new InteractiveButton(ButtonStyle.PRIMARY, "player:loop", "↻"));
+        assertThat(controls(announcer.render(baseState().loopMode(LoopMode.TRACK).build())).buttons().get(3))
+                .isEqualTo(new InteractiveButton(ButtonStyle.PRIMARY, "player:loop", "↻¹"));
     }
 
     @Test
@@ -196,9 +232,19 @@ class PlaybackComponentTest {
     private static List<String> texts(ComponentMessage message) {
         return message.containers().stream()
                 .flatMap(container -> container.children().stream())
-                .filter(TextBlock.class::isInstance)
-                .map(TextBlock.class::cast)
-                .map(TextBlock::text)
+                .flatMap(child -> switch (child) {
+                    case TextBlock text -> Stream.of(text.text());
+                    case Section section -> section.texts().stream();
+                    default -> Stream.<String>empty();
+                })
                 .toList();
+    }
+
+    private static String plain(String ansi) {
+        return ansi.replaceAll("\u001b\\[[0-9;]*m", "");
+    }
+
+    private static ActionRow controls(ComponentMessage message) {
+        return (ActionRow) message.containers().get(1).children().getFirst();
     }
 }

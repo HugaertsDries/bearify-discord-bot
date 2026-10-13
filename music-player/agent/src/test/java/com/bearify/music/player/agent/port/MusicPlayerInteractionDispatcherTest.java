@@ -11,6 +11,7 @@ import com.bearify.music.player.agent.domain.AudioTrackLoader;
 import com.bearify.music.player.agent.domain.Track;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
@@ -316,6 +317,54 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
+    void routesCycleLoopToPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.CycleLoop(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
+
+        assertThat(pool.cycleLoopCalls).containsExactly(GUILD_ID + "|@user");
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenCyclingLoopWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.CycleLoop(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    @Test
+    void routesSetLoopToPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.SetLoop(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, LoopMode.TRACK));
+
+        assertThat(pool.setLoopCalls).containsExactly("TRACK|" + GUILD_ID + "|@user");
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenSettingLoopWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.SetLoop(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, LoopMode.TRACK));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    @Test
     void routesSetVolumeToPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
@@ -461,6 +510,8 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> removeCalls = new ArrayList<>();
         final List<String> shuffleCalls = new ArrayList<>();
         final List<String> setVolumeCalls = new ArrayList<>();
+        final List<String> cycleLoopCalls = new ArrayList<>();
+        final List<String> setLoopCalls = new ArrayList<>();
         final List<String> jumpCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
@@ -548,6 +599,16 @@ class MusicPlayerInteractionDispatcherTest {
             @Override
             public void setVolume(int volume, Request request) {
                 setVolumeCalls.add(volume + "|" + guildId + "|" + request.requesterTag());
+            }
+
+            @Override
+            public void cycleLoop(Request request) {
+                cycleLoopCalls.add(guildId + "|" + request.requesterTag());
+            }
+
+            @Override
+            public void setLoop(LoopMode mode, Request request) {
+                setLoopCalls.add(mode + "|" + guildId + "|" + request.requesterTag());
             }
 
             @Override

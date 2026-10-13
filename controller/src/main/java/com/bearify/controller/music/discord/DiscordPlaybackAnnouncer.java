@@ -7,6 +7,7 @@ import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private volatile Duration currentQueueDuration = Duration.ZERO;
     private volatile String currentRequesterTag;
     private volatile int currentVolume = 100;
+    private volatile LoopMode currentLoopMode = LoopMode.OFF;
 
     public DiscordPlaybackAnnouncer(DiscordClient discord,
                                     AnnouncerProperties properties,
@@ -92,6 +94,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Removed removed -> onRemoved(removed);
             case MusicPlayerEvent.Shuffled shuffled -> onShuffled(shuffled);
             case MusicPlayerEvent.VolumeChanged volumeChanged -> onVolumeChanged(volumeChanged);
+            case MusicPlayerEvent.LoopModeChanged loopModeChanged -> onLoopModeChanged(loopModeChanged);
             case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
             case MusicPlayerEvent.QueueEmpty ignored -> onQueueEmpty();
             case MusicPlayerEvent.Stopped stopped -> onStopped(stopped);
@@ -112,6 +115,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             currentQueueDuration = Duration.ofMillis(event.queueDurationMs());
             currentRequesterTag = event.request().requesterTag();
             currentVolume = event.volume();
+            currentLoopMode = event.loopMode();
             playbackState = PlaybackComponentState.PlaybackState.PLAYING;
             updateOrPost(playbackComponent.render(currentState()));
         } catch (Exception e) {
@@ -166,6 +170,16 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private void onVolumeChanged(MusicPlayerEvent.VolumeChanged event) {
         currentVolume = event.volume();
         notify("Volume set to " + event.volume() + "% by " + event.request().requesterTag());
+    }
+
+    private void onLoopModeChanged(MusicPlayerEvent.LoopModeChanged event) {
+        currentLoopMode = event.mode();
+        String label = switch (event.mode()) {
+            case OFF -> "Loop off";
+            case QUEUE -> "Looping the queue";
+            case TRACK -> "Looping this track";
+        };
+        notify(label + " by " + event.request().requesterTag());
     }
 
     private void updatePlaybackState(PlaybackComponentState.PlaybackState state, boolean autoPaused) {
@@ -299,6 +313,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
                 .queueSize(currentQueueSize)
                 .queueDuration(currentQueueDuration)
                 .volume(currentVolume)
+                .loopMode(currentLoopMode)
                 .artworkUri(artworkUrlResolver.resolve(currentTrack).orElse(null))
                 .footer(properties.footer())
                 .paused(playbackState == PlaybackComponentState.PlaybackState.PAUSED)

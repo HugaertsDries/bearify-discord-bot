@@ -4,6 +4,9 @@ import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.lava.LavaAudioEngine;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
+import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
+import com.bearify.music.player.bridge.model.Request;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +18,7 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class AudioPlayerPoolTest {
 
@@ -99,5 +103,24 @@ class AudioPlayerPoolTest {
         pool.getOrCreate("guild-1");
 
         assertThat(engines).singleElement().extracting(LavaAudioEngine::getVolume).isEqualTo(40);
+    }
+
+    @Test
+    void startsNewPlayerWithLoopOff() {
+        var eventDispatcher = mock(MusicPlayerEventDispatcher.class);
+        var pool = new AudioPlayerPool(
+                mock(DiscordClient.class),
+                eventDispatcher,
+                PROPERTIES,
+                Executors.newScheduledThreadPool(1),
+                () -> new LavaAudioEngine(manager),
+                "player-1");
+        pool.getOrCreate("guild-1").cycleLoop(new Request("req-1", "@user"));
+        pool.getOrCreate("guild-1").close();
+
+        pool.getOrCreate("guild-1").cycleLoop(new Request("req-2", "@user"));
+
+        verify(eventDispatcher).dispatch(
+                new MusicPlayerEvent.LoopModeChanged("player-1", new Request("req-2", "@user"), "guild-1", LoopMode.QUEUE));
     }
 }

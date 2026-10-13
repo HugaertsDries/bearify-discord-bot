@@ -4,6 +4,7 @@ import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -581,6 +582,158 @@ class AudioPlayerTest {
     }
 
     @Test
+    void cyclesLoopModeOffQueueTrack() {
+        player.cycleLoop(new Request("req-1", "@user"));
+        player.cycleLoop(new Request("req-2", "@user"));
+        player.cycleLoop(new Request("req-3", "@user"));
+
+        assertThat(eventDispatcher.getEvents()).containsExactly(
+                new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, LoopMode.QUEUE),
+                new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, new Request("req-2", "@user"), GUILD_ID, LoopMode.TRACK),
+                new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, new Request("req-3", "@user"), GUILD_ID, LoopMode.OFF));
+    }
+
+    @Test
+    void setsLoopModeDirectly() {
+        player.setLoop(LoopMode.TRACK, new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, LoopMode.TRACK));
+        player.cycleLoop(new Request("req-2", "@user"));
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, new Request("req-2", "@user"), GUILD_ID, LoopMode.OFF));
+    }
+
+    @Test
+    void replaysSameTrackInTrackMode() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        loop(LoopMode.TRACK);
+
+        finishPlayingTrack();
+
+        assertThat(playingTitle()).isEqualTo("Song A");
+        assertThat(upcomingTitles()).containsExactly("Song B");
+        player.previous(new Request("req-1", "@user"));
+        assertThat(eventDispatcher.getLastEvent()).isInstanceOf(MusicPlayerEvent.NothingToGoBack.class);
+    }
+
+    @Test
+    void advancesOnNextInTrackModeAndKeepsLooping() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        loop(LoopMode.TRACK);
+
+        player.next(new Request("req-1", "@user"));
+        finishPlayingTrack();
+
+        assertThat(playingTitle()).isEqualTo("Song B");
+        assertThat(upcomingTitles()).isEmpty();
+    }
+
+    @Test
+    void wrapsQueueInQueueMode() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        player.play(track("Song C", 200_000));
+        loop(LoopMode.QUEUE);
+
+        finishPlayingTrack();
+        finishPlayingTrack();
+        finishPlayingTrack();
+
+        assertThat(playingTitle()).isEqualTo("Song A");
+        assertThat(upcomingTitles()).containsExactly("Song B", "Song C");
+    }
+
+    @Test
+    void reappendsSkippedTrackInQueueMode() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        player.play(track("Song C", 200_000));
+        loop(LoopMode.QUEUE);
+
+        player.next(new Request("req-1", "@user"));
+
+        assertThat(playingTitle()).isEqualTo("Song B");
+        assertThat(upcomingTitles()).containsExactly("Song C", "Song A");
+    }
+
+    @Test
+    void reappendsTrackForwardedPastItsEndInQueueMode() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        loop(LoopMode.QUEUE);
+
+        player.forward(Duration.ofMinutes(5), new Request("req-1", "@user"));
+
+        assertThat(playingTitle()).isEqualTo("Song B");
+        assertThat(upcomingTitles()).containsExactly("Song A");
+    }
+
+    @Test
+    void repeatsSingleTrackInQueueMode() {
+        InMemoryTrack song = track("Song A", 120_000);
+        engine.play(song);
+        loop(LoopMode.QUEUE);
+
+        finishPlayingTrack();
+        player.next(new Request("req-1", "@user"));
+
+        assertThat(engine.getPlayingTrack()).get().isNotSameAs(song);
+        assertThat(playingTitle()).isEqualTo("Song A");
+        assertThat(upcomingTitles()).isEmpty();
+        assertThat(eventDispatcher.getEvents()).noneMatch(MusicPlayerEvent.NothingToAdvance.class::isInstance);
+    }
+
+    @Test
+    void doesNotLoopTrackThatErrored() {
+        InMemoryTrack broken = track("Broken", 120_000);
+        engine.play(broken);
+        player.play(track("Song B", 180_000));
+        loop(LoopMode.QUEUE);
+
+        engine.triggerOnTrackError(broken);
+        engine.triggerOnTrackEnd(broken);
+
+        assertThat(upcomingTitles()).isEmpty();
+    }
+
+    @Test
+    void doesNotLoopLiveStreamThatEndedBeforeAnySound() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        engine.play(stream);
+        loop(LoopMode.TRACK);
+
+        engine.triggerOnTrackEnd(stream);
+
+        assertThat(eventDispatcher.getEvents()).filteredOn(MusicPlayerEvent.TrackStart.class::isInstance).hasSize(1);
+        assertThat(eventDispatcher.getEvents()).hasAtLeastOneElementOfType(MusicPlayerEvent.QueueEmpty.class);
+    }
+
+    @Test
+    void ignoresLoopWhenTrackEndIsReplaced() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        loop(LoopMode.QUEUE);
+
+        // the skip replaces Song A, which must not append it a second time
+        player.next(new Request("req-1", "@user"));
+
+        assertThat(upcomingTitles()).containsExactly("Song A");
+    }
+
+    @Test
+    void includesLoopModeInTrackStart() {
+        loop(LoopMode.TRACK);
+
+        player.play(track("Song A", 120_000));
+
+        MusicPlayerEvent.TrackStart start = (MusicPlayerEvent.TrackStart) eventDispatcher.getLastEvent();
+        assertThat(start.loopMode()).isEqualTo(LoopMode.TRACK);
+    }
+
+    @Test
     void snapshotsCurrentTrackAndFullQueue() {
         InMemoryTrack playing = track("Playing", 120_000);
         engine.play(playing);
@@ -987,6 +1140,27 @@ class AudioPlayerTest {
         assertThat(player.isIdle()).isFalse();
     }
 
+    private void loop(LoopMode mode) {
+        for (int i = 0; i < mode.ordinal(); i++) {
+            player.cycleLoop(new Request("req-loop", "@user"));
+        }
+    }
+
+    private void finishPlayingTrack() {
+        engine.triggerOnTrackEnd(engine.getPlayingTrack().orElseThrow());
+    }
+
+    private String playingTitle() {
+        return engine.getPlayingTrack().orElseThrow().title();
+    }
+
+    private List<String> upcomingTitles() {
+        player.snapshot("req-snapshot");
+        return ((MusicPlayerEvent.QueueSnapshot) eventDispatcher.getLastEvent()).upcoming().stream()
+                .map(track -> track.title())
+                .toList();
+    }
+
     private static InMemoryTrack track(String title, long duration) {
         return new InMemoryTrack(title, duration, null);
     }
@@ -1048,6 +1222,13 @@ class AudioPlayerTest {
         void triggerOnTrackEnd(Track track) {
             if (listener != null) {
                 listener.onTrackEnd(track, true);
+            }
+        }
+
+        /** Simulates LavaPlayer's exception that comes before a failed track's end. */
+        void triggerOnTrackError(Track track) {
+            if (listener != null) {
+                listener.onTrackError(track, "boom");
             }
         }
 

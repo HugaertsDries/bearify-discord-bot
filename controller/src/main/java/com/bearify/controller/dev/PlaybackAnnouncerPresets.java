@@ -1,6 +1,7 @@
 package com.bearify.controller.dev;
 
 import com.bearify.controller.music.discord.PlaybackComponentState;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.net.URI;
@@ -39,6 +40,7 @@ public class PlaybackAnnouncerPresets {
                         .track(new TrackMetadata("Daft Punk - Voyager", "Daft Punk", "https://example.com/voyager", 227_000))
                         .requesterTag("@Bearable")
                         .upNext(List.of(new TrackMetadata("Digital Love", "Daft Punk", "https://example.com/digital-love", 301_000)))
+                        .loopMode(LoopMode.TRACK)
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
                         .paused(false)
@@ -56,6 +58,7 @@ public class PlaybackAnnouncerPresets {
                         // the bear sends the first three; nine more wait behind the Show button
                         .queueSize(12)
                         .queueDuration(Duration.ofMinutes(52))
+                        .loopMode(LoopMode.QUEUE)
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
                         .paused(false)

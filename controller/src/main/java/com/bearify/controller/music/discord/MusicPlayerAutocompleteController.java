@@ -31,6 +31,11 @@ public class MusicPlayerAutocompleteController {
     private static final int MAX_VALUE_LENGTH = 100;
     private static final int MAX_CHOICES = 25;
 
+    private static final List<Option> LOOP_MODES = List.of(
+            new Option("Off", "off"),
+            new Option("Queue: keep the whole queue going round", "queue"),
+            new Option("Track: repeat the song that's playing", "track"));
+
     private final TrackCatalogue catalogue;
     private final MusicPlayerPool pool;
 
@@ -80,6 +85,15 @@ public class MusicPlayerAutocompleteController {
                 })
                 .toList();
         interaction.reply(options);
+    }
+
+    @SuppressWarnings("unused")
+    @Interaction(type = AUTOCOMPLETE, value = "player:loop:mode")
+    public void loop(AutocompleteInteraction interaction) {
+        String typed = interaction.getValue().trim().toLowerCase(Locale.ROOT);
+        interaction.reply(LOOP_MODES.stream()
+                .filter(option -> option.name().toLowerCase(Locale.ROOT).contains(typed))
+                .toList());
     }
 
     private static boolean matches(TrackMetadata track, String typed) {

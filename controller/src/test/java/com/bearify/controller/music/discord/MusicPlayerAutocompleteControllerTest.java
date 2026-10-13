@@ -66,6 +66,19 @@ class MusicPlayerAutocompleteControllerTest {
     }
 
     @Test
+    void suggestsLoopModesMatchingTypedText() {
+        MusicPlayerAutocompleteController controller = new MusicPlayerAutocompleteController(mock(TrackCatalogue.class), mock(MusicPlayerPool.class));
+        MockAutocompleteInteraction all = MockAutocompleteInteraction.forAutocomplete("player:loop:mode", "").build();
+        MockAutocompleteInteraction queue = MockAutocompleteInteraction.forAutocomplete("player:loop:mode", "que").build();
+
+        controller.loop(all);
+        controller.loop(queue);
+
+        assertThat(all.getReplies().getFirst()).extracting(Option::value).containsExactly("off", "queue", "track");
+        assertThat(queue.getReplies().getFirst()).extracting(Option::value).containsExactly("queue");
+    }
+
+    @Test
     void returnsNothingWhenNoBearInChannel() {
         MusicPlayerPool pool = mock(MusicPlayerPool.class);
         when(pool.find(GUILD_ID, VOICE_CHANNEL_ID)).thenReturn(Optional.empty());

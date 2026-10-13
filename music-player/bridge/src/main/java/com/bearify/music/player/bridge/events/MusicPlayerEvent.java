@@ -1,5 +1,6 @@
 package com.bearify.music.player.bridge.events;
 
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
@@ -43,6 +44,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackNotInQueue.class, name = "track_not_in_queue"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Shuffled.class, name = "shuffled"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.VolumeChanged.class, name = "volume_changed"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.LoopModeChanged.class, name = "loop_mode_changed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Jumped.class, name = "jumped"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.JumpOutOfRange.class, name = "jump_out_of_range"),
 })
@@ -79,6 +81,7 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackNotInQueue,
         MusicPlayerEvent.Shuffled,
         MusicPlayerEvent.VolumeChanged,
+        MusicPlayerEvent.LoopModeChanged,
         MusicPlayerEvent.Jumped,
         MusicPlayerEvent.JumpOutOfRange {
 
@@ -90,13 +93,15 @@ public sealed interface MusicPlayerEvent permits
      * {@code upNext} is the start of the queue; {@code queueSize} and {@code queueDurationMs} (live streams excluded)
      * cover the whole queue, and are 0 when an older bear sent the event (boxed so their absence reads as 0, not an error).
      * {@code volume} is the bear's current volume, 100 (LavaPlayer's default) when an older bear sent the event.
+     * {@code loopMode} is the bear's current loop, OFF when an older bear sent the event.
      */
-    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs, Integer volume) implements MusicPlayerEvent {
+    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs, Integer volume, LoopMode loopMode) implements MusicPlayerEvent {
         public TrackStart {
             upNext = upNext != null ? List.copyOf(upNext) : List.of();
             queueSize = queueSize != null ? queueSize : 0;
             queueDurationMs = queueDurationMs != null ? queueDurationMs : 0L;
             volume = volume != null ? volume : 100;
+            loopMode = loopMode != null ? loopMode : LoopMode.OFF;
         }
         @Override public String requestId() { return request.id(); }
     }
@@ -191,6 +196,9 @@ public sealed interface MusicPlayerEvent permits
     }
 
     record VolumeChanged(String playerId, Request request, String guildId, int volume) implements MusicPlayerEvent {
+        @Override public String requestId() { return request.id(); }
+    }
+    record LoopModeChanged(String playerId, Request request, String guildId, LoopMode mode) implements MusicPlayerEvent {
         @Override public String requestId() { return request.id(); }
     }
 

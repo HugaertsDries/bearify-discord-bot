@@ -4,6 +4,7 @@ import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.music.player.agent.config.PlayerProperties;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.slf4j.Logger;
@@ -43,6 +44,7 @@ public class AudioPlayer implements AudioProvider {
     private boolean closed = false;
     private boolean autoPaused = false;
     private volatile boolean lastTrackWasError = false;
+    private LoopMode loopMode = LoopMode.OFF;
 
     protected AudioPlayer(AudioEngine engine,
                           AudioProvider audioProvider,
@@ -126,7 +128,20 @@ public class AudioPlayer implements AudioProvider {
         eventDispatcher.dispatch(new MusicPlayerEvent.VolumeChanged(playerId, request, guildId, clamped));
     }
 
+    public synchronized void cycleLoop(Request request) {
+        setLoop(loopMode.next(), request);
+    }
+
+    public synchronized void setLoop(LoopMode mode, Request request) {
+        loopMode = mode;
+        eventDispatcher.dispatch(new MusicPlayerEvent.LoopModeChanged(playerId, request, guildId, loopMode));
+    }
+
     public synchronized void next(Request request) {
+        if (loopMode == LoopMode.QUEUE) {
+            // a skipped track stays in the cycle; alone, it starts over
+            engine.getPlayingTrack().ifPresent(current -> queue.addLast(current.clone()));
+        }
         if (queue.isEmpty()) {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
             return;
@@ -187,7 +202,10 @@ public class AudioPlayer implements AudioProvider {
             eventDispatcher.dispatch(new MusicPlayerEvent.Forwarded(playerId, request, guildId, after - before));
             return;
         }
-        // forwarding past the end is a skip to the next track
+        // forwarding past the end is a skip to the next track, so in a looping queue the track stays in the cycle too
+        if (loopMode == LoopMode.QUEUE) {
+            queue.addLast(track.clone());
+        }
         if (queue.isEmpty()) {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
             return;
@@ -353,11 +371,13 @@ public class AudioPlayer implements AudioProvider {
             List<TrackMetadata> upNext;
             int queueSize;
             long queueDurationMs;
+            LoopMode loop;
             synchronized (AudioPlayer.this) {
                 justRestarted = false;
                 upNext = upNext();
                 queueSize = queue.size();
                 queueDurationMs = queueDurationMs();
+                loop = loopMode;
             }
             LOG.info("Now playing: {} by {}", track.title(), track.author());
             status.show(track);
@@ -369,7 +389,8 @@ public class AudioPlayer implements AudioProvider {
                     upNext,
                     queueSize,
                     queueDurationMs,
-                    engine.getVolume()));
+                    engine.getVolume(),
+                    loop));
         }
 
         @Override
@@ -382,6 +403,16 @@ public class AudioPlayer implements AudioProvider {
             boolean wasError = lastTrackWasError;
             lastTrackWasError = false;
             synchronized (AudioPlayer.this) {
+                // a failed track would fail again forever, and a live stream that ended has gone off the air
+                boolean loops = !wasError && !track.toMetadata().isLive();
+                if (loops && loopMode == LoopMode.TRACK) {
+                    engine.play(track.clone());
+                    return;
+                }
+                if (loops && loopMode == LoopMode.QUEUE) {
+                    // with nothing else queued the track plays itself next, so a single song repeats
+                    queue.addLast(track.clone());
+                }
                 if (!queue.isEmpty()) {
                     history.addFirst(track.clone());
                     Track next = queue.pollFirst();

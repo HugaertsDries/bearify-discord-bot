@@ -8,6 +8,7 @@ import com.bearify.controller.music.discord.DiscordPlaybackAnnouncerFactory;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
@@ -103,6 +104,12 @@ class RedisMusicPlayer implements MusicPlayer {
     public void shuffle(String requesterTag, MusicPlayerEventListener handler) { state.shuffle(requesterTag, handler); }
     @Override
     public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { state.setVolume(volume, requesterTag, handler); }
+
+    @Override
+    public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) { state.cycleLoop(requesterTag, handler); }
+
+    @Override
+    public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) { state.setLoop(mode, requesterTag, handler); }
 
     @Override
     public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) { state.jump(position, requesterTag, handler); }
@@ -204,6 +211,16 @@ class RedisMusicPlayer implements MusicPlayer {
         @Override
         public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
             refuse("setVolume", handler);
+        }
+
+        @Override
+        public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {
+            refuse("cycleLoop", handler);
+        }
+
+        @Override
+        public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {
+            refuse("setLoop", handler);
         }
 
         @Override
@@ -379,6 +396,28 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.VolumeChanged v -> handler.onVolumeChanged(v.volume());
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for setVolume request", event.getClass().getSimpleName());
+                }
+            });
+        }
+
+        @Override
+        public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {
+            request(requestId -> new MusicPlayerInteraction.CycleLoop(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
+                switch (event) {
+                    case MusicPlayerEvent.LoopModeChanged l -> handler.onLoopModeChanged(l.mode());
+                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
+                    default -> LOG.warn("Unexpected event '{}' for cycleLoop request", event.getClass().getSimpleName());
+                }
+            });
+        }
+
+        @Override
+        public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {
+            request(requestId -> new MusicPlayerInteraction.SetLoop(playerId, new Request(requestId, requesterTag), guildId, mode), handler, event -> {
+                switch (event) {
+                    case MusicPlayerEvent.LoopModeChanged l -> handler.onLoopModeChanged(l.mode());
+                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
+                    default -> LOG.warn("Unexpected event '{}' for setLoop request", event.getClass().getSimpleName());
                 }
             });
         }

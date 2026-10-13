@@ -92,6 +92,14 @@ public class MusicPlayerInteractionDispatcher {
                     pool.get(v.guildId()).ifPresentOrElse(
                             player -> player.setVolume(v.volume(), v.request()),
                             () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, v.requestId(), v.guildId())));
+            case MusicPlayerInteraction.CycleLoop l ->
+                    pool.get(l.guildId()).ifPresentOrElse(
+                            player -> player.cycleLoop(l.request()),
+                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, l.requestId(), l.guildId())));
+            case MusicPlayerInteraction.SetLoop l ->
+                    pool.get(l.guildId()).ifPresentOrElse(
+                            player -> player.setLoop(l.mode(), l.request()),
+                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, l.requestId(), l.guildId())));
             case MusicPlayerInteraction.Jump j ->
                     pool.get(j.guildId()).ifPresentOrElse(
                             player -> player.jump(Duration.ofMillis(j.positionMs()), j.request()),

@@ -19,6 +19,7 @@ public final class BearifyEmoji {
     public static final String FORWARD = "\u23E9";
     public static final String TRASH = "\uD83D\uDDD1\uFE0F";
     public static final String SHUFFLE = "\uD83D\uDD00";
+    public static final String REPEAT = "\uD83D\uDD01";
     public static final String FLAG = "\uD83C\uDFC1";
     public static final String PARTY = "\uD83C\uDF89";
     public static final String FOREST = "\uD83C\uDF32";

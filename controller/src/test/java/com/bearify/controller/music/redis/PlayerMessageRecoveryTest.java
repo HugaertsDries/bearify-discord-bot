@@ -8,6 +8,7 @@ import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.testing.MockDiscordClient;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
@@ -114,7 +115,7 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
 
     private static MusicPlayerEvent.TrackStart trackStart() {
         return new MusicPlayerEvent.TrackStart(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID,
-                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100);
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF);
     }
 
     private void cleanUp() {

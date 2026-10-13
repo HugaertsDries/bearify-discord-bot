@@ -10,7 +10,6 @@ import com.bearify.discord.api.interaction.ReplyBuilder;
 import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
 
-import java.time.Duration;
 import java.util.Optional;
 
 @DiscordController
@@ -19,7 +18,6 @@ public class MusicPlayerButtonController {
     private static final String NOT_IN_VOICE_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | Looks like you're not in a voice channel! Jump in one and try again.";
     private static final String NOT_IN_GUILD_MESSAGE = BearifyEmoji.BLOCKED + " | I only lumber around inside a server.";
     private static final String WRONG_VOICE_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | You need to be in the same voice channel as the active player to use these controls.";
-    private static final Duration DEFAULT_SEEK = Duration.ofSeconds(30);
 
     private final MusicPlayerPool pool;
 
@@ -46,24 +44,6 @@ public class MusicPlayerButtonController {
     }
 
     @SuppressWarnings("unused")
-    @Interaction(type = InteractionType.BUTTON, value = "player:rewind")
-    public void rewind(ButtonInteraction interaction) {
-        requirePlayer(interaction).ifPresent(player -> {
-            interaction.acknowledge();
-            player.rewind(DEFAULT_SEEK, interaction.getUserMention(), answerFailuresPrivately(interaction));
-        });
-    }
-
-    @SuppressWarnings("unused")
-    @Interaction(type = InteractionType.BUTTON, value = "player:forward")
-    public void forward(ButtonInteraction interaction) {
-        requirePlayer(interaction).ifPresent(player -> {
-            interaction.acknowledge();
-            player.forward(DEFAULT_SEEK, interaction.getUserMention(), answerFailuresPrivately(interaction));
-        });
-    }
-
-    @SuppressWarnings("unused")
     @Interaction(type = InteractionType.BUTTON, value = "player:next")
     public void next(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {
@@ -78,6 +58,15 @@ public class MusicPlayerButtonController {
         requirePlayer(interaction).ifPresent(player -> {
             interaction.acknowledge();
             player.clear(interaction.getUserMention(), answerFailuresPrivately(interaction));
+        });
+    }
+
+    @SuppressWarnings("unused")
+    @Interaction(type = InteractionType.BUTTON, value = "player:loop")
+    public void loop(ButtonInteraction interaction) {
+        requirePlayer(interaction).ifPresent(player -> {
+            interaction.acknowledge();
+            player.cycleLoop(interaction.getUserMention(), answerFailuresPrivately(interaction));
         });
     }
 

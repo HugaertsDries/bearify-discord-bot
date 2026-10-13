@@ -13,6 +13,7 @@ import com.bearify.discord.api.message.TextBlock;
 import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
@@ -245,7 +246,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         PLAYER_ID,
                         new Request("event-1", "@user"),
                         GUILD_ID,
-                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100)));
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF)));
 
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
@@ -273,7 +274,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         PLAYER_ID,
                         new Request("event-1", "@user"),
                         GUILD_ID,
-                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100)));
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF)));
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
             assertThat(discord.sentComponents("text-1")).hasSize(1);
@@ -284,7 +285,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
             assertThat(discord.sentComponents("text-1")).hasSize(1);
-            assertThat(allTexts(discord.sentComponents("text-1").getFirst())).anyMatch(text -> text.contains("ON THE AIR"));
+            assertThat(allTexts(discord.sentComponents("text-1").getFirst())).anyMatch(text -> text.contains("ON AIR"));
         });
     }
 
@@ -307,7 +308,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         PLAYER_ID,
                         new Request("event-1", "@user"),
                         GUILD_ID,
-                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100)));
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF)));
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
             assertThat(discord.sentComponents("text-1")).hasSize(1);

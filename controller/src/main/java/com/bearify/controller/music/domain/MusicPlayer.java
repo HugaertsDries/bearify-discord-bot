@@ -1,6 +1,7 @@
 package com.bearify.controller.music.domain;
 
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackRequest;
 
 import java.time.Duration;
@@ -22,6 +23,9 @@ public interface MusicPlayer {
     void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler);
     void shuffle(String requesterTag, MusicPlayerEventListener handler);
     void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler);
+    /** Moves the loop on from off to the queue to the current track and back to off. */
+    void cycleLoop(String requesterTag, MusicPlayerEventListener handler);
+    void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler);
     void jump(Duration position, String requesterTag, MusicPlayerEventListener handler);
     /** Blocks for the bear's reply, a {@link MusicPlayerEvent.QueueSnapshot} or {@link MusicPlayerEvent.PlayerNotFound}; empty when it doesn't answer in time. */
     Optional<MusicPlayerEvent> queue();

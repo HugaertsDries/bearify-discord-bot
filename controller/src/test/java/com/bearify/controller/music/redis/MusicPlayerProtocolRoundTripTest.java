@@ -2,6 +2,7 @@ package com.bearify.controller.music.redis;
 
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
@@ -82,6 +83,13 @@ class MusicPlayerProtocolRoundTripTest {
         String json = "{\"type\":\"track_start\",\"playerId\":\"player-id\",\"request\":{\"id\":\"request-id\",\"requesterTag\":\"@user\"},\"guildId\":\"guild-id\",\"upNext\":[]}";
 
         assertThat(((MusicPlayerEvent.TrackStart) OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class)).volume()).isEqualTo(100);
+    }
+
+    @Test
+    void readsTrackStartFromOlderBearWithoutLoopModeAsOff() {
+        String json = "{\"type\":\"track_start\",\"playerId\":\"player-id\",\"request\":{\"id\":\"request-id\",\"requesterTag\":\"@user\"},\"guildId\":\"guild-id\",\"upNext\":[]}";
+
+        assertThat(((MusicPlayerEvent.TrackStart) OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class)).loopMode()).isEqualTo(LoopMode.OFF);
     }
 
     @Test

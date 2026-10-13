@@ -11,10 +11,12 @@ import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.spring.annotation.Option;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -42,6 +44,7 @@ public class MusicPlayerCommandController {
     private static final String PICK_A_TRACK_MESSAGE = BearifyEmoji.BLOCKED + " | Pick a track from the list so I know which one to drop.";
     private static final String TRACK_NOT_IN_QUEUE_MESSAGE = BearifyEmoji.BLOCKED + " | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
     private static final String NOTHING_TO_SHUFFLE_MESSAGE = BearifyEmoji.HONEY + " | The queue is empty, nothing to shuffle.";
+    private static final String LOOP_MODE_MESSAGE = BearifyEmoji.BLOCKED + " | Pick a loop mode: `off`, `queue` or `track`.";
     private static final String TIME_FORMAT_MESSAGE = BearifyEmoji.BLOCKED + " | Use a time like `1:23`, `1h30m` or `83` (seconds).";
 
     private static final List<String> JOIN_ENDINGS = List.of(
@@ -392,6 +395,33 @@ public class MusicPlayerCommandController {
     }
 
     @SuppressWarnings("unused")
+    @Interaction(value = "loop", description = "I'll keep the queue or this track going round")
+    public void loop(CommandInteraction interaction,
+                     @Option(name = "mode", description = "off, queue or track", required = true, autocomplete = true) String mode) {
+        Optional<LoopMode> loopMode = Arrays.stream(LoopMode.values())
+                .filter(candidate -> candidate.name().equalsIgnoreCase(mode.trim()))
+                .findFirst();
+        if (loopMode.isEmpty()) {
+            interaction.reply(LOOP_MODE_MESSAGE).ephemeral().send();
+            return;
+        }
+        requireVoiceSession(interaction).ifPresent(ctx ->
+                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
+                        player -> {
+                            EditableMessage message = interaction.defer(true);
+                            player.setLoop(loopMode.get(), interaction.getUserMention(), new AnsweringListener(message::edit) {
+                                @Override
+                                public void onLoopModeChanged(LoopMode changed) {
+                                    answer(loopMessage(changed));
+                                }
+                            });
+                        },
+                        () -> replyNoPlayer(interaction)
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
     @Interaction(value = "queue", description = "I'll show you everything that's coming up on the trail")
     public void queue(CommandInteraction interaction) {
         requireVoiceSession(interaction).ifPresent(ctx ->
@@ -523,6 +553,14 @@ public class MusicPlayerCommandController {
 
     private static String shuffledMessage(int count) {
         return BearifyEmoji.SHUFFLE + " | Shuffled " + count + (count == 1 ? " track" : " tracks") + ". Chaos, bear-style.";
+    }
+
+    private static String loopMessage(LoopMode mode) {
+        return BearifyEmoji.REPEAT + switch (mode) {
+            case OFF -> " | Loop off.";
+            case QUEUE -> " | Looping the queue.";
+            case TRACK -> " | Looping this track.";
+        };
     }
 
     private static String volumeMessage(int volume) {

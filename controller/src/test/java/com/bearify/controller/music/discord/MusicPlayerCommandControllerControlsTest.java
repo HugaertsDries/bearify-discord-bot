@@ -10,6 +10,7 @@ import com.bearify.discord.spring.CommandRegistry;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.model.StopReason;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
@@ -52,6 +53,8 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String PICK_A_TRACK_MESSAGE = "🛑️ | Pick a track from the list so I know which one to drop.";
     private static final String SHUFFLED_MESSAGE = "🔀 | Shuffled 12 tracks. Chaos, bear-style.";
     private static final String NOTHING_TO_SHUFFLE_MESSAGE = "🍯 | The queue is empty, nothing to shuffle.";
+    private static final String LOOP_QUEUE_MESSAGE = "🔁 | Looping the queue.";
+    private static final String LOOP_MODE_MESSAGE = "🛑️ | Pick a loop mode: `off`, `queue` or `track`.";
     private static final String VOLUME_SET_MESSAGE = "🔊 | Volume set to 40%. Only too loud for you? Right-click the bear → User Volume.";
     private static final String VOLUME_OUT_OF_RANGE_MESSAGE = "🛑️ | Volume goes from 0 to 100, bear with me.";
     private static final String JUMPED_MESSAGE = "⏩ | Jumped to 1m 23s.";
@@ -605,6 +608,48 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void setsLoopModeAndConfirmsIt() {
+        BlockingQueue<MusicPlayerInteraction> sent = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer bear = answerAs(interaction -> {
+            sent.offer(interaction);
+            MusicPlayerInteraction.SetLoop setLoop = (MusicPlayerInteraction.SetLoop) interaction;
+            return new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, setLoop.request(), GUILD_ID, setLoop.mode());
+        });
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("loop", "mode", "Queue");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(LOOP_QUEUE_MESSAGE));
+            assertThat(sent).singleElement()
+                    .isInstanceOfSatisfying(MusicPlayerInteraction.SetLoop.class, setLoop -> assertThat(setLoop.mode()).isEqualTo(LoopMode.QUEUE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void rejectsUnknownLoopModeWithoutContactingBear() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("loop", "mode", "forever");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.getReplies()).singleElement().satisfies(reply -> {
+                assertThat(reply.isEphemeral()).isTrue();
+                assertThat(reply.getContent()).isEqualTo(LOOP_MODE_MESSAGE);
+            });
+            assertThat(received.poll(500, TimeUnit.MILLISECONDS)).isNull();
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
     void rejectsVolumeOutOfRangeWithoutContactingBear() throws Exception {
         BlockingQueue<String> received = new LinkedBlockingQueue<>();
         RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
@@ -737,6 +782,8 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
         @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
@@ -754,6 +801,8 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { handler.onTimedOut(); }
+        @Override public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
         @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}

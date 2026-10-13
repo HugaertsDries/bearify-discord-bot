@@ -17,13 +17,16 @@ import static com.bearify.discord.api.message.ButtonStyle.SECONDARY;
 
 public class PlaybackComponent {
 
-    public static final String PLAYER_PREVIOUS_LABEL = "❙◀︎◀︎";
-    public static final String PLAYER_REWIND_LABEL = "◀︎";
+    public static final String PLAYER_PREVIOUS_LABEL = "❙◀︎";
     public static final String PLAYER_PAUSE_LABEL = "❚❚";
     public static final String PLAYER_PLAY_LABEL = "▶︎";
-    public static final String PLAYER_FORWARD_LABEL = "▶︎";
-    public static final String PLAYER_NEXT_LABEL = "▶︎▶︎❙";
+    public static final String PLAYER_NEXT_LABEL = "▶︎❙";
     public static final String PLAYER_SHOW_QUEUE_LABEL = "Show";
+    public static final String PLAYER_LOOP_OFF_LABEL = "↻";
+    public static final String PLAYER_LOOP_QUEUE_LABEL = "↻";
+    public static final String PLAYER_LOOP_TRACK_LABEL = "↻¹";
+    private static final int VOLUME_METER_SEGMENTS = 10;
+    private static final String ANSI_RESET = "\u001b[0m";
     static final String LIVE_LABEL = BearifyEmoji.RED + " LIVE";
 
     private final AnnouncerProperties properties;
@@ -50,7 +53,7 @@ public class PlaybackComponent {
 
     private static void appendHero(ComponentMessageBuilder builder, PlaybackComponentState state) {
         builder.container(container -> {
-            container.text("-# **" + state.playbackState().header() + "**");
+            container.text(tuner(state.playbackState(), state.volume()));
             state.artworkUri().ifPresent(uri -> container.image(uri.toString(), "Track artwork"));
             container.section(section -> {
                 section.text("## " + truncate(state.track().title(), 45));
@@ -58,18 +61,42 @@ public class PlaybackComponent {
             });
             container.text("### " + trackMetaLine(state.track(), 40, UnaryOperator.identity()));
             container.separator();
-            container.text("-# **Requested by** " + state.requesterTag() + " · " + BearifyEmoji.SPEAKER + " " + state.volume() + "%");
+            container.text("-# **Requested by** " + state.requesterTag());
         });
     }
 
     private static void appendActionRow(ComponentMessageBuilder builder, PlaybackComponentState state) {
         builder.container(container -> container.ActionRow(row -> {
             row.secondary("player:previous", PLAYER_PREVIOUS_LABEL);
-            row.secondary("player:rewind", PLAYER_REWIND_LABEL);
             row.primary("player:pause-play", state.paused() ? PLAYER_PLAY_LABEL : PLAYER_PAUSE_LABEL);
-            row.secondary("player:forward", PLAYER_FORWARD_LABEL);
             row.secondary("player:next", PLAYER_NEXT_LABEL);
+            switch (state.loopMode()) {
+                case OFF -> row.secondary("player:loop", PLAYER_LOOP_OFF_LABEL);
+                case QUEUE -> row.primary("player:loop", PLAYER_LOOP_QUEUE_LABEL);
+                case TRACK -> row.primary("player:loop", PLAYER_LOOP_TRACK_LABEL);
+            }
         }));
+    }
+
+    /**
+     * The status line as a radio's tuner faceplate, in an ansi code block (the only way Discord colours text): an
+     * on-air light that is red while playing, a VU meter for the volume and, below full volume, its level.
+     */
+    static String tuner(PlaybackComponentState.PlaybackState playbackState, int volume) {
+        String light = ansi(playbackState == PlaybackComponentState.PlaybackState.PLAYING ? "31" : "30", "●");
+        // rounded up, so any volume you can hear lights at least one segment
+        int lit = Math.ceilDiv(Math.clamp(volume, 0, 100), 100 / VOLUME_METER_SEGMENTS);
+        StringBuilder meter = new StringBuilder();
+        for (int segment = 1; segment <= VOLUME_METER_SEGMENTS; segment++) {
+            String colour = segment == VOLUME_METER_SEGMENTS ? "31" : segment > VOLUME_METER_SEGMENTS - 3 ? "33" : "32";
+            meter.append(segment <= lit ? ansi(colour, "▮") : ansi("30", "▯"));
+        }
+        String level = volume >= 100 ? "" : "  " + ansi("1;37", volume <= 0 ? "MUTE" : String.valueOf(volume));
+        return "```ansi\n" + light + " " + ansi("1;37", "ON AIR") + "   " + meter + level + "\n```";
+    }
+
+    private static String ansi(String code, String text) {
+        return "\u001b[" + code + "m" + text + ANSI_RESET;
     }
 
     private static void appendQueue(ComponentMessageBuilder builder, PlaybackComponentState state) {

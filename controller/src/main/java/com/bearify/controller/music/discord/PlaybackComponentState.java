@@ -1,5 +1,6 @@
 package com.bearify.controller.music.discord;
 
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.net.URI;
@@ -21,18 +22,8 @@ public final class PlaybackComponentState {
     }
 
     public enum PlaybackState {
-        PLAYING("\uD83D\uDD34 \u200E ON THE AIR"),
-        PAUSED("\u26AA \u200E ON THE AIR");
-
-        private final String header;
-
-        PlaybackState(String header) {
-            this.header = header;
-        }
-
-        public String header() {
-            return header;
-        }
+        PLAYING,
+        PAUSED
     }
 
     private final PlaybackState playbackState;
@@ -43,6 +34,7 @@ public final class PlaybackComponentState {
     private final int queueSize;
     private final Duration queueDuration;
     private final int volume;
+    private final LoopMode loopMode;
     private final URI artworkUri;
     private final String footer;
     private final boolean paused;
@@ -56,6 +48,7 @@ public final class PlaybackComponentState {
         this.queueSize = builder.queueSize;
         this.queueDuration = builder.queueDuration;
         this.volume = builder.volume;
+        this.loopMode = builder.loopMode;
         this.artworkUri = builder.artworkUri;
         this.footer = builder.footerText;
         this.paused = builder.paused;
@@ -99,6 +92,10 @@ public final class PlaybackComponentState {
         return volume;
     }
 
+    public LoopMode loopMode() {
+        return loopMode;
+    }
+
     public Optional<URI> artworkUri() {
         return Optional.ofNullable(artworkUri);
     }
@@ -120,6 +117,7 @@ public final class PlaybackComponentState {
         private int queueSize;
         private Duration queueDuration = Duration.ZERO;
         private int volume = 100;
+        private LoopMode loopMode = LoopMode.OFF;
         private URI artworkUri;
         private String footerText;
         private boolean paused;
@@ -169,6 +167,11 @@ public final class PlaybackComponentState {
 
         public Builder volume(int volume) {
             this.volume = volume;
+            return this;
+        }
+
+        public Builder loopMode(LoopMode loopMode) {
+            this.loopMode = loopMode;
             return this;
         }
 
