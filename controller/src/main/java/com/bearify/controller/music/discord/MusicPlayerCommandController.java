@@ -3,6 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.domain.Timestamp;
 import com.bearify.controller.music.spotify.SpotifyLinkResolver;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.EditableMessage;
@@ -41,6 +42,7 @@ public class MusicPlayerCommandController {
     private static final String PICK_A_TRACK_MESSAGE = BearifyEmoji.BLOCKED + " | Pick a track from the list so I know which one to drop.";
     private static final String TRACK_NOT_IN_QUEUE_MESSAGE = BearifyEmoji.BLOCKED + " | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
     private static final String NOTHING_TO_SHUFFLE_MESSAGE = BearifyEmoji.HONEY + " | The queue is empty, nothing to shuffle.";
+    private static final String TIME_FORMAT_MESSAGE = BearifyEmoji.BLOCKED + " | Use a time like `1:23`, `1h30m` or `83` (seconds).";
 
     private static final List<String> JOIN_ENDINGS = List.of(
             "Let's just chill for a bit?",
@@ -268,6 +270,36 @@ public class MusicPlayerCommandController {
     }
 
     @SuppressWarnings("unused")
+    @Interaction(value = "jump", description = "I'll jump straight to a moment in the current track")
+    public void jump(CommandInteraction interaction,
+                     @Option(name = "time", description = "Where to jump to, like 1:23, 1h30m or 83 (seconds)", required = true) String time) {
+        Optional<Duration> position = Timestamp.parse(time).map(Timestamp::position);
+        if (position.isEmpty()) {
+            interaction.reply(TIME_FORMAT_MESSAGE).ephemeral().send();
+            return;
+        }
+        requireVoiceSession(interaction).ifPresent(ctx ->
+                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
+                        player -> {
+                            EditableMessage message = interaction.defer(true);
+                            player.jump(position.get(), interaction.getUserMention(), new AnsweringListener(message::edit) {
+                                @Override
+                                public void onJumped(Duration jumpedTo) {
+                                    answer(jumpedMessage(jumpedTo));
+                                }
+
+                                @Override
+                                public void onJumpOutOfRange(Duration trackLength) {
+                                    answer(trackTooShortMessage(trackLength));
+                                }
+                            });
+                        },
+                        () -> replyNoPlayer(interaction)
+                )
+        );
+    }
+
+    @SuppressWarnings("unused")
     @Interaction(value = "clear", description = "I'll clear the current playlist. (I'm not responsible for losing friends)")
     public void clear(CommandInteraction interaction) {
         requireVoiceSession(interaction).ifPresent(ctx ->
@@ -471,6 +503,14 @@ public class MusicPlayerCommandController {
 
     private static String forwardedMessage(Duration seek) {
         return BearifyEmoji.FORWARD + " | Forwarded the current track by " + seek.toSeconds() + "s for you.";
+    }
+
+    private static String jumpedMessage(Duration position) {
+        return BearifyEmoji.FORWARD + " | Jumped to " + PlaybackComponent.humanReadable(position) + ".";
+    }
+
+    private static String trackTooShortMessage(Duration trackLength) {
+        return BearifyEmoji.BLOCKED + " | That track is only " + PlaybackComponent.humanReadable(trackLength) + " long.";
     }
 
     private static String clearedMessage() {

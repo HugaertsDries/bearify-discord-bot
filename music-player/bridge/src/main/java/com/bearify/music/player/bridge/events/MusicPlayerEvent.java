@@ -43,6 +43,8 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackNotInQueue.class, name = "track_not_in_queue"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Shuffled.class, name = "shuffled"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.VolumeChanged.class, name = "volume_changed"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.Jumped.class, name = "jumped"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.JumpOutOfRange.class, name = "jump_out_of_range"),
 })
 public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.TrackStart,
@@ -76,7 +78,9 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.Removed,
         MusicPlayerEvent.TrackNotInQueue,
         MusicPlayerEvent.Shuffled,
-        MusicPlayerEvent.VolumeChanged {
+        MusicPlayerEvent.VolumeChanged,
+        MusicPlayerEvent.Jumped,
+        MusicPlayerEvent.JumpOutOfRange {
 
     String playerId();
     String requestId();
@@ -164,7 +168,7 @@ public sealed interface MusicPlayerEvent permits
             upcoming = upcoming != null ? List.copyOf(upcoming) : List.of();
         }
     }
-    /** A rewind or forward on a track that can't seek, such as a live stream. */
+    /** A rewind, forward or jump on a track that can't seek, such as a live stream. */
     record NotSeekable(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
     /** Same queue fields as {@link QueueUpdated}, so the player message keeps counting what's further up the trail. */
     record Removed(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, int queueSize, long queueDurationMs) implements MusicPlayerEvent {
@@ -189,4 +193,10 @@ public sealed interface MusicPlayerEvent permits
     record VolumeChanged(String playerId, Request request, String guildId, int volume) implements MusicPlayerEvent {
         @Override public String requestId() { return request.id(); }
     }
+
+    record Jumped(String playerId, Request request, String guildId, long positionMs) implements MusicPlayerEvent {
+        @Override public String requestId() { return request.id(); }
+    }
+    /** A jump to or past the end of the playing track. */
+    record JumpOutOfRange(String playerId, String requestId, String guildId, long durationMs) implements MusicPlayerEvent {}
 }

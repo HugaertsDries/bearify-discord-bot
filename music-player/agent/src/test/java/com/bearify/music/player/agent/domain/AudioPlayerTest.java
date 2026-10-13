@@ -369,6 +369,63 @@ class AudioPlayerTest {
     }
 
     @Test
+    void jumpsToRequestedPosition() {
+        InMemoryTrack track = track("Track", 225_000);
+        track.setPosition(10_000);
+        engine.play(track);
+
+        player.jump(Duration.ofSeconds(83), new Request("req-1", "@user"));
+
+        assertThat(track.position()).isEqualTo(83_000);
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.Jumped(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 83_000));
+    }
+
+    @Test
+    void keepsPausedStateWhenJumping() {
+        InMemoryTrack track = track("Track", 225_000);
+        engine.play(track);
+        engine.setPaused(true);
+
+        player.jump(Duration.ofSeconds(83), new Request("req-1", "@user"));
+
+        assertThat(engine.isPaused()).isTrue();
+    }
+
+    @Test
+    void rejectsJumpPastTheEnd() {
+        InMemoryTrack track = track("Track", 225_000);
+        track.setPosition(10_000);
+        engine.play(track);
+
+        player.jump(Duration.ofMillis(225_000), new Request("req-1", "@user"));
+
+        assertThat(track.position()).isEqualTo(10_000);
+        assertThat(eventDispatcher.getLastEvent())
+                .isEqualTo(new MusicPlayerEvent.JumpOutOfRange(PLAYER_ID, "req-1", GUILD_ID, 225_000));
+    }
+
+    @Test
+    void rejectsJumpOnLiveStream() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        stream.setPosition(60_000);
+        engine.play(stream);
+
+        player.jump(Duration.ofSeconds(83), new Request("req-1", "@user"));
+
+        assertThat(stream.position()).isEqualTo(60_000);
+        assertThat(eventDispatcher.getLastEvent()).isEqualTo(new MusicPlayerEvent.NotSeekable(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
+    void answersNothingPlayingWhenJumpingWithoutTrack() {
+        player.jump(Duration.ofSeconds(83), new Request("req-1", "@user"));
+
+        assertThat(eventDispatcher.getEvents())
+                .containsExactly(new MusicPlayerEvent.NothingPlaying(PLAYER_ID, "req-1", GUILD_ID));
+    }
+
+    @Test
     void goesBackInsteadOfRestartingLiveStream() {
         InMemoryTrack earlier = track("Earlier", 120_000);
         engine.play(earlier);

@@ -54,6 +54,9 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String NOTHING_TO_SHUFFLE_MESSAGE = "🍯 | The queue is empty, nothing to shuffle.";
     private static final String VOLUME_SET_MESSAGE = "🔊 | Volume set to 40%. Only too loud for you? Right-click the bear → User Volume.";
     private static final String VOLUME_OUT_OF_RANGE_MESSAGE = "🛑️ | Volume goes from 0 to 100, bear with me.";
+    private static final String JUMPED_MESSAGE = "⏩ | Jumped to 1m 23s.";
+    private static final String TIME_FORMAT_MESSAGE = "🛑️ | Use a time like `1:23`, `1h30m` or `83` (seconds).";
+    private static final String TRACK_TOO_SHORT_MESSAGE = "🛑️ | That track is only 3m 45s long.";
     private static final SpotifyLinkResolver NO_SPOTIFY = new SpotifyLinkResolver(uri -> Optional.empty());
 
     @Autowired CommandRegistry commandRegistry;
@@ -447,6 +450,63 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void jumpsAndConfirmsPosition() throws Exception {
+        BlockingQueue<MusicPlayerInteraction> sent = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer bear = answerAs(interaction -> {
+            sent.add(interaction);
+            MusicPlayerInteraction.Jump jump = (MusicPlayerInteraction.Jump) interaction;
+            return new MusicPlayerEvent.Jumped(PLAYER_ID, jump.request(), GUILD_ID, jump.positionMs());
+        });
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("jump", "time", "1:23");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.isDeferredEphemeral()).isTrue();
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(JUMPED_MESSAGE));
+            assertThat(sent.poll(2, TimeUnit.SECONDS)).isInstanceOfSatisfying(MusicPlayerInteraction.Jump.class, jump -> {
+                assertThat(jump.positionMs()).isEqualTo(83_000);
+                assertThat(jump.guildId()).isEqualTo(GUILD_ID);
+            });
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void explainsTrackIsShorter() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.JumpOutOfRange(PLAYER_ID, interaction.requestId(), GUILD_ID, 225_000));
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("jump", "time", "9:00");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(TRACK_TOO_SHORT_MESSAGE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
+    void explainsThatLiveStreamsCannotBeJumpedIn() {
+        RedisMessageListenerContainer bear = answerAs(interaction ->
+                new MusicPlayerEvent.NotSeekable(PLAYER_ID, interaction.requestId(), GUILD_ID));
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("jump", "time", "1:23");
+            commandRegistry.handle(interaction);
+
+            await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(NOT_SEEKABLE_MESSAGE));
+        } finally {
+            bear.stop();
+        }
+    }
+
+    @Test
     void answersLeavePubliclyAfterBearConfirms() {
         RedisMessageListenerContainer bear = answerAs(interaction ->
                 new MusicPlayerEvent.Stopped(PLAYER_ID, interaction.requestId(), GUILD_ID, StopReason.REQUESTED));
@@ -569,6 +629,26 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
+    void explainsTimeFormatWithoutContactingTheBear() throws Exception {
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        RedisMessageListenerContainer container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+
+        try {
+            MockCommandInteraction interaction = buildInteractionWithOption("jump", "time", "1:5");
+            commandRegistry.handle(interaction);
+
+            assertThat(interaction.getReplies()).singleElement().satisfies(reply -> {
+                assertThat(reply.isEphemeral()).isTrue();
+                assertThat(reply.getContent()).isEqualTo(TIME_FORMAT_MESSAGE);
+            });
+            assertThat(interaction.getDeferredMessage()).isEmpty();
+            assertThat(received.poll(500, TimeUnit.MILLISECONDS)).isNull();
+        } finally {
+            container.stop();
+        }
+    }
+
+    @Test
     void saysNothingToShuffleOnEmptyQueue() {
         RedisMessageListenerContainer bear = answerAs(interaction ->
                 new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, 0, List.of()));
@@ -660,6 +740,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
         @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {}
     }
 
     private static final class TimingOutMusicPlayer implements MusicPlayer {
@@ -676,5 +757,6 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
         @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
+        @Override public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {}
     }
 }

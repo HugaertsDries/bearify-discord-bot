@@ -337,5 +337,9 @@ class MusicPlayerButtonControllerTest {
         @Override
         public void shuffle(String requesterTag, MusicPlayerEventListener handler) {
         }
+
+        @Override
+        public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {
+        }
     }
 }

@@ -22,6 +22,7 @@ public interface MusicPlayer {
     void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler);
     void shuffle(String requesterTag, MusicPlayerEventListener handler);
     void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler);
+    void jump(Duration position, String requesterTag, MusicPlayerEventListener handler);
     /** Blocks for the bear's reply, a {@link MusicPlayerEvent.QueueSnapshot} or {@link MusicPlayerEvent.PlayerNotFound}; empty when it doesn't answer in time. */
     Optional<MusicPlayerEvent> queue();
 }

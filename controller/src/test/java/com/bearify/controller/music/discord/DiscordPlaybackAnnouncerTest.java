@@ -162,6 +162,17 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
+    void labelsJumpWithPositionAndRequester() {
+        AtomicReference<ComponentMessage> updated = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(trackStart("player-1"));
+        announcer.accept(new MusicPlayerEvent.Jumped("player-1", new Request("req-2", "@other"), "guild-1", 83_000));
+
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@other jumped to 1m 23s"));
+    }
+
+    @Test
     void showsVolumeFromTrackStart() {
         AtomicReference<ComponentMessage> sent = new AtomicReference<>();
         MusicPlayerEventConsumer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));

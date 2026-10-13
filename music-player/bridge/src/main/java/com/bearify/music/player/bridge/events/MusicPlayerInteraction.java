@@ -21,7 +21,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = MusicPlayerInteraction.QueueRequest.class, name = "queue_request"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Remove.class, name = "remove"),
         @JsonSubTypes.Type(value = MusicPlayerInteraction.Shuffle.class, name = "shuffle"),
-        @JsonSubTypes.Type(value = MusicPlayerInteraction.SetVolume.class, name = "set_volume")
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.SetVolume.class, name = "set_volume"),
+        @JsonSubTypes.Type(value = MusicPlayerInteraction.Jump.class, name = "jump")
 })
 public sealed interface MusicPlayerInteraction permits
         MusicPlayerInteraction.Play,
@@ -38,7 +39,8 @@ public sealed interface MusicPlayerInteraction permits
         MusicPlayerInteraction.QueueRequest,
         MusicPlayerInteraction.Remove,
         MusicPlayerInteraction.Shuffle,
-        MusicPlayerInteraction.SetVolume {
+        MusicPlayerInteraction.SetVolume,
+        MusicPlayerInteraction.Jump {
 
     String playerId();
     String requestId();
@@ -85,6 +87,10 @@ public sealed interface MusicPlayerInteraction permits
     }
 
     record SetVolume(String playerId, Request request, String guildId, int volume) implements MusicPlayerInteraction {
+        @Override public String requestId() { return request.id(); }
+    }
+
+    record Jump(String playerId, Request request, String guildId, long positionMs) implements MusicPlayerInteraction {
         @Override public String requestId() { return request.id(); }
     }
 }

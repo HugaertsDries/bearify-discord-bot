@@ -27,10 +27,13 @@ public interface MusicPlayerEventListener {
     /** {@code count} is 0 when the queue was empty. */
     default void onShuffled(int count) {}
     default void onVolumeChanged(int volume) {}
+    default void onJumped(Duration position) {}
+    /** A jump to or past the end of the playing track, which is {@code trackLength} long. */
+    default void onJumpOutOfRange(Duration trackLength) {}
     default void onStopped() {}
     default void onNothingPlaying() {}
     default void onNothingToAdvance() {}
     default void onNothingToGoBack() {}
-    /** A rewind or forward on a track that can't seek, such as a live stream. */
+    /** A rewind, forward or jump on a track that can't seek, such as a live stream. */
     default void onNotSeekable() {}
 }

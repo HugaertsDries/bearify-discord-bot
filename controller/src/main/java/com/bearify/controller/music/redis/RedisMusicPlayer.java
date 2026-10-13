@@ -105,6 +105,9 @@ class RedisMusicPlayer implements MusicPlayer {
     public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { state.setVolume(volume, requesterTag, handler); }
 
     @Override
+    public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) { state.jump(position, requesterTag, handler); }
+
+    @Override
     public Optional<MusicPlayerEvent> queue() { return state.queue(); }
 
     private String serialize(Object value) {
@@ -201,6 +204,11 @@ class RedisMusicPlayer implements MusicPlayer {
         @Override
         public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {
             refuse("setVolume", handler);
+        }
+
+        @Override
+        public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {
+            refuse("jump", handler);
         }
 
         @Override
@@ -371,6 +379,20 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.VolumeChanged v -> handler.onVolumeChanged(v.volume());
                     case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
                     default -> LOG.warn("Unexpected event '{}' for setVolume request", event.getClass().getSimpleName());
+                }
+            });
+        }
+
+        @Override
+        public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {
+            request(requestId -> new MusicPlayerInteraction.Jump(playerId, new Request(requestId, requesterTag), guildId, position.toMillis()), handler, event -> {
+                switch (event) {
+                    case MusicPlayerEvent.Jumped j -> handler.onJumped(Duration.ofMillis(j.positionMs()));
+                    case MusicPlayerEvent.JumpOutOfRange o -> handler.onJumpOutOfRange(Duration.ofMillis(o.durationMs()));
+                    case MusicPlayerEvent.NothingPlaying ignored -> handler.onNothingPlaying();
+                    case MusicPlayerEvent.NotSeekable ignored -> handler.onNotSeekable();
+                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
+                    default -> LOG.warn("Unexpected event '{}' for jump request", event.getClass().getSimpleName());
                 }
             });
         }

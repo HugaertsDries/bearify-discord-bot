@@ -340,6 +340,30 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
+    void routesJumpToPlayer() {
+        StubAudioPlayerPool pool = new StubAudioPlayerPool();
+        pool.primeGuild(GUILD_ID);
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Jump(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 83_000));
+
+        assertThat(pool.jumpCalls).containsExactly("83000|" + GUILD_ID + "|@user");
+    }
+
+    @Test
+    void answersPlayerNotFoundWhenJumpingWithoutPlayer() {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(new MusicPlayerInteraction.Jump(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 83_000));
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    @Test
     void dispatchesSearchInteractionToLoaderAndPublishesSearchResults() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         List<String> searchCalls = new ArrayList<>();
@@ -437,6 +461,7 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> removeCalls = new ArrayList<>();
         final List<String> shuffleCalls = new ArrayList<>();
         final List<String> setVolumeCalls = new ArrayList<>();
+        final List<String> jumpCalls = new ArrayList<>();
 
         private final Set<String> primedGuilds = new HashSet<>();
 
@@ -523,6 +548,11 @@ class MusicPlayerInteractionDispatcherTest {
             @Override
             public void setVolume(int volume, Request request) {
                 setVolumeCalls.add(volume + "|" + guildId + "|" + request.requesterTag());
+            }
+
+            @Override
+            public void jump(Duration position, Request request) {
+                jumpCalls.add(position.toMillis() + "|" + guildId + "|" + request.requesterTag());
             }
         }
 

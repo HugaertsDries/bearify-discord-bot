@@ -204,6 +204,20 @@ public class AudioPlayer implements AudioProvider {
         eventDispatcher.dispatch(new MusicPlayerEvent.Skipped(playerId, request, guildId));
     }
 
+    public synchronized void jump(Duration position, Request request) {
+        Optional<Track> playing = seekableTrack(request);
+        if (playing.isEmpty()) {
+            return;
+        }
+        Track track = playing.get();
+        if (position.toMillis() >= track.duration()) {
+            eventDispatcher.dispatch(new MusicPlayerEvent.JumpOutOfRange(playerId, request.id(), guildId, track.duration()));
+            return;
+        }
+        track.setPosition(position.toMillis());
+        eventDispatcher.dispatch(new MusicPlayerEvent.Jumped(playerId, request, guildId, position.toMillis()));
+    }
+
     // the playing track if it can seek; otherwise answers the request with why not
     private Optional<Track> seekableTrack(Request request) {
         Optional<Track> playing = engine.getPlayingTrack();

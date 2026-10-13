@@ -87,6 +87,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Restarted restarted -> notify("Restarted by " + restarted.request().requesterTag());
             case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
             case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
+            case MusicPlayerEvent.Jumped jumped -> notify(jumped.request().requesterTag() + " jumped to " + PlaybackComponent.humanReadable(Duration.ofMillis(jumped.positionMs())));
             case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
             case MusicPlayerEvent.Removed removed -> onRemoved(removed);
             case MusicPlayerEvent.Shuffled shuffled -> onShuffled(shuffled);

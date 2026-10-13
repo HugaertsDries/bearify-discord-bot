@@ -47,6 +47,9 @@ Rewinds by the given number of seconds (default: 10s for tracks under 5 minutes,
 ### `/player forward [seconds]`
 Fast-forwards by the given number of seconds (default: 10s for tracks under 5 minutes, 30s for longer ones).
 
+### `/player jump <time>`
+Jumps straight to a moment in the current track: `83` (seconds), `1:23`, `1:02:03`, `1h`, `1h30m` or `2m15s`. A paused track stays paused. The player shows "@user jumped to 1m 23s" for a moment. Live streams can't jump.
+
 ### `/player clear`
 Clears the current playlist.
 

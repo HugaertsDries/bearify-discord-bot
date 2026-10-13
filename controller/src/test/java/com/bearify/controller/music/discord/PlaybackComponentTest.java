@@ -150,6 +150,12 @@ class PlaybackComponentTest {
     }
 
     @Test
+    void showsHoursOnceATrackPassesOne() {
+        assertThat(PlaybackComponent.humanReadable(java.time.Duration.ofSeconds(3723))).isEqualTo("1h 02m 03s");
+        assertThat(PlaybackComponent.humanReadable(java.time.Duration.ofSeconds(83))).isEqualTo("1m 23s");
+    }
+
+    @Test
     void truncatesBeforeAnEmojiInsteadOfSplittingIt() {
         String title = "a".repeat(8) + "🎵" + "tail";
 

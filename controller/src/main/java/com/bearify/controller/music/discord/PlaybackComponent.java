@@ -178,6 +178,9 @@ public class PlaybackComponent {
         long totalSeconds = duration.toSeconds();
         long minutes = totalSeconds / 60;
         long seconds = totalSeconds % 60;
+        if (minutes >= 60) {
+            return "%dh %02dm %02ds".formatted(minutes / 60, minutes % 60, seconds);
+        }
         if (minutes > 0) {
             return "%dm %02ds".formatted(minutes, seconds);
         }
