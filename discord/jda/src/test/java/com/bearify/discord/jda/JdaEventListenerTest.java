@@ -3,14 +3,18 @@ package com.bearify.discord.jda;
 import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
+import com.bearify.discord.api.interaction.MessageContextInteraction;
 import com.bearify.discord.api.interaction.Option;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.entities.channel.unions.MessageChannelUnion;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.MessageContextInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.AutoCompleteQuery;
 import net.dv8tion.jda.api.interactions.commands.Command;
@@ -53,7 +57,8 @@ class JdaEventListenerTest {
                 },
                 event -> mock(CommandInteraction.class),
                 event -> mock(ButtonInteraction.class),
-                event -> mock(AutocompleteInteraction.class)
+                event -> mock(AutocompleteInteraction.class),
+                event -> mock(MessageContextInteraction.class)
         );
 
         listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
@@ -79,7 +84,8 @@ class JdaEventListenerTest {
                 interaction -> {},
                 event -> mock(CommandInteraction.class),
                 event -> mock(ButtonInteraction.class),
-                event -> mock(AutocompleteInteraction.class)
+                event -> mock(AutocompleteInteraction.class),
+                event -> mock(MessageContextInteraction.class)
         );
 
         listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
@@ -110,7 +116,8 @@ class JdaEventListenerTest {
                 },
                 event -> mock(CommandInteraction.class),
                 event -> mock(ButtonInteraction.class),
-                event -> mock(AutocompleteInteraction.class)
+                event -> mock(AutocompleteInteraction.class),
+                event -> mock(MessageContextInteraction.class)
         );
 
         listener.onSlashCommandInteraction(mock(SlashCommandInteractionEvent.class));
@@ -139,7 +146,8 @@ class JdaEventListenerTest {
                 },
                 event -> mock(CommandInteraction.class),
                 event -> mock(ButtonInteraction.class),
-                event -> mock(AutocompleteInteraction.class)
+                event -> mock(AutocompleteInteraction.class),
+                event -> mock(MessageContextInteraction.class)
         );
 
         listener.onCommandAutoCompleteInteraction(mock(CommandAutoCompleteInteractionEvent.class));
@@ -150,6 +158,52 @@ class JdaEventListenerTest {
         captured.getFirst().run();
 
         assertThat(autocompleteCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void forwardsMessageContextEventsToHandler() {
+        List<Runnable> captured = new ArrayList<>();
+        AtomicInteger messageContextCalls = new AtomicInteger();
+
+        JdaEventListener listener = new JdaEventListener(
+                captured::add,
+                interaction -> {
+                    if (interaction instanceof MessageContextInteraction) {
+                        messageContextCalls.incrementAndGet();
+                    }
+                },
+                event -> mock(CommandInteraction.class),
+                event -> mock(ButtonInteraction.class),
+                event -> mock(AutocompleteInteraction.class),
+                event -> mock(MessageContextInteraction.class)
+        );
+
+        listener.onMessageContextInteraction(mock(MessageContextInteractionEvent.class));
+
+        assertThat(messageContextCalls.get()).isZero();
+        assertThat(captured).hasSize(1);
+
+        captured.getFirst().run();
+
+        assertThat(messageContextCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void adaptsMessageContextTargetMessage() {
+        MessageContextInteractionEvent event = mock(MessageContextInteractionEvent.class);
+        Message target = mock(Message.class);
+        User author = mock(User.class);
+        when(event.getName()).thenReturn("Play with Bearify");
+        when(event.getTarget()).thenReturn(target);
+        when(target.getContentRaw()).thenReturn("listen https://youtu.be/dQw4w9WgXcQ");
+        when(target.getAuthor()).thenReturn(author);
+        when(author.getAsMention()).thenReturn("<@42>");
+
+        JdaMessageContextInteraction interaction = new JdaMessageContextInteraction(event);
+
+        assertThat(interaction.getName()).isEqualTo("Play with Bearify");
+        assertThat(interaction.getTargetMessageContent()).isEqualTo("listen https://youtu.be/dQw4w9WgXcQ");
+        assertThat(interaction.getTargetAuthorMention()).isEqualTo("<@42>");
     }
 
     @Test

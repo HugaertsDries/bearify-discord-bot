@@ -13,7 +13,6 @@ import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.spring.annotation.Option;
 import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
-import com.bearify.music.player.bridge.model.TrackRequest;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -22,25 +21,20 @@ import java.util.Optional;
 import java.util.Random;
 
 import static com.bearify.controller.music.discord.AnsweringListener.NO_PLAYER_MESSAGE;
+import static com.bearify.controller.music.discord.MusicPlayerPlayback.CONNECT_FAILED_MESSAGE;
+import static com.bearify.controller.music.discord.MusicPlayerPlayback.JOINING_MESSAGE;
+import static com.bearify.controller.music.discord.MusicPlayerPlayback.queuedMessage;
+import static com.bearify.controller.music.discord.MusicPlayerPlayback.requireVoiceSession;
 @DiscordController
 @InteractionGroup(value = "player", description = "Player commands")
 public class MusicPlayerCommandController {
 
-    private static final String NOT_IN_VOICE_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | Looks like you're not in a voice channel! Jump in one and try again.";
-    private static final String NOT_IN_GUILD_MESSAGE = BearifyEmoji.BLOCKED + " | I only lumber around inside a server.";
-    private static final String JOINING_MESSAGE = BearifyEmoji.HONEY + " | Sending a bear your way!";
     private static final String UNAVAILABLE_MESSAGE = BearifyEmoji.BLOCKED + " | No music bears are free right now. Try again in a moment.";
-    private static final String PLAY_UNAVAILABLE_MESSAGE = BearifyEmoji.BLOCKED + " | Bearly any bears left! They're all busy right now. Try again in a moment.";
-    private static final String CONNECT_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | The bear couldn't reach your channel. Try again in a moment.";
     private static final String LEAVING_MESSAGE = BearifyEmoji.HONEY + " | Alright, cleaning up after myself. Talk to you later! " + BearifyEmoji.WAVE;
     private static final String LEAVE_OTHER_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | Bear with me, I can't lumber out of your voice channel when I'm not with you.";
-    private static final String TRACK_NOT_FOUND_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that track. Try a different search or link?";
     private static final String NEGATIVE_REWIND_MESSAGE = BearifyEmoji.REWIND + " | Use a positive number of seconds, bear with me.";
     private static final String NEGATIVE_FORWARD_MESSAGE = BearifyEmoji.FORWARD + " | Use a positive number of seconds, bear with me.";
     private static final String VOLUME_OUT_OF_RANGE_MESSAGE = BearifyEmoji.BLOCKED + " | Volume goes from 0 to 100, bear with me.";
-    private static final String TRACK_LOAD_FAILED_MESSAGE = BearifyEmoji.BLOCKED + " | Oops! Something went wrong loading this track. This could be due to age-restrictions or region lock. (I'm technically less than 1 year old)";
-    private static final String SPOTIFY_NOT_A_SONG_MESSAGE = BearifyEmoji.BLOCKED + " | I can only sniff out single Spotify songs. Paste a track link instead!";
-    private static final String SPOTIFY_UNREADABLE_MESSAGE = BearifyEmoji.BLOCKED + " | I couldn't sniff out that Spotify song. Try a YouTube link or a search instead?";
     private static final String PICK_A_TRACK_MESSAGE = BearifyEmoji.BLOCKED + " | Pick a track from the list so I know which one to drop.";
     private static final String TRACK_NOT_IN_QUEUE_MESSAGE = BearifyEmoji.BLOCKED + " | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
     private static final String NOTHING_TO_SHUFFLE_MESSAGE = BearifyEmoji.HONEY + " | The queue is empty, nothing to shuffle.";
@@ -62,11 +56,11 @@ public class MusicPlayerCommandController {
     private static final Random RANDOM = new Random();
 
     private final MusicPlayerPool pool;
-    private final SpotifyLinkResolver spotify;
+    private final MusicPlayerPlayback playback;
 
     public MusicPlayerCommandController(MusicPlayerPool pool, SpotifyLinkResolver spotify) {
         this.pool = pool;
-        this.spotify = spotify;
+        this.playback = new MusicPlayerPlayback(pool, spotify);
     }
 
     @SuppressWarnings("unused")
@@ -115,41 +109,7 @@ public class MusicPlayerCommandController {
     @Interaction(value = "play", description = "I'll gladly play you some tunes. I accept links: YouTube, Twitch, Soundcloud, etc.")
     public void play(CommandInteraction interaction,
                      @Option(name = "search", description = "Search or link to a song or playlist.", required = true, autocomplete = true) String query) {
-        requireVoiceSession(interaction).ifPresent(ctx -> {
-            String textChannelId = interaction.getTextChannelId()
-                    .orElseThrow(() -> new IllegalStateException("No text channel ID on interaction"));
-            // before resolving: reading a Spotify page can outlast Discord's 3s acknowledgement window
-            EditableMessage message = interaction.defer(true);
-            Optional<String> resolvedQuery = resolveQuery(query, message);
-            if (resolvedQuery.isEmpty()) {
-                return;
-            }
-            var trackRequest = new TrackRequest(resolvedQuery.get(), textChannelId, interaction.getUserMention());
-
-            pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                    player -> player.play(trackRequest, queueing(message)),
-                    () -> {
-                        var player = pool.acquire(ctx.guildId(), ctx.voiceChannelId());
-                        message.edit(JOINING_MESSAGE);
-                        player.join(new MusicPlayerEventListener() {
-                            @Override
-                            public void onReady() {
-                                player.play(trackRequest, queueing(message));
-                            }
-
-                            @Override
-                            public void onFailed(String reason) {
-                                message.edit(CONNECT_FAILED_MESSAGE);
-                            }
-
-                            @Override
-                            public void onNoPlayersAvailable() {
-                                message.edit(PLAY_UNAVAILABLE_MESSAGE);
-                            }
-                        });
-                    }
-            );
-        });
+        playback.play(interaction, List.of(query), (queued, failed) -> queuedMessage(queued.getFirst()));
     }
 
     @SuppressWarnings("unused")
@@ -447,64 +407,8 @@ public class MusicPlayerCommandController {
         interaction.reply(message).ephemeral().send();
     }
 
-    private Optional<ChannelContext> requireVoiceSession(CommandInteraction interaction) {
-        if (interaction.getVoiceChannelId().isEmpty()) {
-            interaction.reply(NOT_IN_VOICE_CHANNEL_MESSAGE).ephemeral().send();
-            return Optional.empty();
-        }
-        if (interaction.getGuildId().isEmpty()) {
-            interaction.reply(NOT_IN_GUILD_MESSAGE).ephemeral().send();
-            return Optional.empty();
-        }
-        return Optional.of(new ChannelContext(
-                interaction.getGuildId().orElseThrow(),
-                interaction.getVoiceChannelId().orElseThrow()));
-    }
-
-    private Optional<String> resolveQuery(String query, EditableMessage message) {
-        return switch (spotify.resolve(query)) {
-            case SpotifyLinkResolver.NotSpotify() ->
-                    Optional.of(query.startsWith("http://") || query.startsWith("https://") ? query : "ytsearch:" + query);
-            case SpotifyLinkResolver.Resolved(String searchQuery) -> Optional.of("ytsearch:" + searchQuery);
-            case SpotifyLinkResolver.NotASong() -> {
-                message.edit(SPOTIFY_NOT_A_SONG_MESSAGE);
-                yield Optional.empty();
-            }
-            case SpotifyLinkResolver.Unreadable() -> {
-                message.edit(SPOTIFY_UNREADABLE_MESSAGE);
-                yield Optional.empty();
-            }
-        };
-    }
-
     private static String joinedMessage(String channelId) {
         return BearifyEmoji.HONEY + " | Joined <#" + channelId + ">, " + JOIN_ENDINGS.get(RANDOM.nextInt(JOIN_ENDINGS.size()));
-    }
-
-    private static MusicPlayerEventListener queueing(EditableMessage message) {
-        return new AnsweringListener(message::edit) {
-            @Override
-            public void onTrackQueued(TrackMetadata track, int queuedCount) {
-                answer(queuedMessage(track, queuedCount));
-            }
-
-            @Override
-            public void onTrackNotFound(String query) {
-                answer(TRACK_NOT_FOUND_MESSAGE);
-            }
-
-            @Override
-            public void onTrackLoadFailed(String reason) {
-                answer(TRACK_LOAD_FAILED_MESSAGE);
-            }
-        };
-    }
-
-    private static String queuedMessage(TrackMetadata track, int queuedCount) {
-        if (queuedCount > 1) {
-            return BearifyEmoji.MUSIC + " | Queued **" + queuedCount + "** tracks from the playlist.";
-        }
-        return BearifyEmoji.MUSIC + " | Queued **" + track.title() + "**.";
     }
 
     private static String pausedMessage() {
@@ -566,8 +470,6 @@ public class MusicPlayerCommandController {
     private static String volumeMessage(int volume) {
         return BearifyEmoji.SPEAKER + " | Volume set to " + volume + "%. Only too loud for you? Right-click the bear → User Volume.";
     }
-
-    private record ChannelContext(String guildId, String voiceChannelId) {}
 
     /** The {@code /player remove} option: a suggestion's {@code <position>|<uri prefix>}, or a position typed by hand. */
     private record PickedTrack(int position, String uriPrefix) {

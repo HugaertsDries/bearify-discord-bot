@@ -31,8 +31,12 @@ public class SpotifyLinkResolver {
         this.fetcher = fetcher;
     }
 
+    public static boolean isSpotifyLink(String query) {
+        return query.startsWith("https://open.spotify.com/") || query.startsWith("https://spotify.link/");
+    }
+
     public Resolution resolve(String query) {
-        if (!query.startsWith("https://open.spotify.com/") && !query.startsWith("https://spotify.link/")) {
+        if (!isSpotifyLink(query)) {
             return new NotSpotify();
         }
         URI uri;

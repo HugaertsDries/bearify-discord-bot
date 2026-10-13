@@ -9,6 +9,7 @@ import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.Interaction;
+import com.bearify.discord.api.interaction.MessageContextInteraction;
 import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.voice.AudioProvider;
@@ -26,6 +27,7 @@ import java.util.function.Consumer;
 
 public class MockDiscordClient implements DiscordClient {
 
+    private final List<CommandDefinition> commands;
     private final Consumer<Interaction> handler;
     private boolean started = false;
     private String startedWithToken;
@@ -39,6 +41,7 @@ public class MockDiscordClient implements DiscordClient {
 
     private MockDiscordClient(List<CommandDefinition> commands,
                               Consumer<Interaction> handler) {
+        this.commands = List.copyOf(commands);
         this.handler = handler;
     }
 
@@ -94,6 +97,15 @@ public class MockDiscordClient implements DiscordClient {
 
     public void dispatchButton(ButtonInteraction interaction) {
         handler.accept(interaction);
+    }
+
+    public void dispatchMessageContext(MessageContextInteraction interaction) {
+        handler.accept(interaction);
+    }
+
+    /** The commands this client was created to register with Discord. */
+    public List<CommandDefinition> getCommands() {
+        return commands;
     }
 
     public boolean isStarted() {

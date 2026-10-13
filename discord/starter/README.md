@@ -3,7 +3,7 @@
 Spring Boot auto-configuration that bridges `discord-api` with Spring. Provides annotations and wiring so application code can declare commands with zero boilerplate.
 
 ## Purpose
-Acts as the glue between the Discord abstraction and Spring Boot. Scans `@DiscordController` beans for `@Interaction` methods, builds the command, button and autocomplete registries, and manages the bot's lifecycle as a `SmartLifecycle` bean.
+Acts as the glue between the Discord abstraction and Spring Boot. Scans `@DiscordController` beans for `@Interaction` methods, builds the command, button, autocomplete and message context-menu registries, and manages the bot's lifecycle as a `SmartLifecycle` bean.
 
 ## Usage
 
@@ -61,10 +61,19 @@ public void search(AutocompleteInteraction interaction) {
 }
 ```
 
+Add a message context-menu command (right-click a message → Apps) with `type = MESSAGE_CONTEXT`; the value is the name Discord shows, so it may contain spaces and capitals. It is registered as a top-level command, also inside an `@InteractionGroup` controller, and only in servers:
+
+```java
+@Interaction(type = InteractionType.MESSAGE_CONTEXT, value = "Play with Bearify")
+public void play(MessageContextInteraction interaction) {
+    interaction.reply("Queued " + interaction.getTargetMessageContent()).ephemeral().send();
+}
+```
+
 ## Error Handling
 
 An exception thrown by any handler is logged through SLF4J and answered, so Discord never shows "This interaction failed":
-- commands and buttons get an ephemeral "Something went wrong. Please try again later." reply;
+- commands, message commands and buttons get an ephemeral "Something went wrong. Please try again later." reply;
 - autocomplete gets an empty choice list.
 
 If that reply fails too (for example because the handler already replied), the failure is logged and swallowed.
@@ -81,8 +90,8 @@ If that reply fails too (for example because the handler already replied), the f
 ## Contents
 - `@DiscordController` — marks a class as a Spring bean holding interaction handlers
 - `@InteractionGroup` — groups a controller's commands as subcommands of one command
-- `@Interaction` — marks a method as a command, button or autocomplete handler
+- `@Interaction` — marks a method as a command, button, autocomplete or message context-menu handler
 - `@Option` — binds a method parameter to a slash command option
-- `CommandRegistry`, `ButtonRegistry`, `AutocompleteRegistry` — route incoming interactions to the right handler
+- `CommandRegistry`, `ButtonRegistry`, `AutocompleteRegistry`, `MessageContextRegistry` — route incoming interactions to the right handler
 - `DiscordAutoConfiguration` — Spring Boot auto-configuration
 - `DiscordProperties` — validated configuration properties

@@ -6,6 +6,7 @@ import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.InteractionType;
+import com.bearify.discord.api.interaction.MessageContextInteraction;
 import com.bearify.discord.api.gateway.Activity;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.spring.annotation.DiscordController;
@@ -15,6 +16,7 @@ import com.bearify.discord.testing.MockAutocompleteInteraction;
 import com.bearify.discord.testing.MockButtonInteraction;
 import com.bearify.discord.testing.MockCommandInteraction;
 import com.bearify.discord.testing.MockDiscordClient;
+import com.bearify.discord.testing.MockMessageContextInteraction;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -180,6 +182,70 @@ class DiscordAutoConfigurationTest {
         void boom(AutocompleteInteraction interaction) {
             throw new IllegalStateException("boom");
         }
+    }
+
+    @DiscordController
+    static class MessageController {
+        @Interaction(type = InteractionType.MESSAGE_CONTEXT, value = "Play with Bearify")
+        void play(MessageContextInteraction interaction) {
+            interaction.reply("queued").ephemeral().send();
+        }
+    }
+
+    @DiscordController
+    static class FailingMessageController {
+        @Interaction(type = InteractionType.MESSAGE_CONTEXT, value = "Boom")
+        void boom(MessageContextInteraction interaction) {
+            throw new IllegalStateException("boom");
+        }
+    }
+
+    @Test
+    void registersMessageCommandsWithDiscordClientNextToSlashCommands() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, HelloCommand.class, MessageController.class)
+                .run(ctx -> {
+                    MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
+                    assertThat(client.getCommands()).containsExactlyInAnyOrder(
+                            CommandDefinition.command("hello", "Say hello", List.of()),
+                            CommandDefinition.message("Play with Bearify"));
+                });
+    }
+
+    @Test
+    void routesDispatchedMessageContextThroughRegistryToHandler() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, MessageController.class)
+                .run(ctx -> {
+                    MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
+                    MockMessageContextInteraction interaction = MockMessageContextInteraction.forMessageCommand("Play with Bearify").build();
+
+                    client.dispatchMessageContext(interaction);
+
+                    assertThat(interaction.getReplies()).singleElement().satisfies(reply ->
+                            assertThat(reply.getContent()).isEqualTo("queued"));
+                });
+    }
+
+    @Test
+    void repliesWithGenericErrorWhenMessageContextHandlerThrows() {
+        contextRunner
+                .withPropertyValues("discord.token=test-token")
+                .withUserConfiguration(MockClientConfig.class, FailingMessageController.class)
+                .run(ctx -> {
+                    MockDiscordClient client = ctx.getBean(MockDiscordClient.Factory.class).getLastCreated().orElseThrow();
+                    MockMessageContextInteraction interaction = MockMessageContextInteraction.forMessageCommand("Boom").build();
+
+                    client.dispatchMessageContext(interaction);
+
+                    assertThat(interaction.getReplies()).singleElement().satisfies(reply -> {
+                        assertThat(reply.getContent()).isEqualTo("Something went wrong. Please try again later.");
+                        assertThat(reply.isEphemeral()).isTrue();
+                        assertThat(reply.isSent()).isTrue();
+                    });
+                });
     }
 
     @Test

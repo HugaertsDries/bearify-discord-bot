@@ -17,7 +17,9 @@ Defines the interfaces and models that the rest of the project depends on. By de
 - `TextChannel` — sends a plain-text message to a Discord text channel via `send(String message)`
 
 ### Interaction
-- `CommandInteraction` — represents an incoming command: `getName()`, `getOption(name)`, `getSubcommandName()`, `getVoiceChannelId()`, `getGuildId()`, `getTextChannelId()`, `reply(message)`, `defer()`
+- `RepliableInteraction` — an interaction answered with a reply: `reply(message)`, `defer()`, `defer(ephemeral)`, plus `getVoiceChannelId()`, `getGuildId()`, `getTextChannelId()`
+- `CommandInteraction` — a `RepliableInteraction` for an incoming command: `getName()`, `getOption(name)`, `getSubcommandName()`
+- `MessageContextInteraction` — a `RepliableInteraction` for a message context-menu command (Apps on a message): `getName()`, `getTargetMessageContent()`, `getTargetAuthorMention()`
 - `ButtonInteraction` — represents a button press: `getCustomId()`, `acknowledge()`, `reply(message)`, and `reply(ComponentMessage)` for a Components V2 reply (a follow-up once acknowledged)
 - `ReplyBuilder` — fluent reply builder: `reply("...").ephemeral().send()`
 - `EditableMessage` — handle to a deferred reply that can be updated: `edit(String message)`, or `edit(ComponentMessage)` to turn it into a Components V2 message
@@ -28,5 +30,5 @@ Defines the interfaces and models that the rest of the project depends on. By de
 - `VoiceSessionListener` — callback fired once the bot has joined a voice channel: `onJoined(channelId)`
 
 ### Model
-- `CommandDefinition` — describes a command registered with Discord (name + description + subcommands + options)
+- `CommandDefinition` — describes a command registered with Discord (name + description + subcommands + options + type): a `SLASH` command, or a `MESSAGE` context-menu command made with `CommandDefinition.message(name)`
 - `OptionDefinition` — describes a command option (name, type, description, required)

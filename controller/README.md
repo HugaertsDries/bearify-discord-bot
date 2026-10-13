@@ -71,6 +71,9 @@ Sets the loop to `off`, `queue` or `track` directly (suggested as you type); sam
 ### ↻ Loop button
 The last button in the player's controls cycles the loop: `↻` (grey) off → `↻` (blurple) queue (a finished, skipped or forwarded-past-the-end track goes to the end of the queue, so the list keeps going round) → `↻¹` (blurple) one track (the song starts over when it ends; skipping moves on and loops the next one) → off. A track that fails to play is never looped, and the loop is off again whenever the bear comes back.
 
+### Apps → Play with Bearify (on a message)
+Right-click a message (long-press on mobile) and pick **Apps → Play with Bearify** to queue what's in it, like `/player play` does. It queues the message's YouTube, Spotify, SoundCloud, Bandcamp, Twitch and Vimeo links in message order (at most 5); without such a link it searches YouTube for the message text (mentions and custom emoji left out, first 100 characters). Every answer is private, and says how many links couldn't be played.
+
 ### `/poke [pokes]`
 Pokes the bear a number of times (default: 4) and reports the response latency of each poke.
 

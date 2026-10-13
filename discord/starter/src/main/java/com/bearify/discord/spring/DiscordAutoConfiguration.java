@@ -6,6 +6,8 @@ import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.Interaction;
+import com.bearify.discord.api.interaction.MessageContextInteraction;
+import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.spring.annotation.DiscordController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,7 @@ import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 @AutoConfiguration
 @ConditionalOnBean(DiscordClientFactory.class)
@@ -52,10 +55,18 @@ public class DiscordAutoConfiguration {
     }
 
     @Bean
+    public MessageContextRegistry messageContextRegistry(ApplicationContext context) {
+        MessageContextRegistry registry = new MessageContextRegistry(context);
+        scanner.scan(context, DiscordController.class, com.bearify.discord.spring.annotation.Interaction.class, registry::register);
+        return registry;
+    }
+
+    @Bean
     public DiscordClient discordClient(DiscordClientFactory factory,
                                        CommandRegistry registry,
                                        ButtonRegistry buttonRegistry,
                                        AutocompleteRegistry autocompleteRegistry,
+                                       MessageContextRegistry messageContextRegistry,
                                        DiscordProperties properties) {
         java.util.function.Consumer<Interaction> interactionHandler = interaction -> {
             try {
@@ -71,13 +82,19 @@ public class DiscordAutoConfiguration {
                     buttonRegistry.handle(buttonInteraction);
                     return;
                 }
+                if (interaction instanceof MessageContextInteraction messageContextInteraction) {
+                    messageContextRegistry.handle(messageContextInteraction);
+                    return;
+                }
                 throw new IllegalStateException("Unsupported interaction type: " + interaction.getClass().getName());
             } catch (RuntimeException e) {
                 LOG.warn("Unhandled interaction exception", e);
                 replyWithGenericError(interaction);
             }
         };
-        return factory.create(registry.getDefinitions(), interactionHandler, properties.activity());
+        List<CommandDefinition> definitions = Stream.concat(
+                registry.getDefinitions().stream(), messageContextRegistry.getDefinitions().stream()).toList();
+        return factory.create(definitions, interactionHandler, properties.activity());
     }
 
     private static void replyWithGenericError(Interaction interaction) {
@@ -85,6 +102,7 @@ public class DiscordAutoConfiguration {
             switch (interaction) {
                 case CommandInteraction command -> command.reply(GENERIC_ERROR).ephemeral().send();
                 case ButtonInteraction button -> button.reply(GENERIC_ERROR).ephemeral().send();
+                case MessageContextInteraction messageContext -> messageContext.reply(GENERIC_ERROR).ephemeral().send();
                 case AutocompleteInteraction autocomplete -> autocomplete.reply(List.of());
                 default -> { }
             }

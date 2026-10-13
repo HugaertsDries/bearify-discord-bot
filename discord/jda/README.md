@@ -17,6 +17,7 @@ Provides a JDA-backed `DiscordClientFactory` bean. Activated automatically when 
 - `JdaDiscordClient` — JDA-backed `DiscordClient`; exposes `guild(guildId)` and `textChannel(channelId)`
 - `JdaEventListener` — bridges JDA events to the `CommandRegistry` dispatcher (async, one virtual thread per interaction)
 - `JdaCommandInteraction` — wraps `SlashCommandInteractionEvent` as `CommandInteraction`
+- `JdaMessageContextInteraction` — wraps `MessageContextInteractionEvent` as `MessageContextInteraction`; message commands are registered for servers only, and Discord sends the target message's content with them, so no message content intent is needed
 - `JdaReplyBuilder` — fluent reply builder backed by JDA's reply API
 - `JdaEditableMessage` — wraps `InteractionHook` as `EditableMessage` (also enforces the 3-second Discord acknowledgement window)
 - `JdaGuild` — JDA-backed `Guild`; `join(channelId, provider, onJoined)` sets the audio send handler before opening the voice connection

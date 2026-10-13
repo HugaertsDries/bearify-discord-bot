@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.audio.AudioModuleConfig;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.interactions.InteractionContextType;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -144,6 +145,10 @@ public class JdaDiscordClient implements DiscordClient {
     private List<CommandData> toCommandData() {
         return commands.stream()
                 .map(def -> {
+                    if (def.type() == CommandDefinition.Type.MESSAGE) {
+                        // a global command would also show up in DMs, where there's no voice channel to play in
+                        return Commands.message(def.name()).setContexts(InteractionContextType.GUILD);
+                    }
                     String description = def.description().isBlank() ? NO_DESCRIPTION : def.description();
                     if (!def.subcommands().isEmpty()) {
                         SlashCommandData group = Commands.slash(def.name(), description);
