@@ -291,7 +291,9 @@ class YoutubeHealthMonitorTest {
 
         @SafeVarargs
         final void answers(Optional<MusicPlayerEvent.HealthCheckResult>... results) {
-            answers.addAll(List.of(results));
+            for (Optional<MusicPlayerEvent.HealthCheckResult> result : results) {
+                answers.add(result);
+            }
         }
 
         @Override

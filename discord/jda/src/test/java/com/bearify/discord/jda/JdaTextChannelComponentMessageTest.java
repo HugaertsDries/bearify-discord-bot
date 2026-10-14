@@ -182,6 +182,7 @@ class JdaTextChannelComponentMessageTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void sendSupportsTextOnlySectionsAndSkipsEmptyContainers() {
         MessageChannel channel = mock(MessageChannel.class);
         MessageCreateAction action = mock(MessageCreateAction.class);
