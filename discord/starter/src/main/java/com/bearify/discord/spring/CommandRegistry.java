@@ -6,7 +6,6 @@ import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.api.model.OptionDefinition;
 import com.bearify.discord.api.model.OptionDefinition.OptionType;
 import com.bearify.discord.api.model.SubcommandDefinition;
-import com.bearify.discord.spring.annotation.DiscordController;
 import com.bearify.discord.spring.annotation.Interaction;
 import com.bearify.discord.spring.annotation.InteractionGroup;
 import com.bearify.discord.spring.annotation.Option;
@@ -54,10 +53,6 @@ public class CommandRegistry {
     void register(String name, Interaction interaction, Method method) {
         if (interaction.type() != InteractionType.COMMAND) {
             return;
-        }
-        DiscordController controller = AnnotationUtils.findAnnotation(method.getDeclaringClass(), DiscordController.class);
-        if (controller == null) {
-            throw new IllegalStateException("Interaction " + interaction + " has no @DiscordController annotation");
         }
         InteractionGroup interactionGroup = AnnotationUtils.findAnnotation(method.getDeclaringClass(), InteractionGroup.class);
         String groupName = interactionGroup == null ? "" : interactionGroup.value();
