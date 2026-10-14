@@ -12,6 +12,8 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.concurrent.Executors;
+
 class InteractionChannelListener implements SmartLifecycle {
 
     private static final Logger LOG = LoggerFactory.getLogger(InteractionChannelListener.class);
@@ -25,6 +27,8 @@ class InteractionChannelListener implements SmartLifecycle {
             String playerId) {
         container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+        // one thread, so a server's interactions run in the order they were sent; no handler blocks, slow loads run on LavaPlayer's threads
+        container.setTaskExecutor(Executors.newSingleThreadExecutor(Thread.ofPlatform().name("player-interactions").daemon().factory()));
         container.addMessageListener(onInteraction(objectMapper, dispatcher), new ChannelTopic(PlayerRedisProtocol.Channels.interactions(playerId)));
         // shortcut: every agent answers a search, route to one agent if the agent count grows
         container.addMessageListener(onInteraction(objectMapper, dispatcher), new ChannelTopic(PlayerRedisProtocol.Channels.SEARCH));

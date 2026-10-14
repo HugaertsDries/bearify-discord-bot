@@ -12,6 +12,7 @@ import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 import com.bearify.music.player.agent.port.RecordingMusicPlayerInteractionDispatcher;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -105,6 +107,20 @@ class MusicPlayerInteractionChannelListenerIntegrationTest extends AbstractAgent
                     assertThat(search.query()).isEqualTo("daft punk");
                     assertThat(search.limit()).isEqualTo(5);
                 }));
+    }
+
+    @Test
+    void handlesInteractionsInTheOrderTheyWereSent() throws Exception {
+        List<MusicPlayerInteraction> sent = IntStream.range(0, 50)
+                .<MusicPlayerInteraction>mapToObj(i -> new MusicPlayerInteraction.Clear(PLAYER_ID, new Request("req-" + i, "user"), GUILD_ID))
+                .toList();
+        for (MusicPlayerInteraction interaction : sent) {
+            redis.convertAndSend(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), objectMapper.writeValueAsString(interaction));
+        }
+
+        await().atMost(5, TimeUnit.SECONDS).until(() -> dispatcher.interactions().size() == sent.size());
+
+        assertThat(dispatcher.interactions()).containsExactlyElementsOf(sent);
     }
 
     @Test
