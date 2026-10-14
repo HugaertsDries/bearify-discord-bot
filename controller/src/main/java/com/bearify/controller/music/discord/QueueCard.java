@@ -9,10 +9,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 
 import static com.bearify.controller.music.discord.AnsweringListener.NO_PLAYER_MESSAGE;
 import static com.bearify.controller.music.discord.AnsweringListener.TIMED_OUT_MESSAGE;
+import static com.bearify.controller.music.discord.PlaybackComponent.escaped;
 import static com.bearify.controller.music.discord.PlaybackComponent.truncate;
 
 /** The queue as a private card in the player's Up Next style; what isn't a list stays plain text. */
@@ -27,8 +27,6 @@ final class QueueCard {
     // the bear sends the player message the first three upcoming tracks, so Show starts after them
     static final int SHOWN_ON_PLAYER = 3;
     private static final int MAX_ROWS = 10;
-    // a title like "*NSYNC" or "||secret||" would otherwise format the rest of the card
-    private static final Pattern MARKDOWN = Pattern.compile("[\\\\*_~|`>\\[\\]]");
 
     /** What to answer with: a plain text, or a card. */
     sealed interface Reply permits Text, Card {}
@@ -82,7 +80,7 @@ final class QueueCard {
             current.ifPresent(track -> container.text("-# Now playing: " + escaped(truncate(track.title(), 50))
                     + " — " + escaped(truncate(track.author(), 50))));
             container.spacer();
-            PlaybackComponent.appendTrackRows(container, rows, QueueCard::escaped);
+            PlaybackComponent.appendTrackRows(container, rows);
             container.separator();
             int unlisted = tracks.size() - rows.size();
             if (unlisted > 0) {
@@ -99,9 +97,5 @@ final class QueueCard {
         // live streams have no length to add up
         String total = known.isEmpty() ? "" : " · " + PlaybackComponent.total(Duration.ofMillis(known.stream().mapToLong(Long::longValue).sum()));
         return "-# " + count + total;
-    }
-
-    private static String escaped(String text) {
-        return MARKDOWN.matcher(text).replaceAll("\\\\$0");
     }
 }

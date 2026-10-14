@@ -11,7 +11,7 @@ import java.awt.Color;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 
 import static com.bearify.discord.api.message.ButtonStyle.SECONDARY;
 
@@ -27,6 +27,8 @@ public class PlaybackComponent {
     public static final String PLAYER_LOOP_TRACK_LABEL = "↻¹";
     private static final int VOLUME_METER_SEGMENTS = 10;
     private static final String ANSI_RESET = "\u001b[0m";
+    // a title like "*NSYNC" or "||secret||" would otherwise format the rest of the message
+    private static final Pattern MARKDOWN = Pattern.compile("[\\\\*_~|`>\\[\\]]");
     static final String LIVE_LABEL = BearifyEmoji.RED + " LIVE";
 
     private final AnnouncerProperties properties;
@@ -56,10 +58,10 @@ public class PlaybackComponent {
             container.text(tuner(state.playbackState(), state.volume()));
             state.artworkUri().ifPresent(uri -> container.image(uri.toString(), "Track artwork"));
             container.section(section -> {
-                section.text("## " + truncate(state.track().title(), 45));
+                section.text("## " + escaped(truncate(state.track().title(), 45)));
                 section.linkButton(state.track().uri(), "Source");
             });
-            container.text("### " + trackMetaLine(state.track(), 40, UnaryOperator.identity()));
+            container.text("### " + trackMetaLine(state.track(), 40));
             container.separator();
             container.text("-# **Requested by** " + state.requesterTag());
         });
@@ -115,13 +117,13 @@ public class PlaybackComponent {
                     -# **%s**
 
                     """.formatted(
-                    truncate(first.title(), 50),
-                    trackMetaLine(first, 50, UnaryOperator.identity())
+                    escaped(truncate(first.title(), 50)),
+                    trackMetaLine(first, 50)
             ));
             List<TrackMetadata> rest = state.upNext().subList(1, state.upNext().size());
             if (!rest.isEmpty()) {
                 container.separator();
-                appendTrackRows(container, rest, UnaryOperator.identity());
+                appendTrackRows(container, rest);
             }
             int more = state.queueSize() - state.upNext().size();
             if (more > 0) {
@@ -135,16 +137,16 @@ public class PlaybackComponent {
         });
     }
 
-    /** Lists tracks the way Up Next lists all but its first; {@code clean} rewrites each title and author after truncation. */
-    static void appendTrackRows(ContainerBuilder container, List<TrackMetadata> tracks, UnaryOperator<String> clean) {
+    /** Lists tracks the way Up Next lists all but its first. */
+    static void appendTrackRows(ContainerBuilder container, List<TrackMetadata> tracks) {
         for (int index = 0; index < tracks.size(); index++) {
             TrackMetadata track = tracks.get(index);
             container.text("""
                     %s
                     -# %s
                     """.formatted(
-                    clean.apply(truncate(track.title(), 50)),
-                    trackMetaLine(track, 50, clean)
+                    escaped(truncate(track.title(), 50)),
+                    trackMetaLine(track, 50)
             ));
             if (index + 1 < tracks.size()) {
                 container.separator();
@@ -170,8 +172,8 @@ public class PlaybackComponent {
         return color.getRGB() & 0xFFFFFF;
     }
 
-    private static String trackMetaLine(TrackMetadata track, int authorLimit, UnaryOperator<String> clean) {
-        return clean.apply(truncate(track.author(), authorLimit)) + " \u2022 " + length(track);
+    private static String trackMetaLine(TrackMetadata track, int authorLimit) {
+        return escaped(truncate(track.author(), authorLimit)) + " \u2022 " + length(track);
     }
 
     static String length(TrackMetadata track) {
@@ -184,6 +186,10 @@ public class PlaybackComponent {
             return "%dh %02dm".formatted(duration.toHours(), duration.toMinutesPart());
         }
         return humanReadable(duration);
+    }
+
+    static String escaped(String text) {
+        return MARKDOWN.matcher(text).replaceAll("\\\\$0");
     }
 
     static String truncate(String text, int limit) {

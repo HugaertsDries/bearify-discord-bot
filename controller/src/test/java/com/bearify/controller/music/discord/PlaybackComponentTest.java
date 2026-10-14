@@ -53,6 +53,21 @@ class PlaybackComponentTest {
     }
 
     @Test
+    void escapesMarkdownInTrackTitlesAndAuthors() {
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+
+        ComponentMessage message = announcer.render(baseState()
+                .track(new TrackMetadata("*NSYNC", "||secret||", "https://example.com", 60_000))
+                .upNext(List.of(new TrackMetadata("__Next__", "Artist", "https://example.com/next", 120_000)))
+                .build());
+
+        assertThat(texts(message))
+                .anyMatch(text -> text.equals("## \\*NSYNC"))
+                .anyMatch(text -> text.startsWith("### \\|\\|secret\\|\\|"))
+                .anyMatch(text -> text.contains("**\\_\\_Next\\_\\_**"));
+    }
+
+    @Test
     void renderOmitsFooterWhenStateHasNone() {
         PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
 
