@@ -34,6 +34,7 @@ class RedisMusicPlayer implements MusicPlayer {
     private static final Executor ANSWERS = Executors.newVirtualThreadPerTaskExecutor();
     private static final String NOT_READY_REASON = "Player is not ready yet";
     private static final String UNREACHABLE_REASON = "Could not reach the music players";
+    private static final String NO_PLAYER_REASON = "No player found in channel";
 
     private sealed interface State extends MusicPlayer {
     }
@@ -144,7 +145,7 @@ class RedisMusicPlayer implements MusicPlayer {
                                     handler.onReady();
                                 }
                                 case MusicPlayerEvent.ConnectFailed f -> handler.onFailed(f.reason());
-                                default -> LOG.warn("Unexpected event '{}' for pending join", event.getClass().getSimpleName());
+                                default -> unexpected("pending join", event, handler);
                             }
                         }
                     }), ANSWERS);
@@ -255,7 +256,7 @@ class RedisMusicPlayer implements MusicPlayer {
                 switch (event) {
                     case MusicPlayerEvent.Ready ignored -> handler.onReady();
                     case MusicPlayerEvent.ConnectFailed f -> handler.onFailed(f.reason());
-                    default -> LOG.warn("Unexpected event '{}' for connected join", event.getClass().getSimpleName());
+                    default -> unexpected("connected join", event, handler);
                 }
             });
         }
@@ -265,7 +266,7 @@ class RedisMusicPlayer implements MusicPlayer {
             request(requestId -> new MusicPlayerInteraction.Stop(playerId, requestId, guildId), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.Stopped ignored -> handler.onStopped();
-                    default -> LOG.warn("Unexpected event '{}' for stop request", event.getClass().getSimpleName());
+                    default -> unexpected("stop", event, handler);
                 }
             });
         }
@@ -282,9 +283,9 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.PlayerNotFound ignored -> {
                         // no track will ever start for it, so it would only post a duplicate player later
                         announcementRegistry.unsubscribe(playerId, guildId, announcer);
-                        handler.onFailed("No player found in channel");
+                        handler.onFailed(NO_PLAYER_REASON);
                     }
-                    default -> LOG.warn("Unexpected event '{}' for play request", event.getClass().getSimpleName());
+                    default -> unexpected("play", event, handler);
                 }
             });
         }
@@ -296,8 +297,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.Paused ignored -> handler.onPaused();
                     case MusicPlayerEvent.Resumed ignored -> handler.onResumed();
                     case MusicPlayerEvent.NothingPlaying ignored -> handler.onNothingPlaying();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for togglePause request", event.getClass().getSimpleName());
+                    default -> unexpected("togglePause", event, handler);
                 }
             });
         }
@@ -308,8 +308,7 @@ class RedisMusicPlayer implements MusicPlayer {
                 switch (event) {
                     case MusicPlayerEvent.Skipped ignored -> handler.onSkipped();
                     case MusicPlayerEvent.NothingToAdvance ignored -> handler.onNothingToAdvance();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for next request", event.getClass().getSimpleName());
+                    default -> unexpected("next", event, handler);
                 }
             });
         }
@@ -321,8 +320,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.WentBack ignored -> handler.onWentBack();
                     case MusicPlayerEvent.Restarted ignored -> handler.onRestarted();
                     case MusicPlayerEvent.NothingToGoBack ignored -> handler.onNothingToGoBack();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for previous request", event.getClass().getSimpleName());
+                    default -> unexpected("previous", event, handler);
                 }
             });
         }
@@ -334,8 +332,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.Rewound r -> handler.onRewound(Duration.ofMillis(r.seekMs()));
                     case MusicPlayerEvent.NothingPlaying ignored -> handler.onNothingPlaying();
                     case MusicPlayerEvent.NotSeekable ignored -> handler.onNotSeekable();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for rewind request", event.getClass().getSimpleName());
+                    default -> unexpected("rewind", event, handler);
                 }
             });
         }
@@ -349,8 +346,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.NothingToAdvance ignored -> handler.onNothingToAdvance();
                     case MusicPlayerEvent.NothingPlaying ignored -> handler.onNothingPlaying();
                     case MusicPlayerEvent.NotSeekable ignored -> handler.onNotSeekable();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for forward request", event.getClass().getSimpleName());
+                    default -> unexpected("forward", event, handler);
                 }
             });
         }
@@ -360,8 +356,7 @@ class RedisMusicPlayer implements MusicPlayer {
             request(requestId -> new MusicPlayerInteraction.Clear(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.Cleared ignored -> handler.onCleared();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for clear request", event.getClass().getSimpleName());
+                    default -> unexpected("clear", event, handler);
                 }
             });
         }
@@ -372,8 +367,7 @@ class RedisMusicPlayer implements MusicPlayer {
                 switch (event) {
                     case MusicPlayerEvent.Removed r -> handler.onRemoved(r.track());
                     case MusicPlayerEvent.TrackNotInQueue ignored -> handler.onTrackNotInQueue();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for remove request", event.getClass().getSimpleName());
+                    default -> unexpected("remove", event, handler);
                 }
             });
         }
@@ -383,8 +377,7 @@ class RedisMusicPlayer implements MusicPlayer {
             request(requestId -> new MusicPlayerInteraction.Shuffle(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.Shuffled s -> handler.onShuffled(s.count());
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for shuffle request", event.getClass().getSimpleName());
+                    default -> unexpected("shuffle", event, handler);
                 }
             });
         }
@@ -394,8 +387,7 @@ class RedisMusicPlayer implements MusicPlayer {
             request(requestId -> new MusicPlayerInteraction.SetVolume(playerId, new Request(requestId, requesterTag), guildId, volume), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.VolumeChanged v -> handler.onVolumeChanged(v.volume());
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for setVolume request", event.getClass().getSimpleName());
+                    default -> unexpected("setVolume", event, handler);
                 }
             });
         }
@@ -405,8 +397,7 @@ class RedisMusicPlayer implements MusicPlayer {
             request(requestId -> new MusicPlayerInteraction.CycleLoop(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.LoopModeChanged l -> handler.onLoopModeChanged(l.mode());
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for cycleLoop request", event.getClass().getSimpleName());
+                    default -> unexpected("cycleLoop", event, handler);
                 }
             });
         }
@@ -416,8 +407,7 @@ class RedisMusicPlayer implements MusicPlayer {
             request(requestId -> new MusicPlayerInteraction.SetLoop(playerId, new Request(requestId, requesterTag), guildId, mode), handler, event -> {
                 switch (event) {
                     case MusicPlayerEvent.LoopModeChanged l -> handler.onLoopModeChanged(l.mode());
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for setLoop request", event.getClass().getSimpleName());
+                    default -> unexpected("setLoop", event, handler);
                 }
             });
         }
@@ -430,8 +420,7 @@ class RedisMusicPlayer implements MusicPlayer {
                     case MusicPlayerEvent.JumpOutOfRange o -> handler.onJumpOutOfRange(Duration.ofMillis(o.durationMs()));
                     case MusicPlayerEvent.NothingPlaying ignored -> handler.onNothingPlaying();
                     case MusicPlayerEvent.NotSeekable ignored -> handler.onNotSeekable();
-                    case MusicPlayerEvent.PlayerNotFound ignored -> handler.onFailed("No player found in channel");
-                    default -> LOG.warn("Unexpected event '{}' for jump request", event.getClass().getSimpleName());
+                    default -> unexpected("jump", event, handler);
                 }
             });
         }
@@ -469,6 +458,16 @@ class RedisMusicPlayer implements MusicPlayer {
             send(pending, () -> redis.convertAndSend(
                     PlayerRedisProtocol.Channels.interactions(playerId), serialize(interaction.apply(pending.requestId()))));
         }
+    }
+
+    // an answer the request doesn't expect (a bear on another version) still answers, so the user is never left waiting
+    private static void unexpected(String action, MusicPlayerEvent event, MusicPlayerEventListener handler) {
+        if (event instanceof MusicPlayerEvent.PlayerNotFound) {
+            handler.onFailed(NO_PLAYER_REASON);
+            return;
+        }
+        LOG.warn("Unexpected event '{}' for {} request", event.getClass().getSimpleName(), action);
+        handler.onFailed(UNREACHABLE_REASON);
     }
 
     // a failed send completes the request, which answers it and frees its pending entry

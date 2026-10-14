@@ -9,6 +9,7 @@ import com.bearify.music.player.bridge.events.JoinRequest;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
+import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
@@ -16,17 +17,22 @@ import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -474,6 +480,86 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
         } finally {
             container.stop();
         }
+    }
+
+    // --- ANSWERS TO THE PLAYER CONTROLS ---
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("answers")
+    void reportsTheBearsAnswerToAControl(Answer answer) throws Exception {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        BlockingQueue<String> received = new LinkedBlockingQueue<>();
+        var container = startListener(PlayerRedisProtocol.Channels.interactions(PLAYER_ID), received);
+        AtomicReference<String> answered = new AtomicReference<>();
+
+        try {
+            MusicPlayer player = pool.acquire(GUILD_ID, VOICE_CHANNEL_ID);
+            answer.control().send(player, recording(answered));
+            publish(answer.reply().apply(nextInteraction(received).requestId()));
+
+            await().atMost(3, TimeUnit.SECONDS).untilAsserted(() -> assertThat(answered.get()).isEqualTo(answer.expected()));
+        } finally {
+            container.stop();
+        }
+    }
+
+    static Stream<Answer> answers() {
+        return Stream.of(
+                new Answer("removed", (player, listener) -> player.remove(1, "", REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.Removed(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, TRACK, List.of(), 0, 0),
+                        "removed One More Time"),
+                new Answer("not in queue", (player, listener) -> player.remove(9, "", REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.TrackNotInQueue(PLAYER_ID, id, GUILD_ID),
+                        "not in queue"),
+                new Answer("shuffled", (player, listener) -> player.shuffle(REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, 4, List.of()),
+                        "shuffled 4"),
+                new Answer("volume", (player, listener) -> player.setVolume(40, REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.VolumeChanged(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, 40),
+                        "volume 40"),
+                new Answer("loop cycled", (player, listener) -> player.cycleLoop(REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, LoopMode.QUEUE),
+                        "loop QUEUE"),
+                new Answer("loop set", (player, listener) -> player.setLoop(LoopMode.TRACK, REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.LoopModeChanged(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, LoopMode.TRACK),
+                        "loop TRACK"),
+                new Answer("jumped", (player, listener) -> player.jump(Duration.ofSeconds(83), REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.Jumped(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, 83_000),
+                        "jumped PT1M23S"),
+                new Answer("jump out of range", (player, listener) -> player.jump(Duration.ofHours(1), REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.JumpOutOfRange(PLAYER_ID, id, GUILD_ID, 320_000),
+                        "out of range PT5M20S"),
+                new Answer("no player", (player, listener) -> player.shuffle(REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, id, GUILD_ID),
+                        "failed No player found in channel"),
+                new Answer("unexpected answer", (player, listener) -> player.setVolume(40, REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.Cleared(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, List.of()),
+                        "failed Could not reach the music players"));
+    }
+
+    /** A control sent to the bear, the bear's reply to that request, and what the listener should hear. */
+    record Answer(String name, Control control, Function<String, MusicPlayerEvent> reply, String expected) {
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    interface Control {
+        void send(MusicPlayer player, MusicPlayerEventListener listener);
+    }
+
+    private static MusicPlayerEventListener recording(AtomicReference<String> answered) {
+        return new MusicPlayerEventListener() {
+            @Override public void onFailed(String reason) { answered.set("failed " + reason); }
+            @Override public void onRemoved(TrackMetadata track) { answered.set("removed " + track.title()); }
+            @Override public void onTrackNotInQueue() { answered.set("not in queue"); }
+            @Override public void onShuffled(int count) { answered.set("shuffled " + count); }
+            @Override public void onVolumeChanged(int volume) { answered.set("volume " + volume); }
+            @Override public void onLoopModeChanged(LoopMode mode) { answered.set("loop " + mode); }
+            @Override public void onJumped(Duration position) { answered.set("jumped " + position); }
+            @Override public void onJumpOutOfRange(Duration trackLength) { answered.set("out of range " + trackLength); }
+        };
     }
 
     // --- HELPERS ---
