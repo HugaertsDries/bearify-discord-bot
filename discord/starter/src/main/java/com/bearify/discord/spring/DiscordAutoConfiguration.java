@@ -7,6 +7,7 @@ import com.bearify.discord.api.interaction.ButtonInteraction;
 import com.bearify.discord.api.interaction.CommandInteraction;
 import com.bearify.discord.api.interaction.Interaction;
 import com.bearify.discord.api.interaction.MessageContextInteraction;
+import com.bearify.discord.api.interaction.RepliableInteraction;
 import com.bearify.discord.api.model.CommandDefinition;
 import com.bearify.discord.spring.annotation.DiscordController;
 import org.slf4j.Logger;
@@ -100,9 +101,8 @@ public class DiscordAutoConfiguration {
     private static void replyWithGenericError(Interaction interaction) {
         try {
             switch (interaction) {
-                case CommandInteraction command -> command.reply(GENERIC_ERROR).ephemeral().send();
+                case RepliableInteraction repliable -> repliable.reply(GENERIC_ERROR).ephemeral().send();
                 case ButtonInteraction button -> button.reply(GENERIC_ERROR).ephemeral().send();
-                case MessageContextInteraction messageContext -> messageContext.reply(GENERIC_ERROR).ephemeral().send();
                 case AutocompleteInteraction autocomplete -> autocomplete.reply(List.of());
                 default -> { }
             }

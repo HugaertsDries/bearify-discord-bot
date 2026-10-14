@@ -28,6 +28,8 @@ import java.util.function.Consumer;
 
 public class MockDiscordClient implements DiscordClient {
 
+    private static final String SELF_USER_ID = "mock-bot-user";
+
     private final List<CommandDefinition> commands;
     private final Consumer<Interaction> handler;
     private boolean started = false;
@@ -38,7 +40,6 @@ public class MockDiscordClient implements DiscordClient {
     private final Map<String, List<String>> deletedMessageIdsByChannel = new ConcurrentHashMap<>();
     private final AtomicLong nextMessageId = new AtomicLong(1);
     private final Set<String> membersInVoice = ConcurrentHashMap.newKeySet();
-    private volatile String selfUserId = "mock-bot-user";
 
     private MockDiscordClient(List<CommandDefinition> commands,
                               Consumer<Interaction> handler) {
@@ -66,11 +67,7 @@ public class MockDiscordClient implements DiscordClient {
 
     @Override
     public String selfUserId() {
-        return selfUserId;
-    }
-
-    public void setSelfUserId(String userId) {
-        this.selfUserId = userId;
+        return SELF_USER_ID;
     }
 
     /** Puts the member in, or takes them out of, a voice channel of this guild as {@link Guild#isInVoice} sees it. */

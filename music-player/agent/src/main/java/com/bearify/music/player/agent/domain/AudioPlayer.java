@@ -155,7 +155,7 @@ public class AudioPlayer implements AudioProvider {
 
     public synchronized void previous(Request request) {
         Optional<Track> current = engine.getPlayingTrack();
-        // TODO why is this justRestarted needed? Why is the second validation not enough?
+        // a second ⏮ after a restart goes back a track, even once the restarted track is past the threshold again
         // a live stream can't seek, so restarting it would only claim a restart that never happened
         if (!justRestarted && current.isPresent() && current.get().isSeekable()
                 && current.get().position() > properties.previousRestartThreshold().toMillis()) {
