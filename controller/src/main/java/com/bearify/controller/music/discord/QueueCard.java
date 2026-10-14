@@ -24,8 +24,6 @@ final class QueueCard {
     static final String UP_NEXT_HEADER = "### Up Next";
     static final String FURTHER_HEADER = "### Further up the trail";
 
-    // the bear sends the player message the first three upcoming tracks, so Show starts after them
-    static final int SHOWN_ON_PLAYER = 3;
     private static final int MAX_ROWS = 10;
 
     /** What to answer with: a plain text, or a card. */
@@ -58,10 +56,10 @@ final class QueueCard {
         return answer(reply, snapshot -> {
             List<TrackMetadata> upcoming = snapshot.upcoming();
             // the queue may have shrunk since the player message showed its Show button
-            if (upcoming.size() <= SHOWN_ON_PLAYER) {
+            if (upcoming.size() <= MusicPlayerEvent.UP_NEXT_SIZE) {
                 return new Text(NOTHING_FURTHER_MESSAGE);
             }
-            return new Card(card(FURTHER_HEADER, Optional.empty(), upcoming.subList(SHOWN_ON_PLAYER, upcoming.size())));
+            return new Card(card(FURTHER_HEADER, Optional.empty(), upcoming.subList(MusicPlayerEvent.UP_NEXT_SIZE, upcoming.size())));
         });
     }
 

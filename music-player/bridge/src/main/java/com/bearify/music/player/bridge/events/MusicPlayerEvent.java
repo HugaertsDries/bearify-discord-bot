@@ -85,6 +85,9 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.Jumped,
         MusicPlayerEvent.JumpOutOfRange {
 
+    /** How many upcoming tracks the bear sends as {@code upNext}; the controller's Show button lists the rest. */
+    int UP_NEXT_SIZE = 3;
+
     String playerId();
     String requestId();
     String guildId();

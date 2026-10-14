@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 public class AudioPlayer implements AudioProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(AudioPlayer.class);
-    private static final int UP_NEXT_SIZE = 3;
     // LavaPlayer reports a stream's length as Long.MAX_VALUE
     private static final long LIVE_DURATION = Long.MAX_VALUE;
 
@@ -369,7 +368,7 @@ public class AudioPlayer implements AudioProvider {
 
     // the player message shows only the first few; queueSize and queueDurationMs tell it how much more there is
     private List<TrackMetadata> upNext() {
-        return queue.stream().limit(UP_NEXT_SIZE).map(Track::toMetadata).toList();
+        return queue.stream().limit(MusicPlayerEvent.UP_NEXT_SIZE).map(Track::toMetadata).toList();
     }
 
     private long queueDurationMs() {

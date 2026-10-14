@@ -49,7 +49,7 @@ public class MusicPlayerAutocompleteController {
     public void play(AutocompleteInteraction interaction) {
         String query = interaction.getValue().trim();
         String guildId = interaction.getGuildId().orElse("");
-        if (query.isBlank() || guildId.isBlank() || isUrl(query)) {
+        if (query.isBlank() || guildId.isBlank() || PlayableMessage.isLink(query)) {
             interaction.reply(List.of());
             return;
         }
@@ -105,10 +105,6 @@ public class MusicPlayerAutocompleteController {
     // no ellipsis: the bear matches the uri by this prefix
     private static String cut(String value, int limit) {
         return value.length() <= limit ? value : value.substring(0, limit);
-    }
-
-    private static boolean isUrl(String value) {
-        return value.startsWith("http://") || value.startsWith("https://");
     }
 
     private static String formatLabel(TrackMetadata track) {

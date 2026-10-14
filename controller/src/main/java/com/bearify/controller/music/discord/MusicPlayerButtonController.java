@@ -12,11 +12,12 @@ import com.bearify.discord.spring.annotation.Interaction;
 
 import java.util.Optional;
 
+import static com.bearify.controller.music.discord.MusicPlayerPlayback.NOT_IN_GUILD_MESSAGE;
+import static com.bearify.controller.music.discord.MusicPlayerPlayback.NOT_IN_VOICE_CHANNEL_MESSAGE;
+
 @DiscordController
 public class MusicPlayerButtonController {
 
-    private static final String NOT_IN_VOICE_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | Looks like you're not in a voice channel! Jump in one and try again.";
-    private static final String NOT_IN_GUILD_MESSAGE = BearifyEmoji.BLOCKED + " | I only lumber around inside a server.";
     private static final String WRONG_VOICE_CHANNEL_MESSAGE = BearifyEmoji.BLOCKED + " | You need to be in the same voice channel as the active player to use these controls.";
 
     private final MusicPlayerPool pool;

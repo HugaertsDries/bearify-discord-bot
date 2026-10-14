@@ -110,7 +110,7 @@ final class MusicPlayerPlayback {
     private Optional<String> resolveQuery(String query, List<String> failures) {
         return switch (spotify.resolve(query)) {
             case SpotifyLinkResolver.NotSpotify() ->
-                    Optional.of(query.startsWith("http://") || query.startsWith("https://") ? query : "ytsearch:" + query);
+                    Optional.of(PlayableMessage.isLink(query) ? query : "ytsearch:" + query);
             case SpotifyLinkResolver.Resolved(String searchQuery) -> Optional.of("ytsearch:" + searchQuery);
             case SpotifyLinkResolver.NotASong() -> {
                 failures.add(SPOTIFY_NOT_A_SONG_MESSAGE);

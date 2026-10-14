@@ -23,6 +23,11 @@ final class PlayableMessage {
     private PlayableMessage() {
     }
 
+    /** Whether {@code text} is a link to play as it is, rather than words to search for. */
+    static boolean isLink(String text) {
+        return text.startsWith("http://") || text.startsWith("https://");
+    }
+
     /** The links the bear plays (the hosts it trusts, plus Spotify songs) in message order, at most {@value MAX_LINKS}. */
     static List<String> links(String content) {
         return LINK.matcher(content).results()
