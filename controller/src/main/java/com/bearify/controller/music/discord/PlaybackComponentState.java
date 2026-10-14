@@ -35,6 +35,7 @@ public final class PlaybackComponentState {
     private final Duration queueDuration;
     private final int volume;
     private final LoopMode loopMode;
+    private final boolean shuffle;
     private final URI artworkUri;
     private final String footer;
     private final boolean paused;
@@ -49,6 +50,7 @@ public final class PlaybackComponentState {
         this.queueDuration = builder.queueDuration;
         this.volume = builder.volume;
         this.loopMode = builder.loopMode;
+        this.shuffle = builder.shuffle;
         this.artworkUri = builder.artworkUri;
         this.footer = builder.footerText;
         this.paused = builder.paused;
@@ -96,6 +98,10 @@ public final class PlaybackComponentState {
         return loopMode;
     }
 
+    public boolean shuffle() {
+        return shuffle;
+    }
+
     public Optional<URI> artworkUri() {
         return Optional.ofNullable(artworkUri);
     }
@@ -118,6 +124,7 @@ public final class PlaybackComponentState {
         private Duration queueDuration = Duration.ZERO;
         private int volume = 100;
         private LoopMode loopMode = LoopMode.OFF;
+        private boolean shuffle;
         private URI artworkUri;
         private String footerText;
         private boolean paused;
@@ -172,6 +179,11 @@ public final class PlaybackComponentState {
 
         public Builder loopMode(LoopMode loopMode) {
             this.loopMode = loopMode;
+            return this;
+        }
+
+        public Builder shuffle(boolean shuffle) {
+            this.shuffle = shuffle;
             return this;
         }
 

@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.random.RandomGenerator;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -34,6 +36,8 @@ class AudioPlayerTest {
             new PlayerProperties.VoiceSession(Duration.ofSeconds(10), Duration.ofMinutes(5), Duration.ofMinutes(10)),
             new PlayerProperties.Engine(new PlayerProperties.Engine.Youtube(null, null, null)));
     private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
+    // every random pick is the first choice, so a shuffle and a shuffled insert come out the same each run
+    private static final RandomGenerator FIRST_PICK = () -> 0L;
 
     private InMemoryAudioEngine engine;
     private RecordingEventDispatcher eventDispatcher;
@@ -45,7 +49,7 @@ class AudioPlayerTest {
         engine = new InMemoryAudioEngine();
         eventDispatcher = new RecordingEventDispatcher();
         status = mock(VoiceChannelStatus.class);
-        player = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, status, () -> {});
+        player = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, FIRST_PICK, PLAYER_ID, GUILD_ID, status, () -> {});
     }
 
     @Test
@@ -543,35 +547,124 @@ class AudioPlayerTest {
     void shufflesUpcomingTracksAndKeepsCurrent() {
         InMemoryTrack playing = track("Playing", 120_000);
         engine.play(playing);
-        List<Track> queued = new ArrayList<>();
-        for (int i = 1; i <= 12; i++) {
-            queued.add(track("Song " + i, 60_000));
-        }
-        player.play(queued);
+        player.play(songs(1, 5));
 
-        player.shuffle(new Request("req-1", "@user"));
-        player.snapshot("req-2");
+        player.toggleShuffle(new Request("req-1", "@user"));
 
-        List<MusicPlayerEvent> events = eventDispatcher.getEvents();
-        assertThat(events.get(events.size() - 2))
-                .isInstanceOfSatisfying(MusicPlayerEvent.Shuffled.class, shuffled -> {
-                    assertThat(shuffled.count()).isEqualTo(12);
-                    assertThat(shuffled.upNext()).hasSize(3);
-                });
-        assertThat(events.getLast()).isInstanceOfSatisfying(MusicPlayerEvent.QueueSnapshot.class, snapshot -> {
-            assertThat(snapshot.current()).contains(playing.toMetadata());
-            assertThat(snapshot.upcoming()).containsExactlyInAnyOrderElementsOf(queued.stream().map(Track::toMetadata).toList());
-        });
+        MusicPlayerEvent.ShuffleChanged changed = (MusicPlayerEvent.ShuffleChanged) eventDispatcher.getLastEvent();
+        List<String> upcoming = upcomingTitles();
+        assertThat(engine.getPlayingTrack()).containsSame(playing);
+        assertThat(upcoming).containsExactlyInAnyOrder(titles(1, 5).toArray(String[]::new)).isNotEqualTo(titles(1, 5));
+        assertThat(changed.shuffle()).isTrue();
+        assertThat(changed.queueSize()).isEqualTo(5);
+        assertThat(changed.upNext()).extracting(track -> track.title()).containsExactlyElementsOf(upcoming.subList(0, 3));
     }
 
     @Test
-    void answersShuffledZeroWhenQueueEmpty() {
+    void putsQueueBackInRequestOrderWhenShuffleTurnsOff() {
+        engine.play(track("Playing", 120_000));
+        player.play(songs(1, 5));
+        player.toggleShuffle(new Request("req-1", "@user"));
+
+        player.toggleShuffle(new Request("req-2", "@user"));
+
+        assertThat(((MusicPlayerEvent.ShuffleChanged) eventDispatcher.getLastEvent()).shuffle()).isFalse();
+        assertThat(upcomingTitles()).containsExactlyElementsOf(titles(1, 5));
+    }
+
+    @Test
+    void placesTracksRequestedWhileShufflingAnywhereAndInRequestOrderOnceShuffleIsOff() {
+        engine.play(track("Playing", 120_000));
+        player.play(songs(1, 3));
+        player.toggleShuffle(new Request("req-1", "@user"));
+
+        player.play(track("Song 4", 60_000));
+        player.play(songs(5, 6));
+
+        // the first pick is the front of the queue, ahead of tracks requested earlier
+        assertThat(upcomingTitles()).startsWith("Song 6", "Song 5", "Song 4").hasSize(6);
+        player.toggleShuffle(new Request("req-2", "@user"));
+        assertThat(upcomingTitles()).containsExactlyElementsOf(titles(1, 6));
+    }
+
+    @Test
+    void leavesPlayedTracksOutWhenShuffleTurnsOff() {
+        player.play(songs(1, 5));
+        player.toggleShuffle(new Request("req-1", "@user"));
+        player.play(songs(6, 7));
+
+        finishPlayingTrack();
+        String played = playingTitle();
+        player.toggleShuffle(new Request("req-2", "@user"));
+
+        assertThat(upcomingTitles()).containsExactlyElementsOf(titles(2, 7).stream().filter(title -> !title.equals(played)).toList());
+    }
+
+    @Test
+    void goesBackToTheTrackThatPlayedBeforeWhileShuffling() {
+        player.play(songs(1, 4));
+        player.toggleShuffle(new Request("req-1", "@user"));
+        finishPlayingTrack();
+        String skippedTo = playingTitle();
+
+        player.previous(new Request("req-2", "@user"));
+
+        assertThat(playingTitle()).isEqualTo("Song 1");
+        assertThat(upcomingTitles().getFirst()).isEqualTo(skippedTo);
+        player.toggleShuffle(new Request("req-3", "@user"));
+        assertThat(upcomingTitles()).containsExactlyElementsOf(titles(2, 4));
+    }
+
+    @Test
+    void keepsTheShuffledOrderEachRoundOfALoopingQueue() {
+        player.play(songs(1, 4));
+        loop(LoopMode.QUEUE);
+        player.toggleShuffle(new Request("req-1", "@user"));
+        List<String> round = new ArrayList<>(List.of(playingTitle()));
+        round.addAll(upcomingTitles());
+
+        for (int i = 0; i < round.size(); i++) {
+            finishPlayingTrack();
+        }
+
+        assertThat(playingTitle()).isEqualTo(round.getFirst());
+        assertThat(upcomingTitles()).containsExactlyElementsOf(round.subList(1, round.size()));
+        player.toggleShuffle(new Request("req-2", "@user"));
+        assertThat(upcomingTitles()).containsExactlyElementsOf(titles(2, 4));
+    }
+
+    @Test
+    void carriesOnFromThePlayingTrackWhenShuffleTurnsOffInALoopingQueue() {
+        player.play(songs(1, 4));
+        loop(LoopMode.QUEUE);
+        player.toggleShuffle(new Request("req-1", "@user"));
+        finishPlayingTrack();
+
+        player.toggleShuffle(new Request("req-2", "@user"));
+
+        // the first pick shuffles 2,3,4 into 3,4,2, so Song 3 plays after Song 1
+        assertThat(playingTitle()).isEqualTo("Song 3");
+        assertThat(upcomingTitles()).containsExactly("Song 4", "Song 1", "Song 2");
+    }
+
+    @Test
+    void turnsShuffleOnWithAnEmptyQueue() {
         engine.play(track("Playing", 120_000));
 
-        player.shuffle(new Request("req-1", "@user"));
+        player.toggleShuffle(new Request("req-1", "@user"));
 
         assertThat(eventDispatcher.getLastEvent())
-                .isEqualTo(new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, 0, List.of()));
+                .isEqualTo(new MusicPlayerEvent.ShuffleChanged(PLAYER_ID, new Request("req-1", "@user"), GUILD_ID, true, List.of(), 0));
+    }
+
+    @Test
+    void includesShuffleInTrackStart() {
+        player.toggleShuffle(new Request("req-1", "@user"));
+
+        player.play(track("Song A", 120_000));
+
+        MusicPlayerEvent.TrackStart start = (MusicPlayerEvent.TrackStart) eventDispatcher.getLastEvent();
+        assertThat(start.shuffle()).isTrue();
     }
 
     @Test
@@ -840,7 +933,7 @@ class AudioPlayerTest {
     @Test
     void runnsOnCloseCallbackWhenClosed() {
         boolean[] closed = {false};
-        AudioPlayer closeable = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, PLAYER_ID, GUILD_ID, status, () -> closed[0] = true);
+        AudioPlayer closeable = new AudioPlayer(engine, new NoOpAudioProvider(), eventDispatcher, PROPS, SCHEDULER, FIRST_PICK, PLAYER_ID, GUILD_ID, status, () -> closed[0] = true);
 
         closeable.close();
 
@@ -1185,6 +1278,14 @@ class AudioPlayerTest {
         return ((MusicPlayerEvent.QueueSnapshot) eventDispatcher.getLastEvent()).upcoming().stream()
                 .map(track -> track.title())
                 .toList();
+    }
+
+    private static List<Track> songs(int first, int last) {
+        return IntStream.rangeClosed(first, last).<Track>mapToObj(number -> track("Song " + number, 60_000)).toList();
+    }
+
+    private static List<String> titles(int first, int last) {
+        return IntStream.rangeClosed(first, last).mapToObj(number -> "Song " + number).toList();
     }
 
     private static InMemoryTrack track(String title, long duration) {

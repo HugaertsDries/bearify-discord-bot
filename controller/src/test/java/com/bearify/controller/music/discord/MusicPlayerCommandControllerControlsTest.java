@@ -49,8 +49,8 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String REMOVED_MESSAGE = "🗑️ | Removed **Africa** from the queue.";
     private static final String TRACK_NOT_IN_QUEUE_MESSAGE = "🛑️ | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
     private static final String PICK_A_TRACK_MESSAGE = "🛑️ | Pick a track from the list so I know which one to drop.";
-    private static final String SHUFFLED_MESSAGE = "🔀 | Shuffled 12 tracks. Chaos, bear-style.";
-    private static final String NOTHING_TO_SHUFFLE_MESSAGE = "🍯 | The queue is empty, nothing to shuffle.";
+    private static final String SHUFFLE_ON_MESSAGE = "🔀 | You turned shuffle on.";
+    private static final String SHUFFLE_OFF_MESSAGE = "🔀 | You turned shuffle off.";
     private static final String LOOP_QUEUE_MESSAGE = "🔁 | You looped the queue.";
     private static final String LOOP_MODE_MESSAGE = "🛑️ | Pick a loop mode: `off`, `queue` or `track`.";
     private static final String VOLUME_SET_MESSAGE = "🔊 | Volume set to 40%. Only too loud for you? Right-click the bear → User Volume.";
@@ -426,9 +426,9 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
-    void shufflesQueue() {
+    void turnsShuffleOn() {
         RedisMessageListenerContainer bear = answerAs(interaction ->
-                new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, 12, List.of(AFRICA)));
+                new MusicPlayerEvent.ShuffleChanged(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, true, List.of(AFRICA), 12));
 
         try {
             MockCommandInteraction interaction = buildInteraction("shuffle");
@@ -436,7 +436,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
             assertThat(interaction.isDeferredEphemeral()).isTrue();
             await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
-                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(SHUFFLED_MESSAGE));
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(SHUFFLE_ON_MESSAGE));
         } finally {
             bear.stop();
         }
@@ -694,16 +694,16 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     }
 
     @Test
-    void saysNothingToShuffleOnEmptyQueue() {
+    void turnsShuffleOff() {
         RedisMessageListenerContainer bear = answerAs(interaction ->
-                new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, 0, List.of()));
+                new MusicPlayerEvent.ShuffleChanged(PLAYER_ID, new Request(interaction.requestId(), REQUESTER_TAG), GUILD_ID, false, List.of(), 0));
 
         try {
             MockCommandInteraction interaction = buildInteraction("shuffle");
             commandRegistry.handle(interaction);
 
             await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
-                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(NOTHING_TO_SHUFFLE_MESSAGE));
+                    assertThat(interaction.getDeferredMessage().orElseThrow().getEdits()).containsExactly(SHUFFLE_OFF_MESSAGE));
         } finally {
             bear.stop();
         }

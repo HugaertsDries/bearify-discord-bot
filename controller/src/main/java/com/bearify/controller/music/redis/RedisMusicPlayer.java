@@ -102,7 +102,7 @@ class RedisMusicPlayer implements MusicPlayer {
     public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) { state.remove(position, uriPrefix, requesterTag, handler); }
 
     @Override
-    public void shuffle(String requesterTag, MusicPlayerEventListener handler) { state.shuffle(requesterTag, handler); }
+    public void toggleShuffle(String requesterTag, MusicPlayerEventListener handler) { state.toggleShuffle(requesterTag, handler); }
     @Override
     public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { state.setVolume(volume, requesterTag, handler); }
 
@@ -205,8 +205,8 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void shuffle(String requesterTag, MusicPlayerEventListener handler) {
-            refuse("shuffle", handler);
+        public void toggleShuffle(String requesterTag, MusicPlayerEventListener handler) {
+            refuse("toggleShuffle", handler);
         }
 
         @Override
@@ -373,11 +373,11 @@ class RedisMusicPlayer implements MusicPlayer {
         }
 
         @Override
-        public void shuffle(String requesterTag, MusicPlayerEventListener handler) {
-            request(requestId -> new MusicPlayerInteraction.Shuffle(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
+        public void toggleShuffle(String requesterTag, MusicPlayerEventListener handler) {
+            request(requestId -> new MusicPlayerInteraction.ToggleShuffle(playerId, new Request(requestId, requesterTag), guildId), handler, event -> {
                 switch (event) {
-                    case MusicPlayerEvent.Shuffled s -> handler.onShuffled(s.count());
-                    default -> unexpected("shuffle", event, handler);
+                    case MusicPlayerEvent.ShuffleChanged s -> handler.onShuffleChanged(s.shuffle());
+                    default -> unexpected("toggleShuffle", event, handler);
                 }
             });
         }

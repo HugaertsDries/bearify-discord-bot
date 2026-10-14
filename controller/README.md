@@ -57,7 +57,10 @@ Clears the current playlist.
 Drops one upcoming track. While you type, it suggests the queued tracks matching your text; a bare number removes the track at that position. If the queue moved since you picked, the bear still removes the track you picked, or says it's gone.
 
 ### `/player shuffle`
-Mixes up the upcoming tracks once. The track playing now stays.
+Turns shuffle on or off; same effect as the ⤮ button.
+
+### ⤮ Shuffle button
+The first button in the player's controls turns shuffle on (blurple) or off (grey), and the player shows "@user turned shuffle on" or "@user turned shuffle off" for a moment. Turning it on keeps the track playing now and puts the rest of the queue in a random order, which Up Next shows; turning it off puts what's left back in the order it was requested, and a looping queue carries on from the track playing now. Tracks requested while shuffle is on each land at a random spot in the queue. ⏮ goes back to the track that actually played before, and a looping queue keeps the same shuffled order every round. Shuffle is off again whenever the bear comes back.
 
 ### `/player queue`
 Shows you, privately, the whole queue as a card in the player's Up Next style: the track playing now, up to 10 rows, then "…and N more", and the track count and total time. When more than 3 tracks are queued, the player's Up Next ends with "+N more on the trail" and a **Show** button that privately lists the tracks the player doesn't show.

@@ -19,7 +19,7 @@ public class NoOpMusicPlayer implements MusicPlayer {
     @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
     @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
     @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
-    @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
+    @Override public void toggleShuffle(String requesterTag, MusicPlayerEventListener handler) {}
     @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {}
     @Override public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {}
     @Override public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {}

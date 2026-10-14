@@ -59,6 +59,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
     private volatile String currentRequesterTag;
     private volatile int currentVolume = 100;
     private volatile LoopMode currentLoopMode = LoopMode.OFF;
+    private volatile boolean currentShuffle;
 
     public DiscordPlaybackAnnouncer(DiscordClient discord,
                                     AnnouncerProperties properties,
@@ -92,7 +93,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Jumped jumped -> notify(jumped.request().requesterTag() + " jumped to " + PlaybackComponent.humanReadable(Duration.ofMillis(jumped.positionMs())));
             case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
             case MusicPlayerEvent.Removed removed -> onRemoved(removed);
-            case MusicPlayerEvent.Shuffled shuffled -> onShuffled(shuffled);
+            case MusicPlayerEvent.ShuffleChanged shuffleChanged -> onShuffleChanged(shuffleChanged);
             case MusicPlayerEvent.VolumeChanged volumeChanged -> onVolumeChanged(volumeChanged);
             case MusicPlayerEvent.LoopModeChanged loopModeChanged -> onLoopModeChanged(loopModeChanged);
             case MusicPlayerEvent.QueueUpdated queueUpdated -> onQueueUpdated(queueUpdated);
@@ -116,6 +117,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             currentRequesterTag = event.request().requesterTag();
             currentVolume = event.volume();
             currentLoopMode = event.loopMode();
+            currentShuffle = event.shuffle();
             playbackState = PlaybackComponentState.PlaybackState.PLAYING;
             updateOrPost(playbackComponent.render(currentState()));
         } catch (Exception e) {
@@ -157,14 +159,17 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         notify(event.request().requesterTag() + " removed **" + PlaybackComponent.escaped(PlaybackComponent.truncate(event.track().title(), 50)) + "**");
     }
 
-    private void onShuffled(MusicPlayerEvent.Shuffled event) {
-        if (event.count() == 0) {
-            return;
-        }
+    private void onShuffleChanged(MusicPlayerEvent.ShuffleChanged event) {
+        currentShuffle = event.shuffle();
         currentUpNext = event.upNext();
-        currentQueueSize = event.count();
+        currentQueueSize = event.queueSize();
         // same tracks in a new order, so the queue's duration stays as it was
-        notify(event.request().requesterTag() + " shuffled the queue");
+        notify(event.request().requesterTag() + " " + shuffleAction(event.shuffle()));
+    }
+
+    /** What someone did to shuffle, said after their name. */
+    static String shuffleAction(boolean shuffle) {
+        return shuffle ? "turned shuffle on" : "turned shuffle off";
     }
 
     private void onVolumeChanged(MusicPlayerEvent.VolumeChanged event) {
@@ -318,6 +323,7 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
                 .queueDuration(currentQueueDuration)
                 .volume(currentVolume)
                 .loopMode(currentLoopMode)
+                .shuffle(currentShuffle)
                 .artworkUri(artworkUrlResolver.resolve(currentTrack).orElse(null))
                 .footer(properties.footer())
                 .paused(playbackState == PlaybackComponentState.PlaybackState.PAUSED)

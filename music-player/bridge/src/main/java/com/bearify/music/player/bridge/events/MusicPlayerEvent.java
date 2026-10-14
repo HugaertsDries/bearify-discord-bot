@@ -42,7 +42,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = MusicPlayerEvent.NotSeekable.class, name = "not_seekable"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Removed.class, name = "removed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.TrackNotInQueue.class, name = "track_not_in_queue"),
-        @JsonSubTypes.Type(value = MusicPlayerEvent.Shuffled.class, name = "shuffled"),
+        @JsonSubTypes.Type(value = MusicPlayerEvent.ShuffleChanged.class, name = "shuffle_changed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.VolumeChanged.class, name = "volume_changed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.LoopModeChanged.class, name = "loop_mode_changed"),
         @JsonSubTypes.Type(value = MusicPlayerEvent.Jumped.class, name = "jumped"),
@@ -79,7 +79,7 @@ public sealed interface MusicPlayerEvent permits
         MusicPlayerEvent.NotSeekable,
         MusicPlayerEvent.Removed,
         MusicPlayerEvent.TrackNotInQueue,
-        MusicPlayerEvent.Shuffled,
+        MusicPlayerEvent.ShuffleChanged,
         MusicPlayerEvent.VolumeChanged,
         MusicPlayerEvent.LoopModeChanged,
         MusicPlayerEvent.Jumped,
@@ -97,14 +97,16 @@ public sealed interface MusicPlayerEvent permits
      * cover the whole queue, and are 0 when an older bear sent the event (boxed so their absence reads as 0, not an error).
      * {@code volume} is the bear's current volume, 100 (LavaPlayer's default) when an older bear sent the event.
      * {@code loopMode} is the bear's current loop, OFF when an older bear sent the event.
+     * {@code shuffle} is whether the bear shuffles, false when an older bear sent the event.
      */
-    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs, Integer volume, LoopMode loopMode) implements MusicPlayerEvent {
+    record TrackStart(String playerId, Request request, String guildId, TrackMetadata track, List<TrackMetadata> upNext, Integer queueSize, Long queueDurationMs, Integer volume, LoopMode loopMode, Boolean shuffle) implements MusicPlayerEvent {
         public TrackStart {
             upNext = upNext != null ? List.copyOf(upNext) : List.of();
             queueSize = queueSize != null ? queueSize : 0;
             queueDurationMs = queueDurationMs != null ? queueDurationMs : 0L;
             volume = volume != null ? volume : 100;
             loopMode = loopMode != null ? loopMode : LoopMode.OFF;
+            shuffle = shuffle != null ? shuffle : false;
         }
         @Override public String requestId() { return request.id(); }
     }
@@ -187,12 +189,9 @@ public sealed interface MusicPlayerEvent permits
     }
     /** A remove whose track already left the queue. */
     record TrackNotInQueue(String playerId, String requestId, String guildId) implements MusicPlayerEvent {}
-    /**
-     * {@code count} is the whole queue, 0 when there was nothing to shuffle (not {@link QueueEmpty}: that removes the player message).
-     * A shuffle leaves the queue's duration as it was.
-     */
-    record Shuffled(String playerId, Request request, String guildId, int count, List<TrackMetadata> upNext) implements MusicPlayerEvent {
-        public Shuffled {
+    /** {@code upNext} and {@code queueSize} as in {@link QueueUpdated}, now in the order the bear plays them; the queue's duration stays as it was. */
+    record ShuffleChanged(String playerId, Request request, String guildId, boolean shuffle, List<TrackMetadata> upNext, int queueSize) implements MusicPlayerEvent {
+        public ShuffleChanged {
             upNext = upNext != null ? List.copyOf(upNext) : List.of();
         }
         @Override public String requestId() { return request.id(); }

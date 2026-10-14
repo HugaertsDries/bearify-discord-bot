@@ -10,6 +10,7 @@ import com.bearify.discord.api.gateway.Guild;
 import com.bearify.discord.api.gateway.SentMessage;
 import com.bearify.discord.api.gateway.TextChannel;
 import com.bearify.discord.api.message.ActionRow;
+import com.bearify.discord.api.message.ButtonStyle;
 import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.message.Container;
 import com.bearify.discord.api.message.ContainerChild;
@@ -70,6 +71,7 @@ class DiscordPlaybackAnnouncerTest {
         assertThat(sent.get().containers()).hasSize(2);
         assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("Song"));
         assertThat(buttonLabels(sent.get())).containsExactly(
+                PLAYER_SHUFFLE_LABEL,
                 PLAYER_PREVIOUS_LABEL,
                 PLAYER_PAUSE_LABEL,
                 PLAYER_NEXT_LABEL,
@@ -88,6 +90,7 @@ class DiscordPlaybackAnnouncerTest {
         assertThat(updated.get()).isNotNull();
         assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("ON AIR"));
         assertThat(buttonLabels(updated.get())).containsExactly(
+                PLAYER_SHUFFLE_LABEL,
                 PLAYER_PREVIOUS_LABEL,
                 PLAYER_PLAY_LABEL,
                 PLAYER_NEXT_LABEL,
@@ -107,6 +110,7 @@ class DiscordPlaybackAnnouncerTest {
         assertThat(updated.get()).isNotNull();
         assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("ON AIR"));
         assertThat(buttonLabels(updated.get())).containsExactly(
+                PLAYER_SHUFFLE_LABEL,
                 PLAYER_PREVIOUS_LABEL,
                 PLAYER_PAUSE_LABEL,
                 PLAYER_NEXT_LABEL,
@@ -177,7 +181,7 @@ class DiscordPlaybackAnnouncerTest {
         MusicPlayerEventConsumer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.TRACK));
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.TRACK, false));
 
         assertThat(loopButtonLabel(sent.get())).contains(PLAYER_LOOP_TRACK_LABEL);
     }
@@ -199,7 +203,7 @@ class DiscordPlaybackAnnouncerTest {
         MusicPlayerEventConsumer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 40, LoopMode.OFF));
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 40, LoopMode.OFF, false));
 
         assertThat(allTexts(sent.get())).anyMatch(text -> text.replaceAll("\u001b\\[[0-9;]*m", "").contains("▮▮▮▮▯▯▯▯▯▯  40"));
     }
@@ -390,7 +394,7 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     @Test
-    void labelsShuffleAndKeepsCountingTheWholeQueue() {
+    void labelsShuffleOnAndKeepsCountingTheWholeQueue() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
         MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
         TrackMetadata one = new TrackMetadata("One", "Artist", "https://example.com/1", 60_000);
@@ -400,24 +404,36 @@ class DiscordPlaybackAnnouncerTest {
 
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1", List.of(one, two, three), 7, 900_000L));
-        announcer.accept(new MusicPlayerEvent.Shuffled("player-1", new Request("req-3", "@user"), "guild-1", 7, List.of(five, one, three)));
+        announcer.accept(new MusicPlayerEvent.ShuffleChanged("player-1", new Request("req-3", "@user"), "guild-1", true, List.of(five, one, three), 7));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user shuffled the queue"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user turned shuffle on"));
         assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Five"));
         assertThat(allTexts(updated.get())).contains("-# +4 more on the trail · 12m 00s");
+        assertThat(button(updated.get(), "player:shuffle")).map(InteractiveButton::style).contains(ButtonStyle.PRIMARY);
     }
 
     @Test
-    void ignoresEmptyShuffle() {
+    void labelsShuffleOffWithRequester() {
         AtomicReference<ComponentMessage> updated = new AtomicReference<>();
-        AtomicInteger deletes = new AtomicInteger();
-        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), deletes, Duration.ofSeconds(15));
+        MusicPlayerEventConsumer announcer = announcer(new AtomicReference<>(), updated, new AtomicInteger(), Duration.ofSeconds(15));
 
         announcer.accept(trackStart("player-1"));
-        announcer.accept(new MusicPlayerEvent.Shuffled("player-1", new Request("req-2", "@user"), "guild-1", 0, List.of()));
+        announcer.accept(new MusicPlayerEvent.ShuffleChanged("player-1", new Request("req-2", "@user"), "guild-1", true, List.of(), 0));
+        announcer.accept(new MusicPlayerEvent.ShuffleChanged("player-1", new Request("req-3", "@other"), "guild-1", false, List.of(), 0));
 
-        assertThat(updated.get()).isNull();
-        assertThat(deletes.get()).isZero();
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@other turned shuffle off"));
+        assertThat(button(updated.get(), "player:shuffle")).map(InteractiveButton::style).contains(ButtonStyle.SECONDARY);
+    }
+
+    @Test
+    void takesShuffleFromTrackStart() {
+        AtomicReference<ComponentMessage> sent = new AtomicReference<>();
+        MusicPlayerEventConsumer announcer = announcer(sent, new AtomicReference<>(), new AtomicInteger(), Duration.ofSeconds(15));
+
+        announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF, true));
+
+        assertThat(button(sent.get(), "player:shuffle")).map(InteractiveButton::style).contains(ButtonStyle.PRIMARY);
     }
 
     @Test
@@ -427,7 +443,7 @@ class DiscordPlaybackAnnouncerTest {
 
         String longTitle = "A".repeat(100);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata(longTitle, "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF));
+                new TrackMetadata(longTitle, "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF, false));
 
         assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("A".repeat(44)));
     }
@@ -439,7 +455,7 @@ class DiscordPlaybackAnnouncerTest {
 
         String longAuthor = "B".repeat(60);
         announcer.accept(new MusicPlayerEvent.TrackStart("player-1", new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", longAuthor, "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF));
+                new TrackMetadata("Song", longAuthor, "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF, false));
 
         assertThat(allTexts(sent.get())).anyMatch(text -> text.contains("B".repeat(39)));
     }
@@ -677,7 +693,7 @@ class DiscordPlaybackAnnouncerTest {
 
     private static MusicPlayerEvent.TrackStart trackStart(String playerId) {
         return new MusicPlayerEvent.TrackStart(playerId, new Request("req-1", "@user"), "guild-1",
-                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF);
+                new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF, false);
     }
 
     private static MusicPlayerEvent.TrackStart trackStartWithUpNext(String playerId) {
@@ -686,7 +702,7 @@ class DiscordPlaybackAnnouncerTest {
                 List.of(
                         new TrackMetadata("Hotel California", "Eagles", "https://example.com/1", 390_000),
                         new TrackMetadata("Stairway to Heaven", "Led Zeppelin", "https://example.com/2", 482_000)
-                ), 2, 872_000L, 100, LoopMode.OFF);
+                ), 2, 872_000L, 100, LoopMode.OFF, false);
     }
 
     private static MusicPlayerEvent.TrackError trackError(String playerId) {
@@ -811,12 +827,16 @@ class DiscordPlaybackAnnouncerTest {
     }
 
     private static Optional<String> loopButtonLabel(ComponentMessage message) {
+        return button(message, "player:loop").map(InteractiveButton::label);
+    }
+
+    private static Optional<InteractiveButton> button(ComponentMessage message, String id) {
         for (Container container : message.containers()) {
             for (ContainerChild child : container.children()) {
                 if (child instanceof ActionRow row) {
                     for (InteractiveButton button : row.buttons()) {
-                        if (button.id().equals("player:loop")) {
-                            return Optional.of(button.label());
+                        if (button.id().equals(id)) {
+                            return Optional.of(button);
                         }
                     }
                 }

@@ -93,6 +93,13 @@ class MusicPlayerProtocolRoundTripTest {
     }
 
     @Test
+    void readsTrackStartFromOlderBearWithoutShuffleAsOff() {
+        String json = "{\"type\":\"track_start\",\"playerId\":\"player-id\",\"request\":{\"id\":\"request-id\",\"requesterTag\":\"@user\"},\"guildId\":\"guild-id\",\"upNext\":[]}";
+
+        assertThat(((MusicPlayerEvent.TrackStart) OBJECT_MAPPER.readValue(json, MusicPlayerEvent.class)).shuffle()).isFalse();
+    }
+
+    @Test
     void readsStoppedWithoutReasonAsRequested() {
         String json = "{\"type\":\"player_stopped\",\"playerId\":\"player-id\",\"requestId\":\"request-id\",\"guildId\":\"guild-id\"}";
 
@@ -117,7 +124,7 @@ class MusicPlayerProtocolRoundTripTest {
         if (type == String.class) return name + "-value";
         if (type == long.class || type == Long.class) return 42L;
         if (type == int.class || type == Integer.class) return 7;
-        if (type == boolean.class) return true;
+        if (type == boolean.class || type == Boolean.class) return true;
         if (type == Optional.class && component.getGenericType().getTypeName().contains(TrackMetadata.class.getName())) return Optional.of(track());
         // the last constant, so a reason lost in transit cannot hide behind a default of REQUESTED
         if (type.isEnum()) return type.getEnumConstants()[type.getEnumConstants().length - 1];

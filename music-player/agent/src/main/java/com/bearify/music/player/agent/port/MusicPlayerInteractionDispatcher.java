@@ -69,8 +69,8 @@ public class MusicPlayerInteractionDispatcher {
                     withPlayer(q.guildId(), q.requestId(), player -> player.snapshot(q.requestId()));
             case MusicPlayerInteraction.Remove r ->
                     withPlayer(r.guildId(), r.requestId(), player -> player.remove(r.position(), r.uriPrefix(), r.request()));
-            case MusicPlayerInteraction.Shuffle s ->
-                    withPlayer(s.guildId(), s.requestId(), player -> player.shuffle(s.request()));
+            case MusicPlayerInteraction.ToggleShuffle s ->
+                    withPlayer(s.guildId(), s.requestId(), player -> player.toggleShuffle(s.request()));
             case MusicPlayerInteraction.SetVolume v ->
                     withPlayer(v.guildId(), v.requestId(), player -> player.setVolume(v.volume(), v.request()));
             case MusicPlayerInteraction.CycleLoop l ->

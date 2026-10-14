@@ -17,6 +17,7 @@ import static com.bearify.discord.api.message.ButtonStyle.SECONDARY;
 
 public class PlaybackComponent {
 
+    public static final String PLAYER_SHUFFLE_LABEL = "⤮";
     public static final String PLAYER_PREVIOUS_LABEL = "❙◀︎";
     public static final String PLAYER_PAUSE_LABEL = "❚❚";
     public static final String PLAYER_PLAY_LABEL = "▶︎";
@@ -69,6 +70,11 @@ public class PlaybackComponent {
 
     private static void appendActionRow(ComponentMessageBuilder builder, PlaybackComponentState state) {
         builder.container(container -> container.ActionRow(row -> {
+            if (state.shuffle()) {
+                row.primary("player:shuffle", PLAYER_SHUFFLE_LABEL);
+            } else {
+                row.secondary("player:shuffle", PLAYER_SHUFFLE_LABEL);
+            }
             row.secondary("player:previous", PLAYER_PREVIOUS_LABEL);
             row.primary("player:pause-play", state.paused() ? PLAYER_PLAY_LABEL : PLAYER_PAUSE_LABEL);
             row.secondary("player:next", PLAYER_NEXT_LABEL);

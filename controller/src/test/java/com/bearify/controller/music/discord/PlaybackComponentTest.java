@@ -179,14 +179,23 @@ class PlaybackComponentTest {
         PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
 
         assertThat(controls(announcer.render(baseState().build())).buttons()).containsExactly(
+                new InteractiveButton(ButtonStyle.SECONDARY, "player:shuffle", "⤮"),
                 new InteractiveButton(ButtonStyle.SECONDARY, "player:previous", PlaybackComponent.PLAYER_PREVIOUS_LABEL),
                 new InteractiveButton(ButtonStyle.PRIMARY, "player:pause-play", PlaybackComponent.PLAYER_PAUSE_LABEL),
                 new InteractiveButton(ButtonStyle.SECONDARY, "player:next", PlaybackComponent.PLAYER_NEXT_LABEL),
                 new InteractiveButton(ButtonStyle.SECONDARY, "player:loop", "↻"));
-        assertThat(controls(announcer.render(baseState().loopMode(LoopMode.QUEUE).build())).buttons().get(3))
+        assertThat(controls(announcer.render(baseState().loopMode(LoopMode.QUEUE).build())).buttons().get(4))
                 .isEqualTo(new InteractiveButton(ButtonStyle.PRIMARY, "player:loop", "↻"));
-        assertThat(controls(announcer.render(baseState().loopMode(LoopMode.TRACK).build())).buttons().get(3))
+        assertThat(controls(announcer.render(baseState().loopMode(LoopMode.TRACK).build())).buttons().get(4))
                 .isEqualTo(new InteractiveButton(ButtonStyle.PRIMARY, "player:loop", "↻¹"));
+    }
+
+    @Test
+    void rendersShuffleButtonFirstAndLightsItWhileShuffling() {
+        PlaybackComponent announcer = new PlaybackComponent(new AnnouncerProperties("#123456", "#AA0000", "Footer", java.time.Duration.ofSeconds(15)));
+
+        assertThat(controls(announcer.render(baseState().shuffle(true).build())).buttons().getFirst())
+                .isEqualTo(new InteractiveButton(ButtonStyle.PRIMARY, "player:shuffle", "⤮"));
     }
 
     @Test

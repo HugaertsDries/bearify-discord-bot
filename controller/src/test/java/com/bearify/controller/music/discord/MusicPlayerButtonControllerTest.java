@@ -92,6 +92,36 @@ class MusicPlayerButtonControllerTest {
     }
 
     @Test
+    void togglesShuffleFromPlayerButton() {
+        RecordingMusicPlayer player = new RecordingMusicPlayer();
+        MockButtonInteraction interaction = MockButtonInteraction.forButton("player:shuffle")
+                .guildId("guild-1")
+                .voiceChannelId("vc-123")
+                .userMention("@dries")
+                .build();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player))).shuffle(interaction);
+
+        assertThat(player.toggleShuffleRequester).isEqualTo("@dries");
+        assertThat(interaction.isAcknowledged()).isTrue();
+        assertThat(interaction.getReplies()).isEmpty();
+    }
+
+    @Test
+    void rejectsShuffleFromAnotherVoiceChannel() {
+        MockButtonInteraction interaction = MockButtonInteraction.forButton("player:shuffle")
+                .guildId("guild-1")
+                .voiceChannelId("voice-other")
+                .build();
+
+        new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.empty())).shuffle(interaction);
+
+        assertThat(interaction.isAcknowledged()).isFalse();
+        assertThat(interaction.getReplies()).singleElement()
+                .satisfies(reply -> assertThat(reply.getContent()).contains("same voice channel"));
+    }
+
+    @Test
     void rejectsLoopFromAnotherVoiceChannel() {
         MockButtonInteraction interaction = MockButtonInteraction.forButton("player:loop")
                 .guildId("guild-1")
@@ -111,7 +141,7 @@ class MusicPlayerButtonControllerTest {
         player.answerWith(MusicPlayerEventListener::onTimedOut);
         MusicPlayerButtonController handler = new MusicPlayerButtonController(new RecordingMusicPlayerPool(Optional.of(player)));
         List<Consumer<MockButtonInteraction>> buttons = List.of(
-                handler::pausePlay, handler::previous, handler::next, handler::clear, handler::loop);
+                handler::pausePlay, handler::previous, handler::next, handler::clear, handler::shuffle, handler::loop);
 
         for (Consumer<MockButtonInteraction> button : buttons) {
             MockButtonInteraction interaction = buttonInteraction();
@@ -260,6 +290,7 @@ class MusicPlayerButtonControllerTest {
         private String nextRequester;
         private String clearRequester;
         private String cycleLoopRequester;
+        private String toggleShuffleRequester;
         private Consumer<MusicPlayerEventListener> answer = handler -> {};
         private Optional<MusicPlayerEvent> queue = Optional.empty();
 
@@ -310,6 +341,12 @@ class MusicPlayerButtonControllerTest {
         @Override
         public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {
             cycleLoopRequester = requesterTag;
+            answer.accept(handler);
+        }
+
+        @Override
+        public void toggleShuffle(String requesterTag, MusicPlayerEventListener handler) {
+            toggleShuffleRequester = requesterTag;
             answer.accept(handler);
         }
 

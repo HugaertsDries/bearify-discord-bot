@@ -38,7 +38,6 @@ public class MusicPlayerCommandController {
     private static final String VOLUME_OUT_OF_RANGE_MESSAGE = BearifyEmoji.BLOCKED + " | Volume goes from 0 to 100, bear with me.";
     private static final String PICK_A_TRACK_MESSAGE = BearifyEmoji.BLOCKED + " | Pick a track from the list so I know which one to drop.";
     private static final String TRACK_NOT_IN_QUEUE_MESSAGE = BearifyEmoji.BLOCKED + " | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
-    private static final String NOTHING_TO_SHUFFLE_MESSAGE = BearifyEmoji.HONEY + " | The queue is empty, nothing to shuffle.";
     private static final String LOOP_MODE_MESSAGE = BearifyEmoji.BLOCKED + " | Pick a loop mode: `off`, `queue` or `track`.";
     private static final String TIME_FORMAT_MESSAGE = BearifyEmoji.BLOCKED + " | Use a time like `1:23`, `1h30m` or `83` (seconds).";
 
@@ -249,12 +248,12 @@ public class MusicPlayerCommandController {
     }
 
     @SuppressWarnings("unused")
-    @Interaction(value = "shuffle", description = "I'll mix up the queue")
+    @Interaction(value = "shuffle", description = "I'll turn shuffle on or off")
     public void shuffle(CommandInteraction interaction) {
-        withPlayer(interaction, (player, message) -> player.shuffle(interaction.getUserMention(), new AnsweringListener(message::edit) {
+        withPlayer(interaction, (player, message) -> player.toggleShuffle(interaction.getUserMention(), new AnsweringListener(message::edit) {
             @Override
-            public void onShuffled(int count) {
-                answer(count == 0 ? NOTHING_TO_SHUFFLE_MESSAGE : shuffledMessage(count));
+            public void onShuffleChanged(boolean shuffle) {
+                answer(shuffleMessage(shuffle));
             }
         }));
     }
@@ -374,8 +373,8 @@ public class MusicPlayerCommandController {
         return BearifyEmoji.TRASH + " | Removed **" + PlaybackComponent.escaped(track.title()) + "** from the queue.";
     }
 
-    private static String shuffledMessage(int count) {
-        return BearifyEmoji.SHUFFLE + " | Shuffled " + count + (count == 1 ? " track" : " tracks") + ". Chaos, bear-style.";
+    private static String shuffleMessage(boolean shuffle) {
+        return BearifyEmoji.SHUFFLE + " | You " + DiscordPlaybackAnnouncer.shuffleAction(shuffle) + ".";
     }
 
     private static String loopMessage(LoopMode mode) {

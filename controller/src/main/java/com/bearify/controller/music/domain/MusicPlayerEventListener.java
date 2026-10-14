@@ -25,8 +25,7 @@ public interface MusicPlayerEventListener {
     default void onCleared() {}
     default void onRemoved(TrackMetadata track) {}
     default void onTrackNotInQueue() {}
-    /** {@code count} is 0 when the queue was empty. */
-    default void onShuffled(int count) {}
+    default void onShuffleChanged(boolean shuffle) {}
     default void onVolumeChanged(int volume) {}
     default void onLoopModeChanged(LoopMode mode) {}
     default void onJumped(Duration position) {}

@@ -21,7 +21,8 @@ public interface MusicPlayer {
     void clear(String requesterTag, MusicPlayerEventListener handler);
     /** {@code position} is 1-based over the upcoming tracks; an empty {@code uriPrefix} removes by position alone. */
     void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler);
-    void shuffle(String requesterTag, MusicPlayerEventListener handler);
+    /** Turns shuffle on when it's off and off when it's on. */
+    void toggleShuffle(String requesterTag, MusicPlayerEventListener handler);
     void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler);
     /** Moves the loop on from off to the queue to the current track and back to off. */
     void cycleLoop(String requesterTag, MusicPlayerEventListener handler);

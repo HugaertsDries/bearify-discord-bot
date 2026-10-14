@@ -59,6 +59,7 @@ public class PlaybackAnnouncerPresets {
                         .queueSize(12)
                         .queueDuration(Duration.ofMinutes(52))
                         .loopMode(LoopMode.QUEUE)
+                        .shuffle(true)
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
                         .paused(false)

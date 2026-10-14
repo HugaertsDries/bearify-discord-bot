@@ -511,9 +511,9 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
                 new Answer("not in queue", (player, listener) -> player.remove(9, "", REQUESTER_TAG, listener),
                         id -> new MusicPlayerEvent.TrackNotInQueue(PLAYER_ID, id, GUILD_ID),
                         "not in queue"),
-                new Answer("shuffled", (player, listener) -> player.shuffle(REQUESTER_TAG, listener),
-                        id -> new MusicPlayerEvent.Shuffled(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, 4, List.of()),
-                        "shuffled 4"),
+                new Answer("shuffle toggled", (player, listener) -> player.toggleShuffle(REQUESTER_TAG, listener),
+                        id -> new MusicPlayerEvent.ShuffleChanged(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, true, List.of(), 4),
+                        "shuffle true"),
                 new Answer("volume", (player, listener) -> player.setVolume(40, REQUESTER_TAG, listener),
                         id -> new MusicPlayerEvent.VolumeChanged(PLAYER_ID, new Request(id, REQUESTER_TAG), GUILD_ID, 40),
                         "volume 40"),
@@ -529,7 +529,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
                 new Answer("jump out of range", (player, listener) -> player.jump(Duration.ofHours(1), REQUESTER_TAG, listener),
                         id -> new MusicPlayerEvent.JumpOutOfRange(PLAYER_ID, id, GUILD_ID, 320_000),
                         "out of range PT5M20S"),
-                new Answer("no player", (player, listener) -> player.shuffle(REQUESTER_TAG, listener),
+                new Answer("no player", (player, listener) -> player.toggleShuffle(REQUESTER_TAG, listener),
                         id -> new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, id, GUILD_ID),
                         "failed No player found in channel"),
                 new Answer("unexpected answer", (player, listener) -> player.setVolume(40, REQUESTER_TAG, listener),
@@ -554,7 +554,7 @@ class RedisMusicPlayerTest extends AbstractControllerIntegrationTest {
             @Override public void onFailed(String reason) { answered.set("failed " + reason); }
             @Override public void onRemoved(TrackMetadata track) { answered.set("removed " + track.title()); }
             @Override public void onTrackNotInQueue() { answered.set("not in queue"); }
-            @Override public void onShuffled(int count) { answered.set("shuffled " + count); }
+            @Override public void onShuffleChanged(boolean shuffle) { answered.set("shuffle " + shuffle); }
             @Override public void onVolumeChanged(int volume) { answered.set("volume " + volume); }
             @Override public void onLoopModeChanged(LoopMode mode) { answered.set("loop " + mode); }
             @Override public void onJumped(Duration position) { answered.set("jumped " + position); }

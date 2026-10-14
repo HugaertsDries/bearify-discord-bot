@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -44,7 +45,7 @@ public class AudioPlayerPool {
             LavaAudioEngine engine = engineFactory.get();
             engine.setVolume(properties.defaultVolume());
             return new AudioPlayer(
-                    engine, engine, eventDispatcher, properties, scheduler, playerId, id,
+                    engine, engine, eventDispatcher, properties, scheduler, new Random(), playerId, id,
                     new VoiceChannelStatus(client, id),
                     () -> this.remove(guildId));
         });

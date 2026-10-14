@@ -63,6 +63,15 @@ public class MusicPlayerButtonController {
     }
 
     @SuppressWarnings("unused")
+    @Interaction(type = InteractionType.BUTTON, value = "player:shuffle")
+    public void shuffle(ButtonInteraction interaction) {
+        requirePlayer(interaction).ifPresent(player -> {
+            interaction.acknowledge();
+            player.toggleShuffle(interaction.getUserMention(), answerFailuresPrivately(interaction));
+        });
+    }
+
+    @SuppressWarnings("unused")
     @Interaction(type = InteractionType.BUTTON, value = "player:loop")
     public void loop(ButtonInteraction interaction) {
         requirePlayer(interaction).ifPresent(player -> {

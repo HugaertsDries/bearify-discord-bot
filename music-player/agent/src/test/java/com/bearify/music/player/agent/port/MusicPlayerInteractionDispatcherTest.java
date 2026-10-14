@@ -244,7 +244,7 @@ class MusicPlayerInteractionDispatcherTest {
                 new MusicPlayerInteraction.Clear(PLAYER_ID, request, GUILD_ID),
                 new MusicPlayerInteraction.QueueRequest(PLAYER_ID, REQUEST_ID, GUILD_ID),
                 new MusicPlayerInteraction.Remove(PLAYER_ID, request, GUILD_ID, 1, ""),
-                new MusicPlayerInteraction.Shuffle(PLAYER_ID, request, GUILD_ID),
+                new MusicPlayerInteraction.ToggleShuffle(PLAYER_ID, request, GUILD_ID),
                 new MusicPlayerInteraction.SetVolume(PLAYER_ID, request, GUILD_ID, 40),
                 new MusicPlayerInteraction.CycleLoop(PLAYER_ID, request, GUILD_ID),
                 new MusicPlayerInteraction.SetLoop(PLAYER_ID, request, GUILD_ID, LoopMode.TRACK),
@@ -291,15 +291,15 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
-    void routesShuffleToPlayer() {
+    void routesShuffleToggleToPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
         MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
                 new RecordingVoiceConnectionManager(), pool, null, null, null, PLAYER_ID);
 
-        dispatcher.handle(new MusicPlayerInteraction.Shuffle(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
+        dispatcher.handle(new MusicPlayerInteraction.ToggleShuffle(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
-        assertThat(pool.shuffleCalls).containsExactly(GUILD_ID + "|@user");
+        assertThat(pool.toggleShuffleCalls).containsExactly(GUILD_ID + "|@user");
     }
 
     @Test
@@ -446,7 +446,7 @@ class MusicPlayerInteractionDispatcherTest {
         final List<String> playPlaylistCalls = new ArrayList<>();
         final List<String> snapshotCalls = new ArrayList<>();
         final List<String> removeCalls = new ArrayList<>();
-        final List<String> shuffleCalls = new ArrayList<>();
+        final List<String> toggleShuffleCalls = new ArrayList<>();
         final List<String> setVolumeCalls = new ArrayList<>();
         final List<String> cycleLoopCalls = new ArrayList<>();
         final List<String> setLoopCalls = new ArrayList<>();
@@ -481,7 +481,7 @@ class MusicPlayerInteractionDispatcherTest {
             private final String guildId;
 
             StubPlayer(String guildId) {
-                super(new NoOpEngine(), new NoOpAudioProvider(), null, PROPS, null, "test", guildId, null, () -> {});
+                super(new NoOpEngine(), new NoOpAudioProvider(), null, PROPS, null, null, "test", guildId, null, () -> {});
                 this.guildId = guildId;
             }
 
@@ -530,8 +530,8 @@ class MusicPlayerInteractionDispatcherTest {
             }
 
             @Override
-            public void shuffle(Request request) {
-                shuffleCalls.add(guildId + "|" + request.requesterTag());
+            public void toggleShuffle(Request request) {
+                toggleShuffleCalls.add(guildId + "|" + request.requesterTag());
             }
 
             @Override

@@ -246,7 +246,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         PLAYER_ID,
                         new Request("event-1", "@user"),
                         GUILD_ID,
-                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF)));
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF, false)));
 
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
@@ -274,7 +274,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         PLAYER_ID,
                         new Request("event-1", "@user"),
                         GUILD_ID,
-                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF)));
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF, false)));
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
             assertThat(discord.sentComponents("text-1")).hasSize(1);
@@ -308,7 +308,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
                         PLAYER_ID,
                         new Request("event-1", "@user"),
                         GUILD_ID,
-                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF)));
+                        new TrackMetadata("Song", "Artist", "https://example.com", 60_000), List.of(), 0, 0L, 100, LoopMode.OFF, false)));
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
             assertThat(discord.sentComponents("text-1")).hasSize(1);

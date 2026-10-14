@@ -12,16 +12,17 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.random.RandomGenerator;
 
 public class AudioPlayer implements AudioProvider {
 
@@ -34,24 +35,29 @@ public class AudioPlayer implements AudioProvider {
     private final MusicPlayerEventDispatcher eventDispatcher;
     private final PlayerProperties properties;
     private final ScheduledExecutorService scheduler;
+    private final RandomGenerator random;
     private final String playerId;
     private final String guildId;
     private final VoiceChannelStatus status;
     private final Runnable onClose;
 
-    private final Deque<Track> queue = new ArrayDeque<>();
-    private final Deque<Track> history = new ArrayDeque<>();
+    private final LinkedList<Queued> queue = new LinkedList<>();
+    private final Deque<Queued> history = new ArrayDeque<>();
+    private long requestCount = 0;
+    private long playingRequestNumber = 0;
     private boolean justRestarted = false;
     private boolean closed = false;
     private boolean autoPaused = false;
     private volatile boolean lastTrackWasError = false;
     private LoopMode loopMode = LoopMode.OFF;
+    private boolean shuffle = false;
 
     protected AudioPlayer(AudioEngine engine,
                           AudioProvider audioProvider,
                           MusicPlayerEventDispatcher eventDispatcher,
                           PlayerProperties properties,
                           ScheduledExecutorService scheduler,
+                          RandomGenerator random,
                           String playerId,
                           String guildId,
                           VoiceChannelStatus status,
@@ -61,6 +67,7 @@ public class AudioPlayer implements AudioProvider {
         this.eventDispatcher = eventDispatcher;
         this.properties = properties;
         this.scheduler = scheduler;
+        this.random = random;
         this.playerId = playerId;
         this.guildId = guildId;
         this.status = status;
@@ -88,10 +95,11 @@ public class AudioPlayer implements AudioProvider {
     // --- Playback control ---
 
     public synchronized void play(Track track) {
+        Queued requested = new Queued(track, ++requestCount);
         if (engine.getPlayingTrack().isEmpty()) {
-            engine.play(track);
+            start(requested);
         } else {
-            queue.addLast(track);
+            enqueue(requested);
             dispatchQueueUpdated();
         }
     }
@@ -99,10 +107,10 @@ public class AudioPlayer implements AudioProvider {
     public synchronized void play(List<Track> tracks) {
         if (tracks.isEmpty()) return;
         for (Track track : tracks) {
-            queue.addLast(track);
+            enqueue(new Queued(track, ++requestCount));
         }
         if (engine.getPlayingTrack().isEmpty()) {
-            engine.play(queue.pollFirst());
+            start(queue.pollFirst());
         }
         dispatchQueueUpdated();
     }
@@ -138,18 +146,33 @@ public class AudioPlayer implements AudioProvider {
         eventDispatcher.dispatch(new MusicPlayerEvent.LoopModeChanged(playerId, request, guildId, loopMode));
     }
 
+    public synchronized void toggleShuffle(Request request) {
+        shuffle = !shuffle;
+        if (shuffle) {
+            Collections.shuffle(queue, random);
+        } else {
+            Comparator<Queued> requestOrder = Comparator.comparingLong(Queued::requestNumber);
+            if (loopMode == LoopMode.QUEUE) {
+                // the cycle carries on from the playing track, so tracks requested before it come round after the rest
+                requestOrder = Comparator.<Queued, Boolean>comparing(queued -> queued.requestNumber() < playingRequestNumber).thenComparing(requestOrder);
+            }
+            queue.sort(requestOrder);
+        }
+        eventDispatcher.dispatch(new MusicPlayerEvent.ShuffleChanged(playerId, request, guildId, shuffle, upNext(), queue.size()));
+    }
+
     public synchronized void next(Request request) {
         if (loopMode == LoopMode.QUEUE) {
             // a skipped track stays in the cycle; alone, it starts over
-            engine.getPlayingTrack().ifPresent(current -> queue.addLast(current.clone()));
+            engine.getPlayingTrack().ifPresent(current -> queue.addLast(playing(current)));
         }
         if (queue.isEmpty()) {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
             return;
         }
-        engine.getPlayingTrack().ifPresent(current -> history.addFirst(current.clone()));
+        engine.getPlayingTrack().ifPresent(current -> history.addFirst(playing(current)));
         engine.setPaused(false);
-        engine.play(queue.pollFirst());
+        start(queue.pollFirst());
         eventDispatcher.dispatch(new MusicPlayerEvent.Skipped(playerId, request, guildId));
     }
 
@@ -169,19 +192,19 @@ public class AudioPlayer implements AudioProvider {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToGoBack(playerId, request.id(), guildId));
             return;
         }
-        current.ifPresent(track -> queue.addFirst(track.clone()));
-        Track previous = history.pollFirst();
+        current.ifPresent(track -> queue.addFirst(playing(track)));
+        Queued previous = history.pollFirst();
         if (loopMode == LoopMode.QUEUE) {
             // the loop already sent this track round to the back, so going back to it must not keep it in the cycle twice
-            for (Iterator<Track> it = queue.descendingIterator(); it.hasNext(); ) {
-                if (Objects.equals(it.next().uri(), previous.uri())) {
+            for (Iterator<Queued> it = queue.descendingIterator(); it.hasNext(); ) {
+                if (it.next().requestNumber() == previous.requestNumber()) {
                     it.remove();
                     break;
                 }
             }
         }
         engine.setPaused(false);
-        engine.play(previous);
+        start(previous);
         eventDispatcher.dispatch(new MusicPlayerEvent.WentBack(playerId, request, guildId));
     }
 
@@ -215,15 +238,15 @@ public class AudioPlayer implements AudioProvider {
         }
         // forwarding past the end is a skip to the next track, so in a looping queue the track stays in the cycle too
         if (loopMode == LoopMode.QUEUE) {
-            queue.addLast(track.clone());
+            queue.addLast(playing(track));
         }
         if (queue.isEmpty()) {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
             return;
         }
         boolean wasPaused = engine.isPaused();
-        history.addFirst(track.clone());
-        engine.play(queue.pollFirst());
+        history.addFirst(playing(track));
+        start(queue.pollFirst());
         if (wasPaused) {
             // a fresh id, so this Paused doesn't answer the forward request in place of Skipped
             eventDispatcher.dispatch(autoPaused
@@ -268,7 +291,7 @@ public class AudioPlayer implements AudioProvider {
 
     /** {@code position} is 1-based over the upcoming tracks; an empty {@code uriPrefix} removes by position alone. */
     public synchronized void remove(int position, String uriPrefix, Request request) {
-        List<Track> tracks = new ArrayList<>(queue);
+        List<Track> tracks = queue.stream().map(Queued::track).toList();
         int index = position - 1;
         if (index < 0 || index >= tracks.size() || !hasUriPrefix(tracks.get(index), uriPrefix)) {
             // the queue moved since the track was picked, so look for it by its uri
@@ -278,18 +301,8 @@ public class AudioPlayer implements AudioProvider {
             eventDispatcher.dispatch(new MusicPlayerEvent.TrackNotInQueue(playerId, request.id(), guildId));
             return;
         }
-        Track removed = tracks.remove(index);
-        queue.clear();
-        queue.addAll(tracks);
+        Track removed = queue.remove(index).track();
         eventDispatcher.dispatch(new MusicPlayerEvent.Removed(playerId, request, guildId, removed.toMetadata(), upNext(), queue.size(), queueDurationMs()));
-    }
-
-    public synchronized void shuffle(Request request) {
-        List<Track> tracks = new ArrayList<>(queue);
-        Collections.shuffle(tracks);
-        queue.clear();
-        queue.addAll(tracks);
-        eventDispatcher.dispatch(new MusicPlayerEvent.Shuffled(playerId, request, guildId, queue.size(), upNext()));
     }
 
     /** Pauses because nobody is listening; only a playing, unpaused track is paused. */
@@ -325,7 +338,7 @@ public class AudioPlayer implements AudioProvider {
         eventDispatcher.dispatch(new MusicPlayerEvent.QueueSnapshot(
                 playerId, requestId, guildId,
                 engine.getPlayingTrack().map(Track::toMetadata),
-                queue.stream().map(Track::toMetadata).toList()));
+                queue.stream().map(queued -> queued.track().toMetadata()).toList()));
     }
 
     public synchronized void close() {
@@ -338,6 +351,25 @@ public class AudioPlayer implements AudioProvider {
     }
 
     // --- Private helpers ---
+
+    private void start(Queued queued) {
+        playingRequestNumber = queued.requestNumber();
+        engine.play(queued.track());
+    }
+
+    // the playing track back in the queue or history keeps the number it was requested with
+    private Queued playing(Track track) {
+        return new Queued(track.clone(), playingRequestNumber);
+    }
+
+    // while shuffling, a newly requested track lands anywhere in what's still to come
+    private void enqueue(Queued queued) {
+        if (shuffle) {
+            queue.add(random.nextInt(queue.size() + 1), queued);
+        } else {
+            queue.addLast(queued);
+        }
+    }
 
     private long defaultSeekMs(Track track) {
         return track.duration() >= properties.seekTrackLengthThreshold().toMillis()
@@ -368,12 +400,15 @@ public class AudioPlayer implements AudioProvider {
 
     // the player message shows only the first few; queueSize and queueDurationMs tell it how much more there is
     private List<TrackMetadata> upNext() {
-        return queue.stream().limit(MusicPlayerEvent.UP_NEXT_SIZE).map(Track::toMetadata).toList();
+        return queue.stream().limit(MusicPlayerEvent.UP_NEXT_SIZE).map(queued -> queued.track().toMetadata()).toList();
     }
 
     private long queueDurationMs() {
-        return queue.stream().mapToLong(Track::duration).filter(ms -> ms != LIVE_DURATION).sum();
+        return queue.stream().mapToLong(queued -> queued.track().duration()).filter(ms -> ms != LIVE_DURATION).sum();
     }
+
+    /** {@code requestNumber} counts up per request, so turning shuffle off can put the queue back in the order it was asked for. */
+    private record Queued(Track track, long requestNumber) {}
 
     private class TrackEventHandler implements AudioEngineListener {
 
@@ -383,12 +418,14 @@ public class AudioPlayer implements AudioProvider {
             int queueSize;
             long queueDurationMs;
             LoopMode loop;
+            boolean shuffled;
             synchronized (AudioPlayer.this) {
                 justRestarted = false;
                 upNext = upNext();
                 queueSize = queue.size();
                 queueDurationMs = queueDurationMs();
                 loop = loopMode;
+                shuffled = shuffle;
             }
             LOG.info("Now playing: {} by {}", track.title(), track.author());
             status.show(track);
@@ -401,7 +438,8 @@ public class AudioPlayer implements AudioProvider {
                     queueSize,
                     queueDurationMs,
                     engine.getVolume(),
-                    loop));
+                    loop,
+                    shuffled));
         }
 
         @Override
@@ -422,16 +460,17 @@ public class AudioPlayer implements AudioProvider {
                 }
                 if (loops && loopMode == LoopMode.QUEUE) {
                     // with nothing else queued the track plays itself next, so a single song repeats
-                    queue.addLast(track.clone());
+                    queue.addLast(playing(track));
                 }
                 if (!queue.isEmpty()) {
-                    history.addFirst(track.clone());
-                    Track next = queue.pollFirst();
+                    history.addFirst(playing(track));
+                    Queued next = queue.pollFirst();
                     if (wasError) {
                         long delayMs = properties.errorSkipDelay().toMillis();
-                        scheduler.schedule(() -> engine.play(next), delayMs, TimeUnit.MILLISECONDS);
+                        playingRequestNumber = next.requestNumber();
+                        scheduler.schedule(() -> engine.play(next.track()), delayMs, TimeUnit.MILLISECONDS);
                     } else {
-                        engine.play(next);
+                        start(next);
                     }
                 } else {
                     status.clear();

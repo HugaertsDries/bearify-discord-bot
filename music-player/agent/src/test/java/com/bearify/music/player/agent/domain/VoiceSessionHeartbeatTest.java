@@ -497,7 +497,7 @@ class VoiceSessionHeartbeatTest {
 
     private AudioPlayer playingPlayer() {
         AudioPlayer player = new AudioPlayer(engine, new AudioPlayerTest.NoOpAudioProvider(), events, properties,
-                null, "test-player", GUILD_ID, new VoiceChannelStatus(discordClient, GUILD_ID), () -> {});
+                null, null, "test-player", GUILD_ID, new VoiceChannelStatus(discordClient, GUILD_ID), () -> {});
         @SuppressWarnings("unchecked")
         Map<String, AudioPlayer> entries = (Map<String, AudioPlayer>) ReflectionTestUtils.getField(pool, "entries");
         entries.put(GUILD_ID, player);
