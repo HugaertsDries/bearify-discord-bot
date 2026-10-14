@@ -672,6 +672,21 @@ class AudioPlayerTest {
     }
 
     @Test
+    void goesBackWithoutDuplicatingTrackInQueueMode() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        player.play(track("Song C", 200_000));
+        loop(LoopMode.QUEUE);
+
+        finishPlayingTrack();
+        player.previous(new Request("req-1", "@user"));
+        finishPlayingTrack();
+
+        assertThat(playingTitle()).isEqualTo("Song B");
+        assertThat(upcomingTitles()).containsExactly("Song C", "Song A");
+    }
+
+    @Test
     void repeatsSingleTrackInQueueMode() {
         InMemoryTrack song = track("Song A", 120_000);
         engine.play(song);

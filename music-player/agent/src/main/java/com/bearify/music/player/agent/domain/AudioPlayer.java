@@ -15,7 +15,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
@@ -169,8 +171,18 @@ public class AudioPlayer implements AudioProvider {
             return;
         }
         current.ifPresent(track -> queue.addFirst(track.clone()));
+        Track previous = history.pollFirst();
+        if (loopMode == LoopMode.QUEUE) {
+            // the loop already sent this track round to the back, so going back to it must not keep it in the cycle twice
+            for (Iterator<Track> it = queue.descendingIterator(); it.hasNext(); ) {
+                if (Objects.equals(it.next().uri(), previous.uri())) {
+                    it.remove();
+                    break;
+                }
+            }
+        }
         engine.setPaused(false);
-        engine.play(history.pollFirst());
+        engine.play(previous);
         eventDispatcher.dispatch(new MusicPlayerEvent.WentBack(playerId, request, guildId));
     }
 
