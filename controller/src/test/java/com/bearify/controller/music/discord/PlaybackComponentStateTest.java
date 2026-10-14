@@ -22,7 +22,6 @@ class PlaybackComponentStateTest {
                 .upNext(List.of(nextTrack))
                 .artworkUri(URI.create("https://cdn.example/art.png"))
                 .footer("Footer")
-                .paused(true)
                 .build();
 
         assertThat(state.playbackState()).isEqualTo(PlaybackComponentState.PlaybackState.PAUSED);
@@ -33,7 +32,6 @@ class PlaybackComponentStateTest {
         assertThat(state.upNext()).containsExactly(nextTrack);
         assertThat(state.artworkUri()).contains(URI.create("https://cdn.example/art.png"));
         assertThat(state.footerText()).contains("Footer");
-        assertThat(state.paused()).isTrue();
     }
 
     @Test
@@ -49,6 +47,5 @@ class PlaybackComponentStateTest {
         assertThat(state.artworkUri()).isEmpty();
         assertThat(state.upNext()).isEmpty();
         assertThat(state.footerText()).isEmpty();
-        assertThat(state.paused()).isFalse();
     }
 }

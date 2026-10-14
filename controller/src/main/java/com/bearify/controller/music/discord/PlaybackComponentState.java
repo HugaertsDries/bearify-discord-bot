@@ -38,7 +38,6 @@ public final class PlaybackComponentState {
     private final boolean shuffle;
     private final URI artworkUri;
     private final String footer;
-    private final boolean paused;
 
     private PlaybackComponentState(Builder builder) {
         this.playbackState = builder.playbackState;
@@ -53,7 +52,6 @@ public final class PlaybackComponentState {
         this.shuffle = builder.shuffle;
         this.artworkUri = builder.artworkUri;
         this.footer = builder.footerText;
-        this.paused = builder.paused;
     }
 
     public static Builder builder() {
@@ -110,10 +108,6 @@ public final class PlaybackComponentState {
         return Optional.ofNullable(footer).filter(text -> !text.isBlank());
     }
 
-    public boolean paused() {
-        return paused;
-    }
-
     public static final class Builder {
         private PlaybackState playbackState = PlaybackState.PLAYING;
         private Notification notification;
@@ -127,7 +121,6 @@ public final class PlaybackComponentState {
         private boolean shuffle;
         private URI artworkUri;
         private String footerText;
-        private boolean paused;
 
         private Builder() {
         }
@@ -194,11 +187,6 @@ public final class PlaybackComponentState {
 
         public Builder footer(String footerText) {
             this.footerText = footerText;
-            return this;
-        }
-
-        public Builder paused(boolean paused) {
-            this.paused = paused;
             return this;
         }
 

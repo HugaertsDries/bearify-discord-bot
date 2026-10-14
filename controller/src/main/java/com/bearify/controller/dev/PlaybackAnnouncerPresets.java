@@ -31,7 +31,6 @@ public class PlaybackAnnouncerPresets {
                         .volume(40)
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
-                        .paused(true)
                         .build(),
                 PlaybackAnnouncerPreset.JUST_SKIPPED,
                 PlaybackComponentState.builder()
@@ -43,7 +42,6 @@ public class PlaybackAnnouncerPresets {
                         .loopMode(LoopMode.TRACK)
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
-                        .paused(false)
                         .build(),
                 PlaybackAnnouncerPreset.HEAVY_QUEUE,
                 PlaybackComponentState.builder()
@@ -62,7 +60,6 @@ public class PlaybackAnnouncerPresets {
                         .shuffle(true)
                         .artworkUri(URI.create("https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"))
                         .footer(footer)
-                        .paused(false)
                         .build()
         );
     }

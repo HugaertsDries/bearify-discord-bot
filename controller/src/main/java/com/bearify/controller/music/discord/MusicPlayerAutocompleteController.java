@@ -1,5 +1,6 @@
 package com.bearify.controller.music.discord;
 
+import com.bearify.controller.music.discord.MusicPlayerCommandController.PickedTrack;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.TrackCatalogue;
@@ -26,8 +27,6 @@ import static com.bearify.discord.api.interaction.InteractionType.AUTOCOMPLETE;
 @InteractionGroup(value = "player", description = "Player commands")
 public class MusicPlayerAutocompleteController {
 
-    /** Splits a {@code /player remove} suggestion's value into its position and uri prefix. */
-    static final String REMOVE_VALUE_SEPARATOR = "|";
     private static final int LIMIT = 5;
     private static final String SEPARATOR = " • ";
     private static final int MAX_LABEL_LENGTH = 100;
@@ -85,7 +84,7 @@ public class MusicPlayerAutocompleteController {
                     return new Option(
                             PlaybackComponent.truncate(position + ". " + describe(track), MAX_LABEL_LENGTH),
                             // no ellipsis: the bear matches the uri by this prefix
-                            TextCut.cut(position + REMOVE_VALUE_SEPARATOR + Objects.requireNonNullElse(track.uri(), ""), MAX_VALUE_LENGTH));
+                            TextCut.cut(new PickedTrack(position, Objects.requireNonNullElse(track.uri(), "")).value(), MAX_VALUE_LENGTH));
                 })
                 .toList();
         interaction.reply(options);

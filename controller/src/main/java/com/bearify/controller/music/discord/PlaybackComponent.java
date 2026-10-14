@@ -24,8 +24,7 @@ public class PlaybackComponent {
     public static final String PLAYER_PLAY_LABEL = "▶︎";
     public static final String PLAYER_NEXT_LABEL = "▶︎❙";
     public static final String PLAYER_SHOW_QUEUE_LABEL = "Show";
-    public static final String PLAYER_LOOP_OFF_LABEL = "↻";
-    public static final String PLAYER_LOOP_QUEUE_LABEL = "↻";
+    public static final String PLAYER_LOOP_LABEL = "↻";
     public static final String PLAYER_LOOP_TRACK_LABEL = "↻¹";
     private static final int VOLUME_METER_SEGMENTS = 10;
     private static final String ANSI_RESET = "\u001b[0m";
@@ -77,11 +76,11 @@ public class PlaybackComponent {
                 row.secondary("player:shuffle", PLAYER_SHUFFLE_LABEL);
             }
             row.secondary("player:previous", PLAYER_PREVIOUS_LABEL);
-            row.primary("player:pause-play", state.paused() ? PLAYER_PLAY_LABEL : PLAYER_PAUSE_LABEL);
+            row.primary("player:pause-play", state.playbackState() == PlaybackComponentState.PlaybackState.PAUSED ? PLAYER_PLAY_LABEL : PLAYER_PAUSE_LABEL);
             row.secondary("player:next", PLAYER_NEXT_LABEL);
             switch (state.loopMode()) {
-                case OFF -> row.secondary("player:loop", PLAYER_LOOP_OFF_LABEL);
-                case QUEUE -> row.primary("player:loop", PLAYER_LOOP_QUEUE_LABEL);
+                case OFF -> row.secondary("player:loop", PLAYER_LOOP_LABEL);
+                case QUEUE -> row.primary("player:loop", PLAYER_LOOP_LABEL);
                 case TRACK -> row.primary("player:loop", PLAYER_LOOP_TRACK_LABEL);
             }
         }));
@@ -163,8 +162,7 @@ public class PlaybackComponent {
 
     // the queue's length minus what Up Next already shows; unknown when the bear didn't say
     private static Optional<String> moreLength(PlaybackComponentState state) {
-        long shownMs = state.upNext().stream().filter(track -> !track.isLive()).mapToLong(TrackMetadata::durationMs).sum();
-        Duration more = state.queueDuration().minusMillis(shownMs);
+        Duration more = state.queueDuration().minusMillis(TrackMetadata.totalDurationMs(state.upNext()));
         return more.isPositive() ? Optional.of(total(more)) : Optional.empty();
     }
 

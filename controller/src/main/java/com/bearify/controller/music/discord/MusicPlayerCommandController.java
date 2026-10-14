@@ -386,9 +386,11 @@ public class MusicPlayerCommandController {
     }
 
     /** The {@code /player remove} option: a suggestion's {@code <position>|<uri prefix>}, or a position typed by hand. */
-    private record PickedTrack(int position, String uriPrefix) {
+    record PickedTrack(int position, String uriPrefix) {
+        private static final String SEPARATOR = "|";
+
         static Optional<PickedTrack> parse(String value) {
-            int separator = value.indexOf(MusicPlayerAutocompleteController.REMOVE_VALUE_SEPARATOR);
+            int separator = value.indexOf(SEPARATOR);
             String position = separator < 0 ? value.trim() : value.substring(0, separator);
             String uriPrefix = separator < 0 ? "" : value.substring(separator + 1);
             try {
@@ -397,6 +399,10 @@ public class MusicPlayerCommandController {
             } catch (NumberFormatException e) {
                 return Optional.empty();
             }
+        }
+
+        String value() {
+            return position + SEPARATOR + uriPrefix;
         }
     }
 }

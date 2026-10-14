@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -61,6 +62,11 @@ public final class TrackMetadata {
     @JsonIgnore
     public boolean isLive() {
         return durationMs == Long.MAX_VALUE;
+    }
+
+    /** How long these tracks play together; live streams have no length to add. */
+    public static long totalDurationMs(List<TrackMetadata> tracks) {
+        return tracks.stream().filter(track -> !track.isLive()).mapToLong(TrackMetadata::durationMs).sum();
     }
 
     @JsonIgnore

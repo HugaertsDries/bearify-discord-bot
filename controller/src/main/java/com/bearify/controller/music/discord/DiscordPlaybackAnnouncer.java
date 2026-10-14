@@ -326,7 +326,6 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
                 .shuffle(currentShuffle)
                 .artworkUri(artworkUrlResolver.resolve(currentTrack).orElse(null))
                 .footer(properties.footer())
-                .paused(playbackState == PlaybackComponentState.PlaybackState.PAUSED)
                 .build();
     }
 

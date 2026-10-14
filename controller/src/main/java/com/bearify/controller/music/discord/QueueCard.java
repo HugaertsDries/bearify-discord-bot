@@ -91,9 +91,8 @@ final class QueueCard {
 
     private static String footer(List<TrackMetadata> tracks) {
         String count = tracks.size() == 1 ? "1 track" : tracks.size() + " tracks";
-        List<Long> known = tracks.stream().filter(track -> !track.isLive()).map(TrackMetadata::durationMs).toList();
-        // live streams have no length to add up
-        String total = known.isEmpty() ? "" : " · " + PlaybackComponent.total(Duration.ofMillis(known.stream().mapToLong(Long::longValue).sum()));
+        long totalMs = TrackMetadata.totalDurationMs(tracks);
+        String total = totalMs == 0 ? "" : " · " + PlaybackComponent.total(Duration.ofMillis(totalMs));
         return "-# " + count + total;
     }
 }

@@ -10,7 +10,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -22,7 +21,6 @@ public class HttpSpotifyPageFetcher implements SpotifyPageFetcher {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpSpotifyPageFetcher.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
-    private static final Set<String> SPOTIFY_HOSTS = Set.of("open.spotify.com", "spotify.link");
     private static final int MAX_REDIRECTS = 5;
     // a track page is about 300 KB and the og tags sit in its <head>
     private static final long MAX_BODY_BYTES = 1024 * 1024;
@@ -46,7 +44,7 @@ public class HttpSpotifyPageFetcher implements SpotifyPageFetcher {
     }
 
     static boolean isSpotify(URI uri) {
-        return "https".equals(uri.getScheme()) && SPOTIFY_HOSTS.contains(uri.getHost());
+        return SpotifyLinkResolver.isSpotifyLink(uri.toString());
     }
 
     @Override

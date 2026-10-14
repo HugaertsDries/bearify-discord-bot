@@ -75,7 +75,7 @@ class DiscordPlaybackAnnouncerTest {
                 PLAYER_PREVIOUS_LABEL,
                 PLAYER_PAUSE_LABEL,
                 PLAYER_NEXT_LABEL,
-                PLAYER_LOOP_OFF_LABEL
+                PLAYER_LOOP_LABEL
         );
     }
 
@@ -94,7 +94,7 @@ class DiscordPlaybackAnnouncerTest {
                 PLAYER_PREVIOUS_LABEL,
                 PLAYER_PLAY_LABEL,
                 PLAYER_NEXT_LABEL,
-                PLAYER_LOOP_OFF_LABEL
+                PLAYER_LOOP_LABEL
         );
     }
 
@@ -114,7 +114,7 @@ class DiscordPlaybackAnnouncerTest {
                 PLAYER_PREVIOUS_LABEL,
                 PLAYER_PAUSE_LABEL,
                 PLAYER_NEXT_LABEL,
-                PLAYER_LOOP_OFF_LABEL
+                PLAYER_LOOP_LABEL
         );
     }
 
@@ -172,7 +172,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.LoopModeChanged("player-1", new Request("req-2", "@other"), "guild-1", LoopMode.QUEUE));
 
         assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@other looped the queue"));
-        assertThat(loopButtonLabel(updated.get())).contains(PLAYER_LOOP_QUEUE_LABEL);
+        assertThat(loopButtonLabel(updated.get())).contains(PLAYER_LOOP_LABEL);
     }
 
     @Test

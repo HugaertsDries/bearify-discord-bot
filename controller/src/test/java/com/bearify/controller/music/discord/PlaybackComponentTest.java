@@ -249,8 +249,7 @@ class PlaybackComponentTest {
                 .requesterTag("@user")
                 .upNext(List.of(new TrackMetadata("Next", "Artist 2", "https://example.com/next", 120_000)))
                 .artworkUri(URI.create("https://cdn.example/art.png"))
-                .footer("Footer")
-                .paused(false);
+                .footer("Footer");
     }
 
     private static List<String> texts(ComponentMessage message) {
