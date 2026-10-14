@@ -409,7 +409,7 @@ public class AudioPlayer implements AudioProvider {
         public void onTrackEnd(Track track, boolean mayStartNext) {
             if (!mayStartNext) return;
             // shortcut: LavaPlayer can't decode some Twitch streams and reports them finished before any sound, so say so instead of ending silently
-            if (track.toMetadata().isLive() && track.position() == 0) {
+            if (!lastTrackWasError && track.toMetadata().isLive() && track.position() == 0) {
                 onTrackError(track, "live stream ended before any sound");
             }
             boolean wasError = lastTrackWasError;

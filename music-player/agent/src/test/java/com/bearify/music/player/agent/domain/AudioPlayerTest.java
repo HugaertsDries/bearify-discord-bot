@@ -333,6 +333,17 @@ class AudioPlayerTest {
     }
 
     @Test
+    void reportsLiveStreamThatFailsToStartOnce() {
+        InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
+        engine.play(stream);
+
+        engine.triggerOnTrackError(stream);
+        engine.triggerOnTrackEnd(stream);
+
+        assertThat(eventDispatcher.getEvents()).filteredOn(MusicPlayerEvent.TrackError.class::isInstance).hasSize(1);
+    }
+
+    @Test
     void endsLiveStreamThatPlayedAWhileWithoutError() {
         InMemoryTrack stream = track("Stream", Long.MAX_VALUE);
         engine.play(stream);
