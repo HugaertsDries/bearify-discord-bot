@@ -27,11 +27,7 @@ public class HttpSpotifyPageFetcher implements SpotifyPageFetcher {
     // a track page is about 300 KB and the og tags sit in its <head>
     private static final long MAX_BODY_BYTES = 1024 * 1024;
 
-    // redirects are followed by hand, so a short link can only lead to another Spotify page
-    private final HttpClient client = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(TIMEOUT)
-            .build();
+    private final HttpClient client;
     private final Predicate<URI> allowed;
     private final Duration timeout;
 
@@ -40,6 +36,11 @@ public class HttpSpotifyPageFetcher implements SpotifyPageFetcher {
     }
 
     HttpSpotifyPageFetcher(Predicate<URI> allowed, Duration timeout) {
+        // redirects are followed by hand, so a short link can only lead to another Spotify page
+        this.client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(timeout)
+                .build();
         this.allowed = allowed;
         this.timeout = timeout;
     }
