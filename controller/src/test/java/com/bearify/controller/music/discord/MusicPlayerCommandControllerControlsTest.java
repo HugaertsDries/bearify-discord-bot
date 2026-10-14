@@ -1,9 +1,9 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.AbstractControllerIntegrationTest;
-import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
-import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.domain.NoOpMusicPlayer;
+import com.bearify.controller.music.domain.SinglePlayerPool;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.controller.music.spotify.SpotifyLinkResolver;
 import com.bearify.discord.spring.CommandRegistry;
@@ -14,7 +14,6 @@ import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.events.MusicPlayerInteraction;
 import com.bearify.music.player.bridge.model.Request;
 import com.bearify.music.player.bridge.model.TrackMetadata;
-import com.bearify.music.player.bridge.model.TrackRequest;
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +23,6 @@ import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
@@ -767,47 +765,12 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
                 .build();
     }
 
-    private record SinglePlayerPool(MusicPlayer player) implements MusicPlayerPool {
-        @Override public MusicPlayer acquire(String guildId, String voiceChannelId) { return player; }
-        @Override public Optional<MusicPlayer> find(String guildId, String voiceChannelId) { return Optional.of(player); }
-        @Override public boolean hasActiveSessionFor(String guildId) { return true; }
-    }
-
-    private static final class FailingMusicPlayer implements MusicPlayer {
-        @Override public void join(MusicPlayerEventListener handler) {}
-        @Override public void stop(MusicPlayerEventListener handler) {}
-        @Override public void play(TrackRequest request, MusicPlayerEventListener handler) {}
+    private static final class FailingMusicPlayer extends NoOpMusicPlayer {
         @Override public void togglePause(String requesterTag, MusicPlayerEventListener handler) { handler.onFailed(FAILURE_REASON); }
-        @Override public void previous(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void next(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
-        @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {}
     }
 
-    private static final class TimingOutMusicPlayer implements MusicPlayer {
-        @Override public void join(MusicPlayerEventListener handler) {}
-        @Override public void stop(MusicPlayerEventListener handler) {}
-        @Override public void play(TrackRequest request, MusicPlayerEventListener handler) {}
+    private static final class TimingOutMusicPlayer extends NoOpMusicPlayer {
         @Override public void togglePause(String requesterTag, MusicPlayerEventListener handler) { handler.onTimedOut(); }
-        @Override public void previous(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void next(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void rewind(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void forward(Duration seek, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void clear(String requesterTag, MusicPlayerEventListener handler) {}
         @Override public void setVolume(int volume, String requesterTag, MusicPlayerEventListener handler) { handler.onTimedOut(); }
-        @Override public void cycleLoop(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public Optional<MusicPlayerEvent> queue() { return Optional.empty(); }
-        @Override public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void shuffle(String requesterTag, MusicPlayerEventListener handler) {}
-        @Override public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {}
     }
 }

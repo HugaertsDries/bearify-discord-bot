@@ -3,10 +3,10 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
+import com.bearify.controller.music.domain.NoOpMusicPlayer;
 import com.bearify.discord.api.message.TextBlock;
 import com.bearify.discord.testing.MockButtonInteraction;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
-import com.bearify.music.player.bridge.model.LoopMode;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import org.junit.jupiter.api.Test;
 
@@ -254,7 +254,7 @@ class MusicPlayerButtonControllerTest {
         }
     }
 
-    private static final class RecordingMusicPlayer implements MusicPlayer {
+    private static final class RecordingMusicPlayer extends NoOpMusicPlayer {
         private String togglePauseRequester;
         private String previousRequester;
         private String nextRequester;
@@ -266,18 +266,6 @@ class MusicPlayerButtonControllerTest {
         /** How the player answers every request, as the agent's reply would. */
         private void answerWith(Consumer<MusicPlayerEventListener> answer) {
             this.answer = answer;
-        }
-
-        @Override
-        public void join(MusicPlayerEventListener handler) {
-        }
-
-        @Override
-        public void stop(MusicPlayerEventListener handler) {
-        }
-
-        @Override
-        public void play(com.bearify.music.player.bridge.model.TrackRequest request, MusicPlayerEventListener handler) {
         }
 
         @Override
@@ -326,24 +314,8 @@ class MusicPlayerButtonControllerTest {
         }
 
         @Override
-        public void setLoop(LoopMode mode, String requesterTag, MusicPlayerEventListener handler) {
-        }
-
-        @Override
         public Optional<MusicPlayerEvent> queue() {
             return queue;
-        }
-
-        @Override
-        public void remove(int position, String uriPrefix, String requesterTag, MusicPlayerEventListener handler) {
-        }
-
-        @Override
-        public void shuffle(String requesterTag, MusicPlayerEventListener handler) {
-        }
-
-        @Override
-        public void jump(Duration position, String requesterTag, MusicPlayerEventListener handler) {
         }
     }
 }
