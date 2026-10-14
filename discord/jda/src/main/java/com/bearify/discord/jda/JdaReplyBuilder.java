@@ -2,12 +2,10 @@ package com.bearify.discord.jda;
 
 import com.bearify.discord.api.interaction.ReplyBuilder;
 import com.bearify.discord.api.message.ComponentMessage;
-import net.dv8tion.jda.api.components.MessageTopLevelComponent;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
-import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 import net.dv8tion.jda.api.utils.FileUpload;
 import org.slf4j.Logger;
@@ -38,12 +36,7 @@ class JdaReplyBuilder implements ReplyBuilder {
     }
 
     JdaReplyBuilder(IReplyCallback event, ComponentMessage message, Optional<JdaEditableMessage> deferredReply, Optional<Duration> deleteAfter) {
-        this(event, components(message), deferredReply, deleteAfter);
-    }
-
-    private static Components components(ComponentMessage message) {
-        ComponentMessageMapper mapper = new ComponentMessageMapper();
-        return new Components(mapper.toJdaComponents(message), mapper.filesFor(message));
+        this(event, new Components(message), deferredReply, deleteAfter);
     }
 
     private JdaReplyBuilder(IReplyCallback event, Content content, Optional<JdaEditableMessage> deferredReply, Optional<Duration> deleteAfter) {
@@ -74,9 +67,15 @@ class JdaReplyBuilder implements ReplyBuilder {
             if (kept) {
                 deferred.keep();
             }
-            content.editOriginal(event.getHook())
-                    .queue(edited -> deferred.deleteLater(),
-                            failure -> LOG.warn("Failed to edit deferred reply: {}", failure.getMessage(), failure));
+            // through the deferred message, so an answer that comes after it deleted itself is posted afresh
+            try {
+                switch (content) {
+                    case Text text -> deferred.edit(text.message());
+                    case Components components -> deferred.edit(components.message());
+                }
+            } catch (RuntimeException e) {
+                LOG.warn("Failed to edit deferred reply: {}", e.getMessage(), e);
+            }
         } else if (event.isAcknowledged()) {
             InteractionHook hook = event.getHook();
             // after a button's acknowledge() the original is the message holding the button, so only the follow-up goes
@@ -96,19 +95,12 @@ class JdaReplyBuilder implements ReplyBuilder {
 
     /** What the reply carries: plain text, or a Components V2 message. */
     private sealed interface Content {
-        WebhookMessageEditAction<Message> editOriginal(InteractionHook hook);
-
         WebhookMessageCreateAction<Message> followUp(InteractionHook hook);
 
         ReplyCallbackAction reply(IReplyCallback event);
     }
 
     private record Text(String message) implements Content {
-        @Override
-        public WebhookMessageEditAction<Message> editOriginal(InteractionHook hook) {
-            return hook.editOriginal(message);
-        }
-
         @Override
         public WebhookMessageCreateAction<Message> followUp(InteractionHook hook) {
             return hook.sendMessage(message);
@@ -120,22 +112,21 @@ class JdaReplyBuilder implements ReplyBuilder {
         }
     }
 
-    private record Components(List<MessageTopLevelComponent> components, List<FileUpload> files) implements Content {
-        @Override
-        public WebhookMessageEditAction<Message> editOriginal(InteractionHook hook) {
-            // replaces the attachments, so the "thinking…" message ends up with exactly the files this message needs
-            return hook.editOriginalComponents(components).useComponentsV2().setFiles(files);
-        }
-
+    /** Maps the message for each request, since a sent file upload can't be sent again. */
+    private record Components(ComponentMessage message) implements Content {
         @Override
         public WebhookMessageCreateAction<Message> followUp(InteractionHook hook) {
-            WebhookMessageCreateAction<Message> followUp = hook.sendMessageComponents(components).useComponentsV2();
+            ComponentMessageMapper mapper = new ComponentMessageMapper();
+            List<FileUpload> files = mapper.filesFor(message);
+            WebhookMessageCreateAction<Message> followUp = hook.sendMessageComponents(mapper.toJdaComponents(message)).useComponentsV2();
             return files.isEmpty() ? followUp : followUp.addFiles(files);
         }
 
         @Override
         public ReplyCallbackAction reply(IReplyCallback event) {
-            ReplyCallbackAction reply = event.replyComponents(components).useComponentsV2();
+            ComponentMessageMapper mapper = new ComponentMessageMapper();
+            List<FileUpload> files = mapper.filesFor(message);
+            ReplyCallbackAction reply = event.replyComponents(mapper.toJdaComponents(message)).useComponentsV2();
             return files.isEmpty() ? reply : reply.addFiles(files);
         }
     }

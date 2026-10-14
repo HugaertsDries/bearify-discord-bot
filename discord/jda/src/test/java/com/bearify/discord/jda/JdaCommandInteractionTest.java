@@ -49,7 +49,7 @@ class JdaCommandInteractionTest {
         interaction.defer(true);
         interaction.reply(MESSAGE).ephemeral().send();
 
-        verify(edit).queue(any(), any());
+        verify(edit).complete();
         verify(hook, never()).sendMessage(anyString());
     }
 

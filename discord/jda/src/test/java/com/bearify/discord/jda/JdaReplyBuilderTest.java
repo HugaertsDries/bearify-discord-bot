@@ -2,6 +2,8 @@ package com.bearify.discord.jda;
 
 import com.bearify.discord.api.message.ComponentMessage;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import net.dv8tion.jda.api.requests.ErrorResponse;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.requests.RestAction;
@@ -75,7 +77,7 @@ class JdaReplyBuilderTest {
 
         new JdaReplyBuilder(event, MESSAGE, deferred(hook, Optional.empty()), Optional.empty()).ephemeral().send();
 
-        verify(edit).queue(any(), any());
+        verify(edit).complete();
         verify(hook, never()).sendMessage(anyString());
         verify(event, never()).reply(anyString());
     }
@@ -116,7 +118,7 @@ class JdaReplyBuilderTest {
         new JdaReplyBuilder(event, CARD, deferred(hook, Optional.empty()), Optional.empty()).ephemeral().send();
 
         verify(edit).useComponentsV2();
-        verify(edit).queue(any(), any());
+        verify(edit).complete();
         verify(hook, never()).sendMessageComponents(anyCollection());
     }
 
@@ -195,6 +197,26 @@ class JdaReplyBuilderTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void repostsDeferredReplyThatAlreadyDeletedItself() {
+        IReplyCallback event = mock(IReplyCallback.class);
+        InteractionHook hook = mock(InteractionHook.class);
+        WebhookMessageEditAction<Message> edit = mock(WebhookMessageEditAction.class);
+        ErrorResponseException gone = mock(ErrorResponseException.class);
+        when(gone.getErrorResponse()).thenReturn(ErrorResponse.UNKNOWN_MESSAGE);
+        when(hook.editOriginal(MESSAGE)).thenReturn(edit);
+        when(edit.complete()).thenThrow(gone);
+        WebhookMessageCreateAction<Message> repost = mock(WebhookMessageCreateAction.class);
+        when(hook.sendMessage(MESSAGE)).thenReturn(repost);
+        when(repost.setEphemeral(true)).thenReturn(repost);
+        when(repost.complete()).thenReturn(mock(Message.class));
+
+        new JdaReplyBuilder(event, MESSAGE, deferred(hook, Optional.empty()), Optional.empty()).ephemeral().send();
+
+        verify(repost).complete();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void deletesEditedEphemeralDeferredReplyAfterTheDelay() {
         IReplyCallback event = mock(IReplyCallback.class);
         InteractionHook hook = mock(InteractionHook.class);
@@ -206,7 +228,6 @@ class JdaReplyBuilderTest {
         doReturn(mock(ScheduledFuture.class)).when(delete).queueAfter(anyLong(), any(TimeUnit.class), isNull(), any(Consumer.class));
 
         new JdaReplyBuilder(event, MESSAGE, deferred(hook, Optional.of(DELETE_AFTER)), Optional.of(DELETE_AFTER)).ephemeral().send();
-        sent(edit).accept(mock(Message.class));
 
         verify(delete).queueAfter(eq(DELETE_AFTER.toMillis()), eq(TimeUnit.MILLISECONDS), isNull(), any(Consumer.class));
     }
@@ -238,7 +259,6 @@ class JdaReplyBuilderTest {
         when(hook.editOriginal(MESSAGE)).thenReturn(edit);
 
         new JdaReplyBuilder(event, MESSAGE, deferred(hook, Optional.of(DELETE_AFTER)), Optional.of(DELETE_AFTER)).keep().send();
-        sent(edit).accept(mock(Message.class));
 
         verify(hook, never()).deleteOriginal();
     }
@@ -268,7 +288,6 @@ class JdaReplyBuilderTest {
 
         // a public defer carries no delay, whatever the reply builder is told
         new JdaReplyBuilder(event, MESSAGE, deferred(hook, Optional.empty()), Optional.of(DELETE_AFTER)).ephemeral().send();
-        sent(edit).accept(mock(Message.class));
 
         verify(hook, never()).deleteOriginal();
     }
