@@ -319,7 +319,7 @@ class MusicPlayerInteractionIntegrationTest extends AbstractControllerIntegratio
         Awaitility.await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             MockDiscordClient discord = discordClientFactory.getLastCreated().orElseThrow();
             assertThat(discord.sentComponents("text-1")).hasSize(1);
-            assertThat(allTexts(discord.sentComponents("text-1").getFirst())).anyMatch(text -> text.contains("Skipped by @user"));
+            assertThat(allTexts(discord.sentComponents("text-1").getFirst())).anyMatch(text -> text.contains("@user skipped the track"));
         });
     }
 

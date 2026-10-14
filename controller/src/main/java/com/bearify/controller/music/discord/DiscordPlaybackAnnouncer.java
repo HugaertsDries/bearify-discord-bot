@@ -84,11 +84,11 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
             case MusicPlayerEvent.Resumed resumed -> updatePlaybackState(PlaybackComponentState.PlaybackState.PLAYING, false);
             case MusicPlayerEvent.AutoPaused ignored -> updatePlaybackState(PlaybackComponentState.PlaybackState.PAUSED, true);
             case MusicPlayerEvent.AutoResumed autoResumed -> updatePlaybackState(PlaybackComponentState.PlaybackState.PLAYING, false);
-            case MusicPlayerEvent.Skipped skipped -> notify("Skipped by " + skipped.request().requesterTag());
-            case MusicPlayerEvent.WentBack wentBack -> notify("Jumped back by " + wentBack.request().requesterTag());
-            case MusicPlayerEvent.Restarted restarted -> notify("Restarted by " + restarted.request().requesterTag());
-            case MusicPlayerEvent.Rewound rewound -> notify("Rewound by " + rewound.request().requesterTag());
-            case MusicPlayerEvent.Forwarded forwarded -> notify("Forwarded by " + forwarded.request().requesterTag());
+            case MusicPlayerEvent.Skipped skipped -> notify(skipped.request().requesterTag() + " skipped the track");
+            case MusicPlayerEvent.WentBack wentBack -> notify(wentBack.request().requesterTag() + " went back a track");
+            case MusicPlayerEvent.Restarted restarted -> notify(restarted.request().requesterTag() + " restarted the track");
+            case MusicPlayerEvent.Rewound rewound -> notify(rewound.request().requesterTag() + " rewound " + PlaybackComponent.humanReadable(Duration.ofMillis(rewound.seekMs())));
+            case MusicPlayerEvent.Forwarded forwarded -> notify(forwarded.request().requesterTag() + " skipped ahead " + PlaybackComponent.humanReadable(Duration.ofMillis(forwarded.seekMs())));
             case MusicPlayerEvent.Jumped jumped -> notify(jumped.request().requesterTag() + " jumped to " + PlaybackComponent.humanReadable(Duration.ofMillis(jumped.positionMs())));
             case MusicPlayerEvent.Cleared cleared -> onCleared(cleared);
             case MusicPlayerEvent.Removed removed -> onRemoved(removed);
@@ -147,14 +147,14 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         currentUpNext = event.upNext();
         currentQueueSize = event.upNext().size();
         currentQueueDuration = Duration.ZERO;
-        notify("Queue cleared by " + event.request().requesterTag());
+        notify(event.request().requesterTag() + " cleared the queue");
     }
 
     private void onRemoved(MusicPlayerEvent.Removed event) {
         currentUpNext = event.upNext();
         currentQueueSize = event.queueSize();
         currentQueueDuration = Duration.ofMillis(event.queueDurationMs());
-        notify("Removed by " + event.request().requesterTag());
+        notify(event.request().requesterTag() + " removed **" + PlaybackComponent.escaped(PlaybackComponent.truncate(event.track().title(), 50)) + "**");
     }
 
     private void onShuffled(MusicPlayerEvent.Shuffled event) {
@@ -164,22 +164,26 @@ public class DiscordPlaybackAnnouncer implements MusicPlayerEventConsumer {
         currentUpNext = event.upNext();
         currentQueueSize = event.count();
         // same tracks in a new order, so the queue's duration stays as it was
-        notify("Shuffled by " + event.request().requesterTag());
+        notify(event.request().requesterTag() + " shuffled the queue");
     }
 
     private void onVolumeChanged(MusicPlayerEvent.VolumeChanged event) {
         currentVolume = event.volume();
-        notify("Volume set to " + event.volume() + "% by " + event.request().requesterTag());
+        notify(event.request().requesterTag() + " set the volume to " + event.volume() + "%");
     }
 
     private void onLoopModeChanged(MusicPlayerEvent.LoopModeChanged event) {
         currentLoopMode = event.mode();
-        String label = switch (event.mode()) {
-            case OFF -> "Loop off";
-            case QUEUE -> "Looping the queue";
-            case TRACK -> "Looping this track";
+        notify(event.request().requesterTag() + " " + loopAction(event.mode()));
+    }
+
+    /** What someone did to the loop, said after their name. */
+    static String loopAction(LoopMode mode) {
+        return switch (mode) {
+            case OFF -> "turned looping off";
+            case QUEUE -> "looped the queue";
+            case TRACK -> "put this track on repeat";
         };
-        notify(label + " by " + event.request().requesterTag());
     }
 
     private void updatePlaybackState(PlaybackComponentState.PlaybackState state, boolean autoPaused) {

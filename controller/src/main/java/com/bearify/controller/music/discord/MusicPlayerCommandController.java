@@ -453,7 +453,7 @@ public class MusicPlayerCommandController {
     }
 
     private static String removedMessage(TrackMetadata track) {
-        return BearifyEmoji.TRASH + " | Removed **" + track.title() + "** from the queue.";
+        return BearifyEmoji.TRASH + " | Removed **" + PlaybackComponent.escaped(track.title()) + "** from the queue.";
     }
 
     private static String shuffledMessage(int count) {
@@ -461,11 +461,7 @@ public class MusicPlayerCommandController {
     }
 
     private static String loopMessage(LoopMode mode) {
-        return BearifyEmoji.REPEAT + switch (mode) {
-            case OFF -> " | Loop off.";
-            case QUEUE -> " | Looping the queue.";
-            case TRACK -> " | Looping this track.";
-        };
+        return BearifyEmoji.REPEAT + " | You " + DiscordPlaybackAnnouncer.loopAction(mode) + ".";
     }
 
     private static String volumeMessage(int volume) {

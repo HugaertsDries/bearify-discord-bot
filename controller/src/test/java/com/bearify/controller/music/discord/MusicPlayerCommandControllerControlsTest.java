@@ -53,7 +53,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String PICK_A_TRACK_MESSAGE = "🛑️ | Pick a track from the list so I know which one to drop.";
     private static final String SHUFFLED_MESSAGE = "🔀 | Shuffled 12 tracks. Chaos, bear-style.";
     private static final String NOTHING_TO_SHUFFLE_MESSAGE = "🍯 | The queue is empty, nothing to shuffle.";
-    private static final String LOOP_QUEUE_MESSAGE = "🔁 | Looping the queue.";
+    private static final String LOOP_QUEUE_MESSAGE = "🔁 | You looped the queue.";
     private static final String LOOP_MODE_MESSAGE = "🛑️ | Pick a loop mode: `off`, `queue` or `track`.";
     private static final String VOLUME_SET_MESSAGE = "🔊 | Volume set to 40%. Only too loud for you? Right-click the bear → User Volume.";
     private static final String VOLUME_OUT_OF_RANGE_MESSAGE = "🛑️ | Volume goes from 0 to 100, bear with me.";

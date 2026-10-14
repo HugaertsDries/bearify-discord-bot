@@ -122,7 +122,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Skipped by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user skipped the track"));
     }
 
     @Test
@@ -133,7 +133,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.WentBack("player-1", new Request("req-2", "@user"), "guild-1"));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Jumped back by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user went back a track"));
     }
 
     @Test
@@ -144,7 +144,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.Restarted("player-1", new Request("req-2", "@user"), "guild-1"));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Restarted by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user restarted the track"));
     }
 
     @Test
@@ -155,7 +155,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.VolumeChanged("player-1", new Request("req-2", "@other"), "guild-1", 40));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Volume set to 40% by @other"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@other set the volume to 40%"));
         assertThat(allTexts(updated.get())).anyMatch(text -> text.replaceAll("\u001b\\[[0-9;]*m", "").contains("▮▮▮▮▯▯▯▯▯▯  40"));
     }
 
@@ -167,7 +167,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(trackStart("player-1"));
         announcer.accept(new MusicPlayerEvent.LoopModeChanged("player-1", new Request("req-2", "@other"), "guild-1", LoopMode.QUEUE));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Looping the queue by @other"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@other looped the queue"));
         assertThat(loopButtonLabel(updated.get())).contains(PLAYER_LOOP_QUEUE_LABEL);
     }
 
@@ -213,8 +213,8 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.Skipped("player-1", new Request("req-2", "@user"), "guild-1"));
         announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-3", "@other"), "guild-1", List.of()));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Queue cleared by @other"));
-        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Skipped by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@other cleared the queue"));
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("@user skipped the track"));
     }
 
     @Test
@@ -228,7 +228,7 @@ class DiscordPlaybackAnnouncerTest {
         Awaitility.await().atMost(Duration.ofSeconds(1)).untilAsserted(() ->
                 assertThat(updated.get()).isNotNull());
         Awaitility.await().atMost(Duration.ofSeconds(1)).untilAsserted(() ->
-                assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Forwarded by @user")));
+                assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("@user skipped ahead 30s")));
     }
 
     @Test
@@ -246,7 +246,7 @@ class DiscordPlaybackAnnouncerTest {
 
         // Give the stale clear time to run now that the lock is free
         Thread.sleep(100);
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Forwarded by @other"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@other skipped ahead 30s"));
     }
 
     @Test
@@ -262,7 +262,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.Forwarded("player-1", new Request("req-2", "@user"), "guild-1", 30_000));
 
         Awaitility.await().atMost(Duration.ofSeconds(1)).untilAsserted(() ->
-                assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Forwarded by @user")));
+                assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("@user skipped ahead 30s")));
         assertThat(updatingThread.get().isVirtual()).isTrue();
     }
 
@@ -366,7 +366,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.Cleared("player-1", new Request("req-2", "@user"), "guild-1", List.of()));
 
         assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("**Up Next**"));
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Queue cleared by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user cleared the queue"));
     }
 
     @Test
@@ -383,9 +383,9 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.Removed("player-1", new Request("req-3", "@user"), "guild-1", two,
                 List.of(one, three, four), 6, 840_000L));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Removed by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user removed **Two**"));
         assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Four"));
-        assertThat(allTexts(updated.get())).noneMatch(text -> text.contains("Two"));
+        assertThat(allTexts(updated.get())).noneMatch(text -> text.startsWith("Two\n"));
         assertThat(allTexts(updated.get())).contains("-# +3 more on the trail · 11m 00s");
     }
 
@@ -402,7 +402,7 @@ class DiscordPlaybackAnnouncerTest {
         announcer.accept(new MusicPlayerEvent.QueueUpdated("player-1", "req-2", "guild-1", List.of(one, two, three), 7, 900_000L));
         announcer.accept(new MusicPlayerEvent.Shuffled("player-1", new Request("req-3", "@user"), "guild-1", 7, List.of(five, one, three)));
 
-        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Shuffled by @user"));
+        assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("@user shuffled the queue"));
         assertThat(allTexts(updated.get())).anyMatch(text -> text.contains("Five"));
         assertThat(allTexts(updated.get())).contains("-# +4 more on the trail · 12m 00s");
     }
