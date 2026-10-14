@@ -8,6 +8,7 @@ import com.bearify.music.player.bridge.model.TrackMetadata;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,62 +50,42 @@ public class MusicPlayerInteractionDispatcher {
             case MusicPlayerInteraction.Play play ->
                     loadAndPlay(play);
             case MusicPlayerInteraction.TogglePause p ->
-                    pool.get(p.guildId()).ifPresentOrElse(
-                            player -> player.togglePause(p.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, p.requestId(), p.guildId())));
+                    withPlayer(p.guildId(), p.requestId(), player -> player.togglePause(p.request()));
             case MusicPlayerInteraction.Next n ->
-                    pool.get(n.guildId()).ifPresentOrElse(
-                            player -> player.next(n.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, n.requestId(), n.guildId())));
+                    withPlayer(n.guildId(), n.requestId(), player -> player.next(n.request()));
             case MusicPlayerInteraction.Previous p ->
-                    pool.get(p.guildId()).ifPresentOrElse(
-                            player -> player.previous(p.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, p.requestId(), p.guildId())));
+                    withPlayer(p.guildId(), p.requestId(), player -> player.previous(p.request()));
             case MusicPlayerInteraction.Rewind r ->
-                    pool.get(r.guildId()).ifPresentOrElse(
-                            player -> player.rewind(Duration.ofMillis(r.seekMs()), r.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, r.requestId(), r.guildId())));
+                    withPlayer(r.guildId(), r.requestId(), player -> player.rewind(Duration.ofMillis(r.seekMs()), r.request()));
             case MusicPlayerInteraction.Forward f ->
-                    pool.get(f.guildId()).ifPresentOrElse(
-                            player -> player.forward(Duration.ofMillis(f.seekMs()), f.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, f.requestId(), f.guildId())));
+                    withPlayer(f.guildId(), f.requestId(), player -> player.forward(Duration.ofMillis(f.seekMs()), f.request()));
             case MusicPlayerInteraction.Clear c ->
-                    pool.get(c.guildId()).ifPresentOrElse(
-                            player -> player.clear(c.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, c.requestId(), c.guildId())));
+                    withPlayer(c.guildId(), c.requestId(), player -> player.clear(c.request()));
             case MusicPlayerInteraction.Search search ->
                     search(search);
             case MusicPlayerInteraction.HealthCheck check ->
                     healthProbe.run(check.requestId());
             case MusicPlayerInteraction.QueueRequest q ->
-                    pool.get(q.guildId()).ifPresentOrElse(
-                            player -> player.snapshot(q.requestId()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, q.requestId(), q.guildId())));
+                    withPlayer(q.guildId(), q.requestId(), player -> player.snapshot(q.requestId()));
             case MusicPlayerInteraction.Remove r ->
-                    pool.get(r.guildId()).ifPresentOrElse(
-                            player -> player.remove(r.position(), r.uriPrefix(), r.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, r.requestId(), r.guildId())));
+                    withPlayer(r.guildId(), r.requestId(), player -> player.remove(r.position(), r.uriPrefix(), r.request()));
             case MusicPlayerInteraction.Shuffle s ->
-                    pool.get(s.guildId()).ifPresentOrElse(
-                            player -> player.shuffle(s.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, s.requestId(), s.guildId())));
+                    withPlayer(s.guildId(), s.requestId(), player -> player.shuffle(s.request()));
             case MusicPlayerInteraction.SetVolume v ->
-                    pool.get(v.guildId()).ifPresentOrElse(
-                            player -> player.setVolume(v.volume(), v.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, v.requestId(), v.guildId())));
+                    withPlayer(v.guildId(), v.requestId(), player -> player.setVolume(v.volume(), v.request()));
             case MusicPlayerInteraction.CycleLoop l ->
-                    pool.get(l.guildId()).ifPresentOrElse(
-                            player -> player.cycleLoop(l.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, l.requestId(), l.guildId())));
+                    withPlayer(l.guildId(), l.requestId(), player -> player.cycleLoop(l.request()));
             case MusicPlayerInteraction.SetLoop l ->
-                    pool.get(l.guildId()).ifPresentOrElse(
-                            player -> player.setLoop(l.mode(), l.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, l.requestId(), l.guildId())));
+                    withPlayer(l.guildId(), l.requestId(), player -> player.setLoop(l.mode(), l.request()));
             case MusicPlayerInteraction.Jump j ->
-                    pool.get(j.guildId()).ifPresentOrElse(
-                            player -> player.jump(Duration.ofMillis(j.positionMs()), j.request()),
-                            () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, j.requestId(), j.guildId())));
+                    withPlayer(j.guildId(), j.requestId(), player -> player.jump(Duration.ofMillis(j.positionMs()), j.request()));
         }
+    }
+
+    // a guild without a player still answers, so the controller isn't left waiting
+    private void withPlayer(String guildId, String requestId, Consumer<AudioPlayer> action) {
+        pool.get(guildId).ifPresentOrElse(action,
+                () -> eventDispatcher.dispatch(new MusicPlayerEvent.PlayerNotFound(playerId, requestId, guildId)));
     }
 
     private void loadAndPlay(MusicPlayerInteraction.Play play) {

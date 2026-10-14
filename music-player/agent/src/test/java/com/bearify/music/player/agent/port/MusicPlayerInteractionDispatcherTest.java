@@ -17,6 +17,8 @@ import com.bearify.music.player.bridge.model.StopReason;
 import com.bearify.music.player.bridge.model.TrackMetadata;
 import com.bearify.music.player.bridge.model.TrackRequest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import com.bearify.music.player.agent.port.MusicPlayerEventDispatcher;
 
 import java.time.Duration;
@@ -25,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -217,6 +220,37 @@ class MusicPlayerInteractionDispatcherTest {
                 .containsExactly(new MusicPlayerEvent.TrackNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID, "empty list"));
     }
 
+    @ParameterizedTest
+    @MethodSource("controlsForAGuild")
+    void answersPlayerNotFoundWhenGuildHasNoPlayer(MusicPlayerInteraction interaction) {
+        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
+        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
+                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
+
+        dispatcher.handle(interaction);
+
+        assertThat(eventDispatcher.events)
+                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
+    }
+
+    static Stream<MusicPlayerInteraction> controlsForAGuild() {
+        Request request = new Request(REQUEST_ID, "@user");
+        return Stream.of(
+                new MusicPlayerInteraction.TogglePause(PLAYER_ID, request, GUILD_ID),
+                new MusicPlayerInteraction.Next(PLAYER_ID, request, GUILD_ID),
+                new MusicPlayerInteraction.Previous(PLAYER_ID, request, GUILD_ID),
+                new MusicPlayerInteraction.Rewind(PLAYER_ID, request, GUILD_ID, 10_000),
+                new MusicPlayerInteraction.Forward(PLAYER_ID, request, GUILD_ID, 10_000),
+                new MusicPlayerInteraction.Clear(PLAYER_ID, request, GUILD_ID),
+                new MusicPlayerInteraction.QueueRequest(PLAYER_ID, REQUEST_ID, GUILD_ID),
+                new MusicPlayerInteraction.Remove(PLAYER_ID, request, GUILD_ID, 1, ""),
+                new MusicPlayerInteraction.Shuffle(PLAYER_ID, request, GUILD_ID),
+                new MusicPlayerInteraction.SetVolume(PLAYER_ID, request, GUILD_ID, 40),
+                new MusicPlayerInteraction.CycleLoop(PLAYER_ID, request, GUILD_ID),
+                new MusicPlayerInteraction.SetLoop(PLAYER_ID, request, GUILD_ID, LoopMode.TRACK),
+                new MusicPlayerInteraction.Jump(PLAYER_ID, request, GUILD_ID, 83_000));
+    }
+
     @Test
     void answersPlayerNotFoundWhenPlayingWithoutPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
@@ -233,18 +267,6 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
-    void answersPlayerNotFoundWhenClearingWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.Clear(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
-    }
-
-    @Test
     void routesQueueRequestToPlayerSnapshot() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
@@ -254,18 +276,6 @@ class MusicPlayerInteractionDispatcherTest {
         dispatcher.handle(new MusicPlayerInteraction.QueueRequest(PLAYER_ID, REQUEST_ID, GUILD_ID));
 
         assertThat(pool.snapshotCalls).containsExactly(GUILD_ID + "|" + REQUEST_ID);
-    }
-
-    @Test
-    void answersPlayerNotFoundForQueueRequestWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.QueueRequest(PLAYER_ID, REQUEST_ID, GUILD_ID));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
     }
 
     @Test
@@ -293,30 +303,6 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
-    void answersPlayerNotFoundWhenRemovingWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.Remove(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 1, ""));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
-    }
-
-    @Test
-    void answersPlayerNotFoundWhenShufflingWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.Shuffle(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
-    }
-
-    @Test
     void routesCycleLoopToPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
@@ -326,18 +312,6 @@ class MusicPlayerInteractionDispatcherTest {
         dispatcher.handle(new MusicPlayerInteraction.CycleLoop(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
 
         assertThat(pool.cycleLoopCalls).containsExactly(GUILD_ID + "|@user");
-    }
-
-    @Test
-    void answersPlayerNotFoundWhenCyclingLoopWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.CycleLoop(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
     }
 
     @Test
@@ -353,18 +327,6 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
-    void answersPlayerNotFoundWhenSettingLoopWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.SetLoop(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, LoopMode.TRACK));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
-    }
-
-    @Test
     void routesSetVolumeToPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
@@ -377,18 +339,6 @@ class MusicPlayerInteractionDispatcherTest {
     }
 
     @Test
-    void answersPlayerNotFoundWhenSettingVolumeWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.SetVolume(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 40));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
-    }
-
-    @Test
     void routesJumpToPlayer() {
         StubAudioPlayerPool pool = new StubAudioPlayerPool();
         pool.primeGuild(GUILD_ID);
@@ -398,18 +348,6 @@ class MusicPlayerInteractionDispatcherTest {
         dispatcher.handle(new MusicPlayerInteraction.Jump(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 83_000));
 
         assertThat(pool.jumpCalls).containsExactly("83000|" + GUILD_ID + "|@user");
-    }
-
-    @Test
-    void answersPlayerNotFoundWhenJumpingWithoutPlayer() {
-        RecordingEventDispatcher eventDispatcher = new RecordingEventDispatcher();
-        MusicPlayerInteractionDispatcher dispatcher = new MusicPlayerInteractionDispatcher(
-                new RecordingVoiceConnectionManager(), new StubAudioPlayerPool(), null, eventDispatcher, null, PLAYER_ID);
-
-        dispatcher.handle(new MusicPlayerInteraction.Jump(PLAYER_ID, new Request(REQUEST_ID, "@user"), GUILD_ID, 83_000));
-
-        assertThat(eventDispatcher.events)
-                .containsExactly(new MusicPlayerEvent.PlayerNotFound(PLAYER_ID, REQUEST_ID, GUILD_ID));
     }
 
     @Test
