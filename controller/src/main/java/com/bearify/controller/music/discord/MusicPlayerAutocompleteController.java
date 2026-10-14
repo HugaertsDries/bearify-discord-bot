@@ -15,7 +15,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.bearify.discord.api.interaction.InteractionType.AUTOCOMPLETE;
 
@@ -80,7 +82,7 @@ public class MusicPlayerAutocompleteController {
                     TrackMetadata track = upcoming.get(index);
                     int position = index + 1;
                     return new Option(
-                            PlaybackComponent.truncate(position + ". " + track.title() + " — " + track.author(), MAX_LABEL_LENGTH),
+                            PlaybackComponent.truncate(position + ". " + describe(track), MAX_LABEL_LENGTH),
                             cut(position + REMOVE_VALUE_SEPARATOR + Objects.requireNonNullElse(track.uri(), ""), MAX_VALUE_LENGTH));
                 })
                 .toList();
@@ -94,6 +96,13 @@ public class MusicPlayerAutocompleteController {
         interaction.reply(LOOP_MODES.stream()
                 .filter(option -> option.name().toLowerCase(Locale.ROOT).contains(typed))
                 .toList());
+    }
+
+    // a bear may not know a track's title or author, and Discord would otherwise show "null"
+    private static String describe(TrackMetadata track) {
+        return Stream.of(track.title(), track.author())
+                .filter(part -> part != null && !part.isBlank())
+                .collect(Collectors.joining(SEPARATOR));
     }
 
     private static boolean matches(TrackMetadata track, String typed) {

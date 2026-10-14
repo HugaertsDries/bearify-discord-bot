@@ -34,8 +34,19 @@ class MusicPlayerAutocompleteControllerTest {
         controller.remove(interaction);
 
         assertThat(interaction.getReplies()).containsExactly(List.of(
-                new Option("2. Africa — TOTO", "2|https://example.com/africa"),
-                new Option("3. Hold the Line — TOTO", "3|https://example.com/hold")));
+                new Option("2. Africa • TOTO", "2|https://example.com/africa"),
+                new Option("3. Hold the Line • TOTO", "3|https://example.com/hold")));
+    }
+
+    @Test
+    void leavesOutAnUnknownAuthor() {
+        TrackMetadata noAuthor = new TrackMetadata("Africa", null, "https://example.com/africa", 295_000);
+        MusicPlayerAutocompleteController controller = removeController(snapshot(List.of(noAuthor)));
+        MockAutocompleteInteraction interaction = removeInteraction("");
+
+        controller.remove(interaction);
+
+        assertThat(interaction.getReplies()).containsExactly(List.of(new Option("1. Africa", "1|https://example.com/africa")));
     }
 
     @Test
