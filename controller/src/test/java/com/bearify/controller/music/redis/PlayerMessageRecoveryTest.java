@@ -63,7 +63,7 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
         recovery(discord).recover();
 
         assertThat(discord.deletedMessageIds(TEXT_CHANNEL_ID)).hasSize(deletedBefore + 1).last().isEqualTo("message-77");
-        assertThat(store.all()).isEmpty();
+        assertThat(remembered()).isEmpty();
     }
 
     @Test
@@ -88,7 +88,7 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
         recovery(discord).recover();
 
         assertThat(registry.sessions()).isEmpty();
-        assertThat(store.all()).isEmpty();
+        assertThat(remembered()).isEmpty();
         assertThat(discord.sentMessages(TEXT_CHANNEL_ID)).isEmpty();
     }
 
@@ -106,7 +106,7 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
         recovery(discord).recover();
 
         verify(present).delete("message-78");
-        assertThat(store.all()).isEmpty();
+        assertThat(remembered()).isEmpty();
     }
 
     private PlayerMessageRecovery recovery(DiscordClient discord) {
@@ -120,8 +120,12 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
 
     private void cleanUp() {
         redis.delete(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID));
-        var keys = redis.keys(RedisPlayerMessageStore.KEY_PREFIX + "*");
-        if (keys != null && !keys.isEmpty()) redis.delete(keys);
+        redis.delete(PlayerRedisProtocol.Keys.messages(PLAYER_ID, GUILD_ID));
+    }
+
+    // other tests share this Redis, so only this test's bear counts
+    private List<PlayerMessage> remembered() {
+        return store.all().stream().filter(message -> message.playerId().equals(PLAYER_ID)).toList();
     }
 
 
@@ -137,7 +141,7 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
         recovery.recover();
 
         assertThat(discord.deletedMessageIds(TEXT_CHANNEL_ID)).hasSize(deletedBefore + 1).last().isEqualTo("message-77");
-        assertThat(store.all()).containsExactly(new PlayerMessage(PLAYER_ID, GUILD_ID, TEXT_CHANNEL_ID, "message-live"));
+        assertThat(remembered()).containsExactly(new PlayerMessage(PLAYER_ID, GUILD_ID, TEXT_CHANNEL_ID, "message-live"));
     }
 
     @Test
@@ -149,7 +153,7 @@ class PlayerMessageRecoveryTest extends AbstractControllerIntegrationTest {
 
         recovery(discord).recover();
 
-        assertThat(store.all()).isEmpty();
+        assertThat(remembered()).isEmpty();
         assertThat(registry.findAll(PLAYER_ID, GUILD_ID)).hasSize(1);
     }
 }

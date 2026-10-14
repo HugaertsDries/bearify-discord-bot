@@ -1,11 +1,11 @@
 package com.bearify.controller.music.redis;
 
 import com.bearify.music.player.bridge.protocol.PlayerRedisProtocol;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /** Whether a bear still claims a voice channel in a guild; its heartbeat keeps that key alive, so a dead bear's expires. */
 class RedisPlayerAssignments {
@@ -16,13 +16,11 @@ class RedisPlayerAssignments {
         this.redis = redis;
     }
 
+    // SCAN, not KEYS: this runs for every session on every liveness tick, and KEYS blocks Redis while it walks the keyspace
     boolean isAssigned(String playerId, String guildId) {
-        Set<String> keys = redis.keys(PlayerRedisProtocol.Keys.assignment(guildId));
-        if (keys == null || keys.isEmpty()) {
-            return false;
+        try (Cursor<String> keys = redis.scan(ScanOptions.scanOptions().match(PlayerRedisProtocol.Keys.assignment(guildId)).build())) {
+            return keys.stream().anyMatch(key -> playerId.equals(redis.opsForValue().get(key)));
         }
-        List<String> owners = redis.opsForValue().multiGet(keys);
-        return owners != null && owners.contains(playerId);
     }
 
     /** The Discord user ID the bear logged in with, as it wrote it at startup. */

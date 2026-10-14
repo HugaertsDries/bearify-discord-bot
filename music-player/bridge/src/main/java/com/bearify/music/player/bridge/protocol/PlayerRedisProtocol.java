@@ -5,6 +5,8 @@ public final class PlayerRedisProtocol {
     private PlayerRedisProtocol() {}
 
     public static final class Keys {
+        public static final String MESSAGES_PREFIX = "players:messages:";
+
         private Keys() {}
 
         public static String connectRequest(String requestId) {
@@ -21,6 +23,10 @@ public final class PlayerRedisProtocol {
 
         public static String bot(String playerId) {
             return "players:bot:" + playerId;
+        }
+
+        public static String messages(String playerId, String guildId) {
+            return MESSAGES_PREFIX + playerId + ":" + guildId;
         }
     }
 
