@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   build:
+    # a pull request from a branch in this repo is already built by its push
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
