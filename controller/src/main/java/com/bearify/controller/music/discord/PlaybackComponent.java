@@ -1,6 +1,7 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.format.BearifyEmoji;
+import com.bearify.discord.api.format.TextCut;
 import com.bearify.discord.api.message.ComponentMessage;
 import com.bearify.discord.api.message.ComponentMessageBuilder;
 import com.bearify.discord.api.message.ContainerBuilder;
@@ -205,12 +206,7 @@ public class PlaybackComponent {
         if (text.length() <= limit) {
             return text;
         }
-        int end = limit - 1;
-        // never keep half of an emoji: cutting between a surrogate pair leaves an invalid character
-        if (Character.isHighSurrogate(text.charAt(end - 1))) {
-            end--;
-        }
-        return text.substring(0, end) + "\u2026";
+        return TextCut.cut(text, limit - 1) + "\u2026";
     }
 
     static String humanReadable(Duration duration) {

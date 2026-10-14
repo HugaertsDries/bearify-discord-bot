@@ -74,6 +74,13 @@ class PlayableMessageTest {
     }
 
     @Test
+    void cutsSearchTextBeforeAnEmojiInsteadOfSplittingIt() {
+        String content = "a".repeat(99) + "🎵 tail";
+
+        assertThat(PlayableMessage.searchText(content)).contains("a".repeat(99));
+    }
+
+    @Test
     void returnsNothingForEmptyOrLinkOnlyUnsupportedMessages() {
         assertThat(PlayableMessage.links("")).isEmpty();
         assertThat(PlayableMessage.searchText("")).isEmpty();

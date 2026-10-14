@@ -3,6 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.TrackCatalogue;
+import com.bearify.discord.api.format.TextCut;
 import com.bearify.discord.api.interaction.Option;
 import com.bearify.discord.api.interaction.AutocompleteInteraction;
 import com.bearify.discord.spring.annotation.DiscordController;
@@ -83,7 +84,8 @@ public class MusicPlayerAutocompleteController {
                     int position = index + 1;
                     return new Option(
                             PlaybackComponent.truncate(position + ". " + describe(track), MAX_LABEL_LENGTH),
-                            cut(position + REMOVE_VALUE_SEPARATOR + Objects.requireNonNullElse(track.uri(), ""), MAX_VALUE_LENGTH));
+                            // no ellipsis: the bear matches the uri by this prefix
+                            TextCut.cut(position + REMOVE_VALUE_SEPARATOR + Objects.requireNonNullElse(track.uri(), ""), MAX_VALUE_LENGTH));
                 })
                 .toList();
         interaction.reply(options);
@@ -111,18 +113,10 @@ public class MusicPlayerAutocompleteController {
                 || (track.author() != null && track.author().toLowerCase(Locale.ROOT).contains(typed));
     }
 
-    // no ellipsis: the bear matches the uri by this prefix
-    private static String cut(String value, int limit) {
-        return value.length() <= limit ? value : value.substring(0, limit);
-    }
-
     private static String formatLabel(TrackMetadata track) {
         String suffix = SEPARATOR + PlaybackComponent.length(track);
         int maxTitleLength = Math.max(0, MAX_LABEL_LENGTH - suffix.length());
         String title = track.title() == null ? "" : track.title();
-        if (title.length() > maxTitleLength) {
-            title = title.substring(0, maxTitleLength);
-        }
-        return title + suffix;
+        return TextCut.cut(title, maxTitleLength) + suffix;
     }
 }

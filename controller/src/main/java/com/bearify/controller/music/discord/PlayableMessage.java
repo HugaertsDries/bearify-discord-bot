@@ -1,6 +1,7 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.music.spotify.SpotifyLinkResolver;
+import com.bearify.discord.api.format.TextCut;
 import com.bearify.music.player.bridge.protocol.TrustedLinks;
 
 import java.util.List;
@@ -46,6 +47,6 @@ final class PlayableMessage {
         if (text.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(text.substring(0, Math.min(text.length(), MAX_SEARCH_LENGTH)).strip());
+        return Optional.of(TextCut.cut(text, MAX_SEARCH_LENGTH).strip());
     }
 }

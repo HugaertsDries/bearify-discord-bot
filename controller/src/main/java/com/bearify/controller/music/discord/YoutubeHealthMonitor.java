@@ -3,6 +3,7 @@ package com.bearify.controller.music.discord;
 import com.bearify.controller.format.BearifyEmoji;
 import com.bearify.controller.music.domain.HealthChecker;
 import com.bearify.controller.music.domain.MusicPlayerEventConsumer;
+import com.bearify.discord.api.format.TextCut;
 import com.bearify.discord.api.gateway.DiscordClient;
 import com.bearify.music.player.bridge.events.MusicPlayerEvent;
 import org.slf4j.Logger;
@@ -99,7 +100,7 @@ public class YoutubeHealthMonitor implements MusicPlayerEventConsumer {
             } else if (result.get().ok()) {
                 moveTo(State.OK, Optional.empty());
             } else {
-                moveTo(State.BROKEN, Optional.of(truncate(result.get().reason().orElse("unknown error"))));
+                moveTo(State.BROKEN, Optional.of(TextCut.cut(result.get().reason().orElse("unknown error"), MAX_REASON_LENGTH)));
             }
         } catch (RuntimeException e) {
             LOG.warn("YouTube health check failed to run", e);
@@ -144,9 +145,5 @@ public class YoutubeHealthMonitor implements MusicPlayerEventConsumer {
         } catch (RuntimeException e) {
             LOG.warn("Failed to post the YouTube health alert to channel {}", channelId, e);
         }
-    }
-
-    private static String truncate(String reason) {
-        return reason.length() <= MAX_REASON_LENGTH ? reason : reason.substring(0, MAX_REASON_LENGTH);
     }
 }

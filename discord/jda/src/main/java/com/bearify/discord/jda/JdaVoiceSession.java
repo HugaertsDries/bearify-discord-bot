@@ -1,5 +1,6 @@
 package com.bearify.discord.jda;
 
+import com.bearify.discord.api.format.TextCut;
 import com.bearify.discord.api.voice.AudioProvider;
 import com.bearify.discord.api.voice.VoiceSession;
 import net.dv8tion.jda.api.entities.channel.attribute.IVoiceStatusChannel;
@@ -51,9 +52,7 @@ class JdaVoiceSession implements VoiceSession {
         if (!(channel instanceof IVoiceStatusChannel statusChannel)) {
             return false;
         }
-        String truncated = status.length() > IVoiceStatusChannel.MAX_STATUS_LENGTH
-                ? status.substring(0, IVoiceStatusChannel.MAX_STATUS_LENGTH)
-                : status;
+        String truncated = TextCut.cut(status, IVoiceStatusChannel.MAX_STATUS_LENGTH);
         try {
             statusChannel.modifyStatus(truncated).queue(null, error ->
                     LOG.warn("Failed to set the status of voice channel {}: {}", channel.getId(), error.getMessage()));
