@@ -557,6 +557,48 @@ class VoiceConnectionManagerTest {
                 }));
     }
 
+    @Test
+    void dropsThePlayerWhenClaimJoinThrows() {
+        seedLivenessKey(REQUEST_ID);
+        discordClient.guild(GUILD_ID).setJoinFails(true);
+
+        voiceConnectionManager.claim(new JoinRequest(REQUEST_ID, GUILD_ID, VOICE_CHANNEL_ID));
+
+        assertThat(pool.get(GUILD_ID)).isEmpty();
+    }
+
+    @Test
+    void dropsThePlayerWhenConnectJoinThrows() {
+        discordClient.guild(GUILD_ID).setJoinFails(true);
+
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+
+        assertThat(pool.get(GUILD_ID)).isEmpty();
+    }
+
+    @Test
+    void keepsTheJoiningPlayerWhenASecondConnectJoinThrows() {
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        AudioPlayer player = pool.get(GUILD_ID).orElseThrow();
+        discordClient.guild(GUILD_ID).setJoinFails(true);
+
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID_2, GUILD_ID));
+
+        assertThat(pool.get(GUILD_ID)).containsSame(player);
+    }
+
+    @Test
+    void keepsThePlayerWhenAMoveThrows() {
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        AudioPlayer player = pool.get(GUILD_ID).orElseThrow();
+        discordClient.guild(GUILD_ID).setJoinFails(true);
+
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID_2, GUILD_ID));
+
+        assertThat(pool.get(GUILD_ID)).containsSame(player);
+    }
+
     private MusicPlayerEvent parseEvent(byte[] body) {
         try {
             return objectMapper.readValue(body, MusicPlayerEvent.class);

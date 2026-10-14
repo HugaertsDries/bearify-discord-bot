@@ -75,6 +75,8 @@ public class VoiceConnectionManager implements AutoCloseable {
         // under the guild lock, so a heartbeat can't stop this player between getOrCreate and join
         synchronized (lockFor(request.guildId())) {
             var guild = client.guild(request.guildId());
+            // an existing player may be serving a join still in flight, so a failed join only drops one made here
+            boolean created = pool.get(request.guildId()).isEmpty();
             AudioPlayer player = pool.getOrCreate(request.guildId());
             guild.voice().ifPresentOrElse(session -> {
                 if (session.getChannelId().equals(request.voiceChannelId())) {
@@ -84,9 +86,14 @@ public class VoiceConnectionManager implements AutoCloseable {
                 } else {
                     eventDispatcher.dispatch(new MusicPlayerEvent.ConnectFailed(playerId, request.requestId(), request.guildId(), "already connected to a different channel"));
                 }
-            }, () -> join(guild, request.requestId(), request.guildId(), request.voiceChannelId(), player, Optional.empty(), _ -> {
-                eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
-            }));
+            }, () -> {
+                boolean joining = join(guild, request.requestId(), request.guildId(), request.voiceChannelId(), player, Optional.empty(), _ -> {
+                    eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
+                });
+                if (!joining && created) {
+                    player.close();
+                }
+            });
         }
     }
 
@@ -208,13 +215,17 @@ public class VoiceConnectionManager implements AutoCloseable {
                 properties.assignment().ttl()));
         if (!claimed) return;
         AudioPlayer player = pool.getOrCreate(request.guildId());
-        join(guild, request.requestId(), request.guildId(), request.voiceChannelId(), player, Optional.of(assignmentKey), _ -> {
+        boolean joining = join(guild, request.requestId(), request.guildId(), request.voiceChannelId(), player, Optional.of(assignmentKey), _ -> {
             eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
         });
+        if (!joining) {
+            player.close();
+        }
     }
 
-    private void join(Guild guild, String requestId, String guildId, String voiceChannelId, AudioPlayer player,
-                      Optional<String> claimedAssignmentKey, VoiceSessionListener onJoined) {
+    /** Starts joining; false when the join threw, after reporting it. A failed move leaves the player playing where it is. */
+    private boolean join(Guild guild, String requestId, String guildId, String voiceChannelId, AudioPlayer player,
+                         Optional<String> claimedAssignmentKey, VoiceSessionListener onJoined) {
         Instant startedAt = clock.instant();
         // until the callback, an empty voice state means "still joining", not "kicked"
         joiningGuilds.put(guildId, startedAt);
@@ -224,11 +235,13 @@ public class VoiceConnectionManager implements AutoCloseable {
                 joiningGuilds.remove(guildId, startedAt);
                 onJoined.onJoined(channelId);
             });
+            return true;
         } catch (RuntimeException e) {
             joiningGuilds.remove(guildId, startedAt);
             claimedAssignmentKey.ifPresent(redis::delete);
             LOG.warn("Failed to join voice channel {} in guild {}", voiceChannelId, guildId, e);
             eventDispatcher.dispatch(new MusicPlayerEvent.ConnectFailed(playerId, requestId, guildId, "failed to join the voice channel"));
+            return false;
         }
     }
 
