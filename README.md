@@ -73,6 +73,16 @@ Both apps import `.env` from their working directory, so run them from the repo 
 ./gradlew :music-player:agent:bootRun
 ```
 
+A bear needs **Connect** and **Speak** in the voice channels it joins, and **Set Voice Channel Status** to show the playing track as the channel's status (without it, it plays on and logs one warning). Its settings:
+
+| Property | Default | Description |
+|---|---|---|
+| `music-player.default-volume` | `100` | The volume, 0 to 100, the bear starts every visit at |
+| `music-player.voice-session.nobody-listening-timeout` | `5m` | The bear pauses when it's alone and leaves once it has been alone this long |
+| `music-player.voice-session.idle-timeout` | `10m` | The bear leaves once it has played nothing, or sat paused, this long |
+| `music-player.health.probe-url` | a YouTube video | The track the YouTube health check plays |
+| `music-player.health.probe-timeout` | `20s` | How long the health check may take to load and play the first frame |
+
 ## Building
 
 ```bash

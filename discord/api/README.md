@@ -14,10 +14,11 @@ Defines the interfaces and models that the rest of the project depends on. By de
   - `voice()` — returns the bot's current `VoiceSession` for this guild, or empty if not connected
   - `isInVoice(userId)` — whether that member is in one of the guild's voice channels right now
   - `join(channelId, provider, onJoined)` — joins a voice channel with the given `AudioProvider` and invokes the listener once connected
-- `TextChannel` — sends a plain-text message to a Discord text channel via `send(String message)`
+- `TextChannel` — sends a plain-text message to a Discord text channel via `send(String message)`, and deletes one via `delete(messageId)`
 
 ### Interaction
-- `RepliableInteraction` — an interaction answered with a reply: `reply(message)`, `defer()`, `defer(ephemeral)`, plus `getVoiceChannelId()`, `getGuildId()`, `getTextChannelId()`
+- `Interaction` — what every interaction offers: `getVoiceChannelId()`, `getGuildId()`, `getTextChannelId()`
+- `RepliableInteraction` — an interaction answered with a reply: `reply(message)`, `defer()`, `defer(ephemeral)`
 - `CommandInteraction` — a `RepliableInteraction` for an incoming command: `getName()`, `getOption(name)`, `getSubcommandName()`
 - `MessageContextInteraction` — a `RepliableInteraction` for a message context-menu command (Apps on a message): `getName()`, `getTargetMessageContent()`, `getTargetAuthorMention()`
 - `ButtonInteraction` — represents a button press: `getCustomId()`, `acknowledge()`, `reply(message)`, and `reply(ComponentMessage)` for a Components V2 reply (a follow-up once acknowledged)

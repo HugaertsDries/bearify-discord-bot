@@ -19,7 +19,7 @@ Provides a JDA-backed `DiscordClientFactory` bean. Activated automatically when 
 - `JdaCommandInteraction` — wraps `SlashCommandInteractionEvent` as `CommandInteraction`
 - `JdaMessageContextInteraction` — wraps `MessageContextInteractionEvent` as `MessageContextInteraction`; message commands are registered for servers only, and Discord sends the target message's content with them, so no message content intent is needed
 - `JdaReplyBuilder` — fluent reply builder backed by JDA's reply API
-- `JdaEditableMessage` — wraps `InteractionHook` as `EditableMessage` (also enforces the 3-second Discord acknowledgement window)
+- `JdaEditableMessage` — wraps `InteractionHook` as `EditableMessage`; an ephemeral one deletes itself a while after the last edit, and an edit that finds it already gone is posted as a new follow-up
 - `JdaGuild` — JDA-backed `Guild`; `join(channelId, provider, onJoined)` sets the audio send handler before opening the voice connection
 - `JdaVoiceSession` — wraps JDA's `AudioManager` as `VoiceSession`
 - `JdaTextChannel` — wraps JDA's `MessageChannel` as `TextChannel`

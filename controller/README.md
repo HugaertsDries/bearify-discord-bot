@@ -21,7 +21,7 @@ REDIS_PASSWORD= \
 
 ## Commands
 
-Every `/player` command answers only once the bear has confirmed it, or says the bear didn't answer in time. A player button that fails answers privately to whoever pressed it.
+Every `/player` command answers only once the bear has confirmed it, or says the bear didn't answer in time. A player button that fails answers privately to whoever pressed it. Private replies disappear 30 seconds after the bot last wrote to them (`discord.ephemeral-delete-after`); the queue card stays until you dismiss it.
 
 ### `/player join`
 Lures a bear into your voice channel. Acquires a free player agent from the pool.
@@ -30,7 +30,7 @@ Lures a bear into your voice channel. Acquires a free player agent from the pool
 Sends the bear home. Disconnects the player from your voice channel.
 
 ### `/player play <search>`
-Plays a track or searches YouTube. Accepts a track name, URL, or search term. Auto-joins your channel if no player is already there.
+Plays a track or searches YouTube. Accepts a search term, a YouTube, SoundCloud, Bandcamp, Vimeo or Twitch link, or a Spotify song link (played from YouTube by its artist and title); links to other sites aren't played. Auto-joins your channel if no player is already there.
 
 ### `/player pause`
 Toggles pause/resume on the currently playing track.
@@ -90,4 +90,10 @@ Posts a playback component preview in the current text channel. Presets: `broadc
 | `spring.data.redis.port` | Yes | Redis port |
 | `spring.data.redis.username` | No | Redis username when the server requires auth |
 | `spring.data.redis.password` | No | Redis password when the server requires auth |
+| `discord.ephemeral-delete-after` | No | How long after the bot last wrote to a private reply it deletes it, from 1s to under 15m (`30s` in `application.yml`). Absent keeps private replies. |
 | `bearify.health.channel-id` | No | Private text channel (env `BEARIFY_HEALTH_CHANNEL_ID`) where the controller posts once when YouTube playback breaks or no bear answers the health check, and once when that clears. The bot needs View Channel and Send Messages there. Blank turns the check off. |
+| `bearify.health.interval` | No | How often to check YouTube while it works (default `6h`); `broken-interval` while it doesn't or no bear answers (default `30m`) |
+| `bearify.health.initial-delay` | No | Wait before the first check, so freshly deployed bears are online (default `2m`) |
+| `bearify.health.timeout` | No | How long a check waits for a bear (default `30s`); keep it above the agent's `music-player.health.probe-timeout` |
+| `bearify.health.passive-cooldown` | No | A failed track also triggers a check, at most once per cooldown (default `10m`) |
+| `bearify.liveness.interval` | No | How often to check that the bears behind the player messages are still there (default `5s`) |
