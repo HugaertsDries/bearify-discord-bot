@@ -55,8 +55,7 @@ public class VoiceConnectionManager implements AutoCloseable {
     }
 
     public void claim(JoinRequest request) {
-        Object lock = guildLocks.computeIfAbsent(request.guildId(), k -> new Object());
-        synchronized (lock) {
+        synchronized (lockFor(request.guildId())) {
             if (!Boolean.TRUE.equals(redis.hasKey(PlayerRedisProtocol.Keys.connectRequest(request.requestId())))) {
                 return;
             }
@@ -74,7 +73,7 @@ public class VoiceConnectionManager implements AutoCloseable {
 
     public void connect(MusicPlayerInteraction.Connect request) {
         // under the guild lock, so a heartbeat can't stop this player between getOrCreate and join
-        synchronized (guildLocks.computeIfAbsent(request.guildId(), k -> new Object())) {
+        synchronized (lockFor(request.guildId())) {
             var guild = client.guild(request.guildId());
             AudioPlayer player = pool.getOrCreate(request.guildId());
             guild.voice().ifPresentOrElse(session -> {
@@ -99,7 +98,7 @@ public class VoiceConnectionManager implements AutoCloseable {
             return;
         }
         join(guild, request.requestId(), request.guildId(), request.voiceChannelId(), player, Optional.of(assignmentKey), _ -> {
-            deleteIfOurs(PlayerRedisProtocol.Keys.assignment(request.guildId(), oldChannelId));
+            deleteIfOurs(redis, playerId, PlayerRedisProtocol.Keys.assignment(request.guildId(), oldChannelId));
             eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
         });
     }
@@ -117,10 +116,14 @@ public class VoiceConnectionManager implements AutoCloseable {
     }
 
     // never removes another agent's assignment
-    private void deleteIfOurs(String key) {
+    static void deleteIfOurs(StringRedisTemplate redis, String playerId, String key) {
         if (playerId.equals(redis.opsForValue().get(key))) {
             redis.delete(key);
         }
+    }
+
+    private Object lockFor(String guildId) {
+        return guildLocks.computeIfAbsent(guildId, k -> new Object());
     }
 
     /**
@@ -128,13 +131,13 @@ public class VoiceConnectionManager implements AutoCloseable {
      * is back in voice, or has a newer player by now: the heartbeat that asks may have seen an older state.
      */
     public void stopSentOut(String guildId, String channelId, AudioPlayer player) {
-        synchronized (guildLocks.computeIfAbsent(guildId, k -> new Object())) {
+        synchronized (lockFor(guildId)) {
             if (isJoining(guildId)
                     || client.guild(guildId).voice().isPresent()
                     || pool.get(guildId).filter(current -> current == player).isEmpty()) {
                 return;
             }
-            deleteIfOurs(PlayerRedisProtocol.Keys.assignment(guildId, channelId));
+            deleteIfOurs(redis, playerId, PlayerRedisProtocol.Keys.assignment(guildId, channelId));
             disconnect(guildId, UUID.randomUUID().toString(), StopReason.DISCONNECTED);
         }
     }
@@ -147,7 +150,7 @@ public class VoiceConnectionManager implements AutoCloseable {
 
     /** Leaves on the bear's own initiative; does nothing when a stop request already left, so no second leave note follows it. */
     public void disconnect(String guildId, StopReason reason) {
-        synchronized (guildLocks.computeIfAbsent(guildId, k -> new Object())) {
+        synchronized (lockFor(guildId)) {
             if (client.guild(guildId).voice().isEmpty() && pool.get(guildId).isEmpty()) {
                 return;
             }
@@ -157,10 +160,10 @@ public class VoiceConnectionManager implements AutoCloseable {
 
     /** Leaves voice and answers {@code Stopped} under {@code requestId}, so a stop request gets its reply. */
     public void disconnect(String guildId, String requestId, StopReason reason) {
-        synchronized (guildLocks.computeIfAbsent(guildId, k -> new Object())) {
+        synchronized (lockFor(guildId)) {
             joiningGuilds.remove(guildId);
             client.guild(guildId).voice().ifPresent(session -> {
-                redis.delete(PlayerRedisProtocol.Keys.assignment(guildId, session.getChannelId()));
+                deleteIfOurs(redis, playerId, PlayerRedisProtocol.Keys.assignment(guildId, session.getChannelId()));
                 // once out of the channel, clearing would need Manage Channels
                 session.setStatus("");
                 session.leave();
@@ -189,7 +192,7 @@ public class VoiceConnectionManager implements AutoCloseable {
             String oldChannelId = session.getChannelId();
             AudioPlayer player = pool.getOrCreate(request.guildId());
             join(guild, request.requestId(), request.guildId(), request.voiceChannelId(), player, Optional.of(assignmentKey), _ -> {
-                redis.delete(PlayerRedisProtocol.Keys.assignment(request.guildId(), oldChannelId));
+                deleteIfOurs(redis, playerId, PlayerRedisProtocol.Keys.assignment(request.guildId(), oldChannelId));
                 eventDispatcher.dispatch(new MusicPlayerEvent.Ready(playerId, request.requestId(), request.guildId()));
             });
         }

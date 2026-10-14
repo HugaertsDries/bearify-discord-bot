@@ -118,7 +118,7 @@ public class VoiceSessionHeartbeat {
                 ? connectedChannels.put(guildId, new Seen(player.get(), channelId))
                 : connectedChannels.remove(guildId);
         if (previous != null && !previous.channelId().equals(channelId)) {
-            deleteIfOurs(PlayerRedisProtocol.Keys.assignment(guildId, previous.channelId()));
+            VoiceConnectionManager.deleteIfOurs(redis, playerId, PlayerRedisProtocol.Keys.assignment(guildId, previous.channelId()));
         }
         if (Boolean.TRUE.equals(redis.expire(key, properties.assignment().ttl()))) {
             return;
@@ -126,13 +126,6 @@ public class VoiceSessionHeartbeat {
         if (!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key, playerId, properties.assignment().ttl()))) {
             // two bears in one channel is a moderator's doing; keep playing rather than fight over the key
             LOG.warn("Channel {} in guild {} is assigned to another bear", channelId, guildId);
-        }
-    }
-
-    // never removes another agent's assignment
-    private void deleteIfOurs(String key) {
-        if (playerId.equals(redis.opsForValue().get(key))) {
-            redis.delete(key);
         }
     }
 

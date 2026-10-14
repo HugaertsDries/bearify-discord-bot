@@ -356,6 +356,18 @@ class VoiceConnectionManagerTest {
     }
 
     @Test
+    void keepsAnotherBearsAssignmentKeyOnDisconnect() {
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
+        voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
+        discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "other-bear");
+
+        voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
+
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo("other-bear");
+    }
+
+    @Test
     void doesNotDeleteAssignmentKeyWhenNotConnected() {
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
 
