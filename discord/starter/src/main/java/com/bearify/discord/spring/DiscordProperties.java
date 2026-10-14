@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.time.DurationMax;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -30,7 +31,8 @@ public final class DiscordProperties {
     private final String guildId;
     @Valid
     private final Activity activity;
-    // Discord only lets the bot touch an interaction's replies for 15 minutes
+    // Discord only lets the bot touch an interaction's replies for 15 minutes; 0s would delete every answer unread
+    @DurationMin(seconds = 1)
     @DurationMax(minutes = 15, inclusive = false)
     private final Duration ephemeralDeleteAfter;
 

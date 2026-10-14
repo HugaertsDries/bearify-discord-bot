@@ -546,4 +546,12 @@ class DiscordAutoConfigurationTest {
                 .withUserConfiguration(MockClientConfig.class)
                 .run(ctx -> assertThat(ctx).getFailure().hasStackTraceContaining("ephemeralDeleteAfter"));
     }
+
+    @Test
+    void rejectsEphemeralDeleteAfterBelowOneSecond() {
+        contextRunner
+                .withPropertyValues("discord.token=my-token", "discord.ephemeral-delete-after=0s")
+                .withUserConfiguration(MockClientConfig.class)
+                .run(ctx -> assertThat(ctx).getFailure().hasStackTraceContaining("ephemeralDeleteAfter"));
+    }
 }
