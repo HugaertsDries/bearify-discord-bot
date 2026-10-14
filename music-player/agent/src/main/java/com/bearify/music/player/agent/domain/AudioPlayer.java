@@ -27,8 +27,6 @@ import java.util.random.RandomGenerator;
 public class AudioPlayer implements AudioProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(AudioPlayer.class);
-    // LavaPlayer reports a stream's length as Long.MAX_VALUE
-    private static final long LIVE_DURATION = Long.MAX_VALUE;
     // far more than anyone steps back with ⏮; unbounded, a looping queue would grow the history forever
     static final int MAX_HISTORY = 50;
 
@@ -346,6 +344,7 @@ public class AudioPlayer implements AudioProvider {
     public synchronized void close() {
         if (closed) return;
         closed = true;
+        status.clear();
         engine.destroy();
         queue.clear();
         history.clear();
@@ -413,7 +412,7 @@ public class AudioPlayer implements AudioProvider {
     }
 
     private long queueDurationMs() {
-        return queue.stream().mapToLong(queued -> queued.track().duration()).filter(ms -> ms != LIVE_DURATION).sum();
+        return TrackMetadata.totalDurationMs(queue.stream().map(queued -> queued.track().toMetadata()).toList());
     }
 
     /** {@code requestNumber} counts up per request, so turning shuffle off can put the queue back in the order it was asked for. */

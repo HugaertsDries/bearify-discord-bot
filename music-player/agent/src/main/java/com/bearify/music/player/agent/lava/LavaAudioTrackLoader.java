@@ -118,10 +118,6 @@ class LavaAudioTrackLoader implements AudioTrackLoader {
     }
 
     private static TrackMetadata toTrackMetadata(AudioTrack track) {
-        return new TrackMetadata(
-                track.getInfo().title,
-                track.getInfo().author,
-                track.getInfo().uri,
-                track.getDuration());
+        return new LavaTrack(track, null).toMetadata();
     }
 }

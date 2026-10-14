@@ -169,13 +169,12 @@ public class VoiceConnectionManager implements AutoCloseable {
     public void disconnect(String guildId, String requestId, StopReason reason) {
         synchronized (lockFor(guildId)) {
             joiningGuilds.remove(guildId);
+            // closing clears the voice status, which would need Manage Channels once out of the channel
+            pool.get(guildId).ifPresent(AudioPlayer::close);
             client.guild(guildId).voice().ifPresent(session -> {
                 deleteIfOurs(redis, playerId, PlayerRedisProtocol.Keys.assignment(guildId, session.getChannelId()));
-                // once out of the channel, clearing would need Manage Channels
-                session.setStatus("");
                 session.leave();
             });
-            pool.get(guildId).ifPresent(AudioPlayer::close);
             eventDispatcher.dispatch(new MusicPlayerEvent.Stopped(playerId, requestId, guildId, reason));
         }
     }
