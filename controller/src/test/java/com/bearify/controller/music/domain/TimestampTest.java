@@ -36,15 +36,13 @@ class TimestampTest {
         assertThat(Timestamp.parse("1h 2m 3s")).contains(new Timestamp(Duration.ofSeconds(3723)));
     }
 
-    // exceptions
+    // edge cases
 
     @ParameterizedTest
     @ValueSource(strings = {"", " ", "abc", "-3", "1:5", "1:75", "1:2:3", "1:60:00", "1:23:", "1234567", "h", "1x", "1s2m", "1h:30"})
-    void rejectsMalformedTimes(String text) {
+    void parsesNothingFromMalformedTimes(String text) {
         assertThat(Timestamp.parse(text)).isEmpty();
     }
-
-    // edge cases
 
     @Test
     void ignoresSurroundingSpacesAndCase() {

@@ -45,6 +45,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
     private static final String NOTHING_PLAYING_MESSAGE = "\uD83C\uDF6F | Nothing's playing right now. Queue something with `/player play`!";
     private static final String QUEUE_EMPTY_MESSAGE = "\uD83C\uDF6F | This is where the trail ends. Try adding more using `/player play` command!";
     private static final String NOT_SEEKABLE_MESSAGE = "\uD83D\uDED1\uFE0F | I can't paw back and forth through a live stream.";
+    private static final String NOT_PLAYING_HINT = "not even playing songs";
     private static final TrackMetadata AFRICA = new TrackMetadata("Africa", "TOTO", "https://example.com/africa", 295_000);
     private static final String REMOVED_MESSAGE = "🗑️ | Removed **Africa** from the queue.";
     private static final String TRACK_NOT_IN_QUEUE_MESSAGE = "🛑️ | That track isn't in the queue anymore. Run `/player queue` to see what's left.";
@@ -321,7 +322,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
             await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
                     assertThat(interaction.getDeferredMessage().orElseThrow().getLastEdit().orElseThrow())
-                            .contains("not even playing songs"));
+                            .contains(NOT_PLAYING_HINT));
         } finally {
             bear.stop();
         }
@@ -538,7 +539,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
+        assertThat(interaction.getReplies().getFirst().getContent()).contains(NOT_PLAYING_HINT);
     }
 
     @Test
@@ -550,7 +551,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
+        assertThat(interaction.getReplies().getFirst().getContent()).contains(NOT_PLAYING_HINT);
     }
 
     @Test
@@ -562,7 +563,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
+        assertThat(interaction.getReplies().getFirst().getContent()).contains(NOT_PLAYING_HINT);
     }
 
     @Test
@@ -574,7 +575,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
+        assertThat(interaction.getReplies().getFirst().getContent()).contains(NOT_PLAYING_HINT);
     }
 
     @Test
@@ -586,7 +587,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
 
         assertThat(interaction.getReplies()).hasSize(1);
         assertThat(interaction.getReplies().getFirst().isEphemeral()).isTrue();
-        assertThat(interaction.getReplies().getFirst().getContent()).contains("not even playing songs");
+        assertThat(interaction.getReplies().getFirst().getContent()).contains(NOT_PLAYING_HINT);
     }
 
     @Test
@@ -717,7 +718,7 @@ class MusicPlayerCommandControllerControlsTest extends AbstractControllerIntegra
         controller.pause(interaction);
 
         assertThat(interaction.getDeferredMessage()).isPresent();
-        assertThat(interaction.getDeferredMessage().get().getLastEdit()).hasValueSatisfying(edit -> assertThat(edit).contains("not even playing songs"));
+        assertThat(interaction.getDeferredMessage().get().getLastEdit()).hasValueSatisfying(edit -> assertThat(edit).contains(NOT_PLAYING_HINT));
     }
 
     @Test

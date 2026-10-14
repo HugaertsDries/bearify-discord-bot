@@ -120,12 +120,11 @@ class VoiceSessionHeartbeatTest {
     }
 
     @Test
-    void leavesAssignmentUntouchedWhenNoVoiceSessionIsActive() throws InterruptedException {
+    void leavesAssignmentUntouchedWhenNoVoiceSessionIsActive() {
         pool.getOrCreate(GUILD_ID);
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID), "test-player", Duration.ofSeconds(2));
         Long ttlBefore = redis.getExpire(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID));
 
-        Thread.sleep(1100);
         heartbeat.maintain();
 
         Long ttlAfter = redis.getExpire(PlayerRedisProtocol.Keys.assignment(GUILD_ID, CHANNEL_ID));

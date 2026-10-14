@@ -346,7 +346,7 @@ class VoiceConnectionManagerTest {
 
     @Test
     void deletesAssignmentKeyOnDisconnect() {
-        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
 
@@ -357,7 +357,7 @@ class VoiceConnectionManagerTest {
 
     @Test
     void keepsAnotherBearsAssignmentKeyOnDisconnect() {
-        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);
         redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "other-bear");
@@ -369,18 +369,18 @@ class VoiceConnectionManagerTest {
 
     @Test
     void doesNotDeleteAssignmentKeyWhenNotConnected() {
-        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
 
         voiceConnectionManager.disconnect(GUILD_ID, StopReason.REQUESTED);
 
         // No voice session active → key should not be touched
-        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo("test-player");
+        assertThat(redis.opsForValue().get(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID))).isEqualTo(PLAYER_ID);
     }
 
     @Test
     void disconnectsAllActiveGuilds() {
-        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), "test-player");
-        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID_2, "voice-2"), "test-player");
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID, VOICE_CHANNEL_ID), PLAYER_ID);
+        redis.opsForValue().set(PlayerRedisProtocol.Keys.assignment(GUILD_ID_2, "voice-2"), PLAYER_ID);
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, REQUEST_ID, VOICE_CHANNEL_ID, GUILD_ID));
         voiceConnectionManager.connect(new MusicPlayerInteraction.Connect(PLAYER_ID, "req-2", "voice-2", GUILD_ID_2));
         discordClient.guild(GUILD_ID).simulateJoined(VOICE_CHANNEL_ID);

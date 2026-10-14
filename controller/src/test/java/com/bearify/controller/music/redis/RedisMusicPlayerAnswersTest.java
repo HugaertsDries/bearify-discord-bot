@@ -1,5 +1,6 @@
 package com.bearify.controller.music.redis;
 
+import com.bearify.controller.music.discord.DiscordPlaybackAnnouncerFactory;
 import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerAnnouncementRegistry;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
@@ -90,7 +91,7 @@ class RedisMusicPlayerAnswersTest {
 
     private static MusicPlayer player(Optional<String> playerId, StringRedisTemplate redis) {
         return new RedisMusicPlayer(playerId, GUILD_ID, VOICE_CHANNEL_ID, redis, new ObjectMapper(),
-                new MusicPlayerPendingInteractions(), new MusicPlayerAnnouncementRegistry(), null,
+                new MusicPlayerPendingInteractions(), new MusicPlayerAnnouncementRegistry(), mock(DiscordPlaybackAnnouncerFactory.class),
                 new MusicPlayerPoolProperties(TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT));
     }
 }
