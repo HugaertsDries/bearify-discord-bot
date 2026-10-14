@@ -29,6 +29,8 @@ public class AudioPlayer implements AudioProvider {
     private static final Logger LOG = LoggerFactory.getLogger(AudioPlayer.class);
     // LavaPlayer reports a stream's length as Long.MAX_VALUE
     private static final long LIVE_DURATION = Long.MAX_VALUE;
+    // far more than anyone steps back with ⏮; unbounded, a looping queue would grow the history forever
+    static final int MAX_HISTORY = 50;
 
     private final AudioEngine engine;
     private final AudioProvider audioProvider;
@@ -170,7 +172,7 @@ public class AudioPlayer implements AudioProvider {
             eventDispatcher.dispatch(new MusicPlayerEvent.NothingToAdvance(playerId, request.id(), guildId));
             return;
         }
-        engine.getPlayingTrack().ifPresent(current -> history.addFirst(playing(current)));
+        engine.getPlayingTrack().ifPresent(current -> remember(playing(current)));
         engine.setPaused(false);
         start(queue.pollFirst());
         eventDispatcher.dispatch(new MusicPlayerEvent.Skipped(playerId, request, guildId));
@@ -245,7 +247,7 @@ public class AudioPlayer implements AudioProvider {
             return;
         }
         boolean wasPaused = engine.isPaused();
-        history.addFirst(playing(track));
+        remember(playing(track));
         start(queue.pollFirst());
         if (wasPaused) {
             // a fresh id, so this Paused doesn't answer the forward request in place of Skipped
@@ -371,6 +373,13 @@ public class AudioPlayer implements AudioProvider {
         }
     }
 
+    private void remember(Queued played) {
+        history.addFirst(played);
+        if (history.size() > MAX_HISTORY) {
+            history.removeLast();
+        }
+    }
+
     private long defaultSeekMs(Track track) {
         return track.duration() >= properties.seekTrackLengthThreshold().toMillis()
                 ? properties.seekLongDefault().toMillis()
@@ -463,7 +472,7 @@ public class AudioPlayer implements AudioProvider {
                     queue.addLast(playing(track));
                 }
                 if (!queue.isEmpty()) {
-                    history.addFirst(playing(track));
+                    remember(playing(track));
                     Queued next = queue.pollFirst();
                     if (wasError) {
                         long delayMs = properties.errorSkipDelay().toMillis();

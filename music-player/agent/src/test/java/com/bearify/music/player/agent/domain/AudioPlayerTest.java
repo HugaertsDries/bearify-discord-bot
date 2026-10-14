@@ -791,6 +791,24 @@ class AudioPlayerTest {
     }
 
     @Test
+    void remembersOnlyTheLatestTracksWhileLooping() {
+        engine.play(track("Song A", 120_000));
+        player.play(track("Song B", 180_000));
+        loop(LoopMode.QUEUE);
+        for (int i = 0; i < AudioPlayer.MAX_HISTORY + 10; i++) {
+            finishPlayingTrack();
+        }
+
+        for (int i = 0; i < AudioPlayer.MAX_HISTORY; i++) {
+            player.previous(new Request("req-" + i, "@user"));
+            assertThat(eventDispatcher.getLastEvent()).isInstanceOf(MusicPlayerEvent.WentBack.class);
+        }
+        player.previous(new Request("req-last", "@user"));
+
+        assertThat(eventDispatcher.getLastEvent()).isInstanceOf(MusicPlayerEvent.NothingToGoBack.class);
+    }
+
+    @Test
     void repeatsSingleTrackInQueueMode() {
         InMemoryTrack song = track("Song A", 120_000);
         engine.play(song);
