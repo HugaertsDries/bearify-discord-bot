@@ -1,6 +1,7 @@
 package com.bearify.controller.music.discord;
 
 import com.bearify.controller.format.BearifyEmoji;
+import com.bearify.controller.music.domain.MusicPlayer;
 import com.bearify.controller.music.domain.MusicPlayerEventListener;
 import com.bearify.controller.music.domain.MusicPlayerPool;
 import com.bearify.controller.music.domain.Timestamp;
@@ -115,68 +116,44 @@ public class MusicPlayerCommandController {
     @SuppressWarnings("unused")
     @Interaction(value = "pause", description = "I'll pause/continue the current track")
     public void pause(CommandInteraction interaction) {
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.togglePause(interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onPaused() {
-                                    answer(pausedMessage());
-                                }
+        withPlayer(interaction, (player, message) -> player.togglePause(interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onPaused() {
+                answer(pausedMessage());
+            }
 
-                                @Override
-                                public void onResumed() {
-                                    answer(resumedMessage());
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+            @Override
+            public void onResumed() {
+                answer(resumedMessage());
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
     @Interaction(value = "previous", description = "I'll go back to the previous track")
     public void previous(CommandInteraction interaction) {
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.previous(interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onWentBack() {
-                                    answer(previousMessage());
-                                }
+        withPlayer(interaction, (player, message) -> player.previous(interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onWentBack() {
+                answer(previousMessage());
+            }
 
-                                @Override
-                                public void onRestarted() {
-                                    answer(restartedMessage());
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+            @Override
+            public void onRestarted() {
+                answer(restartedMessage());
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
     @Interaction(value = "next", description = "I'll skip the current song")
     public void next(CommandInteraction interaction) {
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.next(interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onSkipped() {
-                                    answer(nextMessage());
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+        withPlayer(interaction, (player, message) -> player.next(interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onSkipped() {
+                answer(nextMessage());
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
@@ -187,20 +164,12 @@ public class MusicPlayerCommandController {
             interaction.reply(NEGATIVE_REWIND_MESSAGE).ephemeral().send();
             return;
         }
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.rewind(Duration.ofSeconds(seconds), interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onRewound(Duration seek) {
-                                    answer(rewoundMessage(seek));
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+        withPlayer(interaction, (player, message) -> player.rewind(Duration.ofSeconds(seconds), interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onRewound(Duration seek) {
+                answer(rewoundMessage(seek));
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
@@ -211,25 +180,17 @@ public class MusicPlayerCommandController {
             interaction.reply(NEGATIVE_FORWARD_MESSAGE).ephemeral().send();
             return;
         }
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.forward(Duration.ofSeconds(seconds), interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onForwarded(Duration seek) {
-                                    answer(forwardedMessage(seek));
-                                }
+        withPlayer(interaction, (player, message) -> player.forward(Duration.ofSeconds(seconds), interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onForwarded(Duration seek) {
+                answer(forwardedMessage(seek));
+            }
 
-                                @Override
-                                public void onSkipped() {
-                                    answer(nextMessage());
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+            @Override
+            public void onSkipped() {
+                answer(nextMessage());
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
@@ -241,44 +202,28 @@ public class MusicPlayerCommandController {
             interaction.reply(TIME_FORMAT_MESSAGE).ephemeral().send();
             return;
         }
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.jump(position.get(), interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onJumped(Duration jumpedTo) {
-                                    answer(jumpedMessage(jumpedTo));
-                                }
+        withPlayer(interaction, (player, message) -> player.jump(position.get(), interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onJumped(Duration jumpedTo) {
+                answer(jumpedMessage(jumpedTo));
+            }
 
-                                @Override
-                                public void onJumpOutOfRange(Duration trackLength) {
-                                    answer(trackTooShortMessage(trackLength));
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+            @Override
+            public void onJumpOutOfRange(Duration trackLength) {
+                answer(trackTooShortMessage(trackLength));
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
     @Interaction(value = "clear", description = "I'll clear the current playlist. (I'm not responsible for losing friends)")
     public void clear(CommandInteraction interaction) {
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.clear(interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onCleared() {
-                                    answer(clearedMessage());
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+        withPlayer(interaction, (player, message) -> player.clear(interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onCleared() {
+                answer(clearedMessage());
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
@@ -290,44 +235,28 @@ public class MusicPlayerCommandController {
             interaction.reply(PICK_A_TRACK_MESSAGE).ephemeral().send();
             return;
         }
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.remove(picked.get().position(), picked.get().uriPrefix(), interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onRemoved(TrackMetadata removed) {
-                                    answer(removedMessage(removed));
-                                }
+        withPlayer(interaction, (player, message) -> player.remove(picked.get().position(), picked.get().uriPrefix(), interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onRemoved(TrackMetadata removed) {
+                answer(removedMessage(removed));
+            }
 
-                                @Override
-                                public void onTrackNotInQueue() {
-                                    answer(TRACK_NOT_IN_QUEUE_MESSAGE);
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+            @Override
+            public void onTrackNotInQueue() {
+                answer(TRACK_NOT_IN_QUEUE_MESSAGE);
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
     @Interaction(value = "shuffle", description = "I'll mix up the queue")
     public void shuffle(CommandInteraction interaction) {
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.shuffle(interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onShuffled(int count) {
-                                    answer(count == 0 ? NOTHING_TO_SHUFFLE_MESSAGE : shuffledMessage(count));
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+        withPlayer(interaction, (player, message) -> player.shuffle(interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onShuffled(int count) {
+                answer(count == 0 ? NOTHING_TO_SHUFFLE_MESSAGE : shuffledMessage(count));
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
@@ -338,20 +267,12 @@ public class MusicPlayerCommandController {
             interaction.reply(VOLUME_OUT_OF_RANGE_MESSAGE).ephemeral().send();
             return;
         }
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.setVolume(level, interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onVolumeChanged(int volume) {
-                                    answer(volumeMessage(volume));
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+        withPlayer(interaction, (player, message) -> player.setVolume(level, interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onVolumeChanged(int volume) {
+                answer(volumeMessage(volume));
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
@@ -365,38 +286,35 @@ public class MusicPlayerCommandController {
             interaction.reply(LOOP_MODE_MESSAGE).ephemeral().send();
             return;
         }
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            player.setLoop(loopMode.get(), interaction.getUserMention(), new AnsweringListener(message::edit) {
-                                @Override
-                                public void onLoopModeChanged(LoopMode changed) {
-                                    answer(loopMessage(changed));
-                                }
-                            });
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+        withPlayer(interaction, (player, message) -> player.setLoop(loopMode.get(), interaction.getUserMention(), new AnsweringListener(message::edit) {
+            @Override
+            public void onLoopModeChanged(LoopMode changed) {
+                answer(loopMessage(changed));
+            }
+        }));
     }
 
     @SuppressWarnings("unused")
     @Interaction(value = "queue", description = "I'll show you everything that's coming up on the trail")
     public void queue(CommandInteraction interaction) {
-        requireVoiceSession(interaction).ifPresent(ctx ->
-                pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
-                        player -> {
-                            EditableMessage message = interaction.defer(true);
-                            switch (QueueCard.wholeQueue(player.queue())) {
-                                case QueueCard.Text text -> message.edit(text.text());
-                                // someone may still be reading the queue, so it stays until they dismiss it
-                                case QueueCard.Card card -> message.keep().edit(card.message());
-                            }
-                        },
-                        () -> replyNoPlayer(interaction)
-                )
-        );
+        withPlayer(interaction, (player, message) -> {
+            switch (QueueCard.wholeQueue(player.queue())) {
+                case QueueCard.Text text -> message.edit(text.text());
+                // someone may still be reading the queue, so it stays until they dismiss it
+                case QueueCard.Card card -> message.keep().edit(card.message());
+            }
+        });
+    }
+
+    /** Sends a control to the bear in the caller's voice channel and answers privately, or says there is no bear. */
+    private void withPlayer(CommandInteraction interaction, PlayerControl control) {
+        requireVoiceSession(interaction).ifPresent(ctx -> pool.find(ctx.guildId(), ctx.voiceChannelId()).ifPresentOrElse(
+                player -> control.send(player, interaction.defer(true)),
+                () -> replyNoPlayer(interaction)));
+    }
+
+    private interface PlayerControl {
+        void send(MusicPlayer player, EditableMessage message);
     }
 
     private void replyNoPlayer(CommandInteraction interaction) {
